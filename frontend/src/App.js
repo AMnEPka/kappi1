@@ -234,38 +234,46 @@ const HostsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {hosts.map((host) => (
-          <Card key={host.id} data-testid={`host-card-${host.id}`}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Server className="h-5 w-5" />
-                    {host.name}
-                  </CardTitle>
-                  <CardDescription>{host.hostname}:{host.port}</CardDescription>
+        {hosts.length === 0 ? (
+          <div className="col-span-full text-center py-16">
+            <Server className="h-16 w-16 mx-auto text-slate-300 mb-4" />
+            <p className="text-slate-500 text-lg mb-2">Нет добавленных хостов</p>
+            <p className="text-slate-400 text-sm">Добавьте первый хост для начала работы</p>
+          </div>
+        ) : (
+          hosts.map((host) => (
+            <Card key={host.id} data-testid={`host-card-${host.id}`}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Server className="h-5 w-5" />
+                      {host.name}
+                    </CardTitle>
+                    <CardDescription>{host.hostname}:{host.port}</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(host)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(host.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => openEditDialog(host)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(host.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div>Пользователь: <strong>{host.username}</strong></div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
+                    <Badge variant="outline">{host.os_type === "linux" ? "Linux" : "Windows"}</Badge>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div>Пользователь: <strong>{host.username}</strong></div>
-                <div className="flex gap-2">
-                  <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
-                  <Badge variant="outline">{host.os_type === "linux" ? "Linux" : "Windows"}</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
