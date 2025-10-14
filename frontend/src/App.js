@@ -507,7 +507,7 @@ const ExecutePage = () => {
   };
 
   const toggleAll = () => {
-    if (selectedHosts.length === hosts.length) {
+    if (selectedHosts.length === hosts.length && hosts.length > 0) {
       setSelectedHosts([]);
     } else {
       setSelectedHosts(hosts.map(h => h.id));
