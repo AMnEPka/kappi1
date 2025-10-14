@@ -523,26 +523,34 @@ const ExecutePage = () => {
           <CardTitle>Выберите скрипт</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedScript} onValueChange={setSelectedScript}>
-            <SelectTrigger data-testid="select-script">
-              <SelectValue placeholder="Выберите скрипт..." />
-            </SelectTrigger>
-            <SelectContent>
-              {scripts.map((script) => (
-                <SelectItem key={script.id} value={script.id}>
-                  {script.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          {selectedScript && (
-            <div className="mt-4">
-              <Label>Содержимое скрипта:</Label>
-              <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto mt-2">
-                {scripts.find(s => s.id === selectedScript)?.content}
-              </pre>
+          {scripts.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              Нет доступных скриптов. Создайте скрипты на странице "Скрипты".
             </div>
+          ) : (
+            <>
+              <Select value={selectedScript} onValueChange={setSelectedScript}>
+                <SelectTrigger data-testid="select-script">
+                  <SelectValue placeholder="Выберите скрипт..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {scripts.map((script) => (
+                    <SelectItem key={script.id} value={script.id}>
+                      {script.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {selectedScript && (
+                <div className="mt-4">
+                  <Label>Содержимое скрипта:</Label>
+                  <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto mt-2">
+                    {scripts.find(s => s.id === selectedScript)?.content}
+                  </pre>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
