@@ -419,36 +419,44 @@ const ScriptsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {scripts.map((script) => (
-          <Card key={script.id} data-testid={`script-card-${script.id}`}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileCode className="h-5 w-5" />
-                    {script.name}
-                  </CardTitle>
-                  {script.description && (
-                    <CardDescription>{script.description}</CardDescription>
-                  )}
+        {scripts.length === 0 ? (
+          <div className="col-span-full text-center py-16">
+            <FileCode className="h-16 w-16 mx-auto text-slate-300 mb-4" />
+            <p className="text-slate-500 text-lg mb-2">Нет созданных скриптов</p>
+            <p className="text-slate-400 text-sm">Создайте первый скрипт для выполнения на хостах</p>
+          </div>
+        ) : (
+          scripts.map((script) => (
+            <Card key={script.id} data-testid={`script-card-${script.id}`}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileCode className="h-5 w-5" />
+                      {script.name}
+                    </CardTitle>
+                    {script.description && (
+                      <CardDescription>{script.description}</CardDescription>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(script)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(script.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => openEditDialog(script)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(script.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto max-h-40">
-                {script.content}
-              </pre>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent>
+                <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto max-h-40">
+                  {script.content}
+                </pre>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
