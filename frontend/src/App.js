@@ -551,27 +551,35 @@ const ExecutePage = () => {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Выберите хосты</CardTitle>
-            <Button variant="outline" size="sm" onClick={toggleAll}>
-              {selectedHosts.length === hosts.length ? "Снять все" : "Выбрать все"}
-            </Button>
+            {hosts.length > 0 && (
+              <Button variant="outline" size="sm" onClick={toggleAll} data-testid="toggle-all-hosts">
+                {selectedHosts.length === hosts.length ? "Снять все" : "Выбрать все"}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {hosts.map((host) => (
-              <div key={host.id} className="flex items-center space-x-3 p-3 border rounded hover:bg-slate-50">
-                <Checkbox
-                  data-testid={`host-checkbox-${host.id}`}
-                  checked={selectedHosts.includes(host.id)}
-                  onCheckedChange={() => toggleHost(host.id)}
-                />
-                <div className="flex-1">
-                  <div className="font-semibold">{host.name}</div>
-                  <div className="text-sm text-slate-600">{host.hostname}:{host.port} ({host.os_type})</div>
+          {hosts.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              Нет доступных хостов. Добавьте хосты на странице "Хосты".
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {hosts.map((host) => (
+                <div key={host.id} className="flex items-center space-x-3 p-3 border rounded hover:bg-slate-50">
+                  <Checkbox
+                    data-testid={`host-checkbox-${host.id}`}
+                    checked={selectedHosts.includes(host.id)}
+                    onCheckedChange={() => toggleHost(host.id)}
+                  />
+                  <div className="flex-1">
+                    <div className="font-semibold">{host.name}</div>
+                    <div className="text-sm text-slate-600">{host.hostname}:{host.port} ({host.os_type})</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
