@@ -644,58 +644,66 @@ const HistoryPage = () => {
       <h1 className="text-3xl font-bold">История выполнений</h1>
       
       <div className="space-y-4">
-        {executions.map((execution) => (
-          <Card key={execution.id} data-testid={`execution-card-${execution.id}`}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Terminal className="h-5 w-5" />
-                    {execution.script_name}
-                  </CardTitle>
-                  <CardDescription>
-                    {new Date(execution.created_at).toLocaleString('ru-RU')}
-                  </CardDescription>
-                </div>
-                <Badge>
-                  {execution.results.filter(r => r.success).length}/{execution.results.length} успешно
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {execution.results.map((result, idx) => (
-                  <div key={idx} className="border rounded p-3">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="font-semibold">{result.host_name}</div>
-                      <Badge variant={result.success ? "default" : "destructive"}>
-                        {result.success ? "Успех" : "Ошибка"}
-                      </Badge>
-                    </div>
-                    
-                    {result.output && (
-                      <div>
-                        <Label className="text-xs">Вывод:</Label>
-                        <pre className="bg-slate-900 text-slate-100 p-2 rounded text-xs overflow-x-auto mt-1 max-h-40">
-                          {result.output}
-                        </pre>
-                      </div>
-                    )}
-                    
-                    {result.error && (
-                      <div className="mt-2">
-                        <Label className="text-xs text-red-600">Ошибка:</Label>
-                        <pre className="bg-red-50 text-red-800 p-2 rounded text-xs overflow-x-auto mt-1">
-                          {result.error}
-                        </pre>
-                      </div>
-                    )}
+        {executions.length === 0 ? (
+          <div className="text-center py-16">
+            <History className="h-16 w-16 mx-auto text-slate-300 mb-4" />
+            <p className="text-slate-500 text-lg mb-2">История выполнений пуста</p>
+            <p className="text-slate-400 text-sm">Выполните скрипт для просмотра результатов</p>
+          </div>
+        ) : (
+          executions.map((execution) => (
+            <Card key={execution.id} data-testid={`execution-card-${execution.id}`}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Terminal className="h-5 w-5" />
+                      {execution.script_name}
+                    </CardTitle>
+                    <CardDescription>
+                      {new Date(execution.created_at).toLocaleString('ru-RU')}
+                    </CardDescription>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  <Badge>
+                    {execution.results.filter(r => r.success).length}/{execution.results.length} успешно
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {execution.results.map((result, idx) => (
+                    <div key={idx} className="border rounded p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-semibold">{result.host_name}</div>
+                        <Badge variant={result.success ? "default" : "destructive"}>
+                          {result.success ? "Успех" : "Ошибка"}
+                        </Badge>
+                      </div>
+                      
+                      {result.output && (
+                        <div>
+                          <Label className="text-xs">Вывод:</Label>
+                          <pre className="bg-slate-900 text-slate-100 p-2 rounded text-xs overflow-x-auto mt-1 max-h-40">
+                            {result.output}
+                          </pre>
+                        </div>
+                      )}
+                      
+                      {result.error && (
+                        <div className="mt-2">
+                          <Label className="text-xs text-red-600">Ошибка:</Label>
+                          <pre className="bg-red-50 text-red-800 p-2 rounded text-xs overflow-x-auto mt-1">
+                            {result.error}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
