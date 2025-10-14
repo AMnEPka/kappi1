@@ -1,0 +1,142 @@
+{
+  "summary": {
+    "tests_run": 22,
+    "tests_passed": 21,
+    "success_rate": 95.45454545454545,
+    "timestamp": "2025-10-14T09:36:37.089335"
+  },
+  "results": [
+    {
+      "test": "Backend connectivity",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.100958"
+    },
+    {
+      "test": "Create Linux host with password",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.168011"
+    },
+    {
+      "test": "Create Windows host with SSH key",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.211561"
+    },
+    {
+      "test": "Get all hosts",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.252033"
+    },
+    {
+      "test": "Verify hosts count (found 2)",
+      "success": true,
+      "details": "",
+      "timestamp": "2025-10-14T09:36:26.252690"
+    },
+    {
+      "test": "Get specific host by ID",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.289595"
+    },
+    {
+      "test": "Update host",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.324196"
+    },
+    {
+      "test": "Delete host",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.402323"
+    },
+    {
+      "test": "Create bash script",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.451400"
+    },
+    {
+      "test": "Create second script",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.488229"
+    },
+    {
+      "test": "Get all scripts",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.565568"
+    },
+    {
+      "test": "Verify scripts count (found 2)",
+      "success": true,
+      "details": "",
+      "timestamp": "2025-10-14T09:36:26.566314"
+    },
+    {
+      "test": "Get specific script by ID",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.640674"
+    },
+    {
+      "test": "Update script",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.678380"
+    },
+    {
+      "test": "Delete script",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:26.713384"
+    },
+    {
+      "test": "Execute script on host",
+      "success": false,
+      "details": "Exception: HTTPSConnectionPool(host='bash-runner-web.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)",
+      "timestamp": "2025-10-14T09:36:36.750647"
+    },
+    {
+      "test": "Get executions history",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-14T09:36:36.807175"
+    },
+    {
+      "test": "Executions history available",
+      "success": true,
+      "details": "Found 1 executions",
+      "timestamp": "2025-10-14T09:36:36.807776"
+    },
+    {
+      "test": "Get non-existent host",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-10-14T09:36:36.852412"
+    },
+    {
+      "test": "Get non-existent script",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-10-14T09:36:36.886969"
+    },
+    {
+      "test": "Create host with missing fields",
+      "success": true,
+      "details": "Status: 422",
+      "timestamp": "2025-10-14T09:36:36.921989"
+    },
+    {
+      "test": "Create script with missing fields",
+      "success": true,
+      "details": "Status: 422",
+      "timestamp": "2025-10-14T09:36:37.009906"
+    }
+  ]
+}
