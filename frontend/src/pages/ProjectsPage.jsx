@@ -22,11 +22,7 @@ export default function ProjectsPage({ onNavigate }) {
       setProjects(response.data);
     } catch (error) {
       console.error('Error fetching projects:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить проекты",
-        variant: "destructive",
-      });
+      toast.error("Ошибка загрузки проектов");
     } finally {
       setLoading(false);
     }
