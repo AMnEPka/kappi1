@@ -158,6 +158,48 @@ class ScriptUpdate(BaseModel):
     content: Optional[str] = None
     order: Optional[int] = None
 
+# Project Models
+class Project(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    status: str = "draft"  # draft, running, completed, failed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+
+# Project Task Models
+class ProjectTask(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    project_id: str
+    host_id: str
+    system_id: str
+    script_ids: List[str]
+    status: str = "pending"  # pending, running, completed, failed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProjectTaskCreate(BaseModel):
+    host_id: str
+    system_id: str
+    script_ids: List[str]
+
+class ProjectTaskUpdate(BaseModel):
+    script_ids: Optional[List[str]] = None
+    status: Optional[str] = None
+
 class ExecutionResult(BaseModel):
     host_id: str
     host_name: str
@@ -166,13 +208,21 @@ class ExecutionResult(BaseModel):
     error: Optional[str] = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Updated Execution Model
 class Execution(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    project_id: Optional[str] = None  # NEW: Link to project
+    project_task_id: Optional[str] = None  # NEW: Link to task
+    host_id: str
+    system_id: str
     script_id: str
     script_name: str
-    host_ids: List[str]
+    success: bool
+    output: str
+    error: Optional[str] = None
+    executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     results: List[Dict[str, Any]]
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
