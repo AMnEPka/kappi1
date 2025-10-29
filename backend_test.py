@@ -295,6 +295,54 @@ class SSHRunnerAPITester:
             if response.get('status') == 'draft':
                 self.log_test("Project created with draft status", True, "")
             else:
+    def test_project_cascade_delete(self):
+        """Test project cascade delete functionality"""
+        print("\n🔍 Testing Project Cascade Delete...")
+        
+        if len(self.created_projects) < 2:
+            self.log_test("Skip cascade delete test", False, "Need at least 2 projects")
+            return
+
+        # Use the second project for deletion test
+        project_to_delete = self.created_projects[1]
+        
+        # First, verify project exists and has tasks if we created any for it
+        success, response = self.run_test(
+            "Verify project exists before delete",
+            "GET", f"projects/{project_to_delete}", 200
+        )
+        
+        if not success:
+            self.log_test("Skip cascade delete", False, "Project doesn't exist")
+            return
+
+        # Delete the project
+        success, response = self.run_test(
+            "Delete project (cascade delete)",
+            "DELETE", f"projects/{project_to_delete}", 200
+        )
+        
+        if success:
+            self.created_projects.remove(project_to_delete)
+            
+            # Verify project is deleted
+            self.run_test(
+                "Verify project deleted",
+                "GET", f"projects/{project_to_delete}", 404
+            )
+            
+            # Verify associated tasks are deleted
+            success, response = self.run_test(
+                "Verify project tasks deleted",
+                "GET", f"projects/{project_to_delete}/tasks", 404
+            )
+            
+            # Verify associated executions are deleted (if any existed)
+            success, response = self.run_test(
+                "Verify project executions cleaned up",
+                "GET", f"projects/{project_to_delete}/executions", 404
+            )
+
                 self.log_test("Project created with draft status", False, f"Got status: {response.get('status')}")
         else:
             self.log_test("Project creation failed", False, "Cannot proceed with project tests")
