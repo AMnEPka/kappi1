@@ -4,29 +4,58 @@ import "@/index.css";
 import App from "@/App";
 import { Toaster } from "@/components/ui/sonner";
 
-// Suppress ResizeObserver errors (known Radix UI issue)
-// More aggressive approach to catch all ResizeObserver errors
+// ============================================
+// Comprehensive ResizeObserver error suppression
+// ============================================
+
+// Method 1: Error event listener with capture
 window.addEventListener('error', e => {
-  if (e.message === 'ResizeObserver loop completed with undelivered notifications.' || 
-      e.message === 'ResizeObserver loop limit exceeded') {
+  if (e.message && (
+    e.message.includes('ResizeObserver loop') ||
+    e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
+    e.message === 'ResizeObserver loop limit exceeded'
+  )) {
     e.stopImmediatePropagation();
     e.preventDefault();
-    return true;
+    return false;
   }
-}, true); // Use capture phase
+}, true);
 
-// Additional safety net - override console.error temporarily
-const _consoleError = console.error;
-console.error = (...args) => {
+// Method 2: Override console.error
+const originalConsoleError = console.error;
+console.error = function(...args) {
+  const firstArg = args[0];
   if (
-    typeof args[0] === 'string' &&
-    (args[0].includes('ResizeObserver loop') || 
-     args[0].includes('ResizeObserver loop completed'))
+    typeof firstArg === 'string' &&
+    (firstArg.includes('ResizeObserver loop') ||
+     firstArg.includes('ResizeObserver loop completed'))
   ) {
-    return; // Suppress ResizeObserver errors in console
+    return; // Suppress
   }
-  _consoleError.apply(console, args);
+  originalConsoleError.apply(console, args);
 };
+
+// Method 3: Wrap ResizeObserver constructor
+if (typeof window !== 'undefined' && window.ResizeObserver) {
+  const OriginalResizeObserver = window.ResizeObserver;
+  
+  window.ResizeObserver = class extends OriginalResizeObserver {
+    constructor(callback) {
+      super((entries, observer) => {
+        window.requestAnimationFrame(() => {
+          try {
+            callback(entries, observer);
+          } catch (e) {
+            // Suppress ResizeObserver errors
+            if (!e.message.includes('ResizeObserver loop')) {
+              throw e;
+            }
+          }
+        });
+      });
+    }
+  };
+}
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
