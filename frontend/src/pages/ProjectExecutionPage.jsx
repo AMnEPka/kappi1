@@ -126,11 +126,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
     } catch (error) {
       console.error('Error starting execution:', error);
       setExecuting(false);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось запустить выполнение",
-        variant: "destructive",
-      });
+      toast.error("Не удалось запустить выполнение");
     }
   };
 
