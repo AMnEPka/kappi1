@@ -223,12 +223,10 @@ class Execution(BaseModel):
     output: str
     error: Optional[str] = None
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    results: List[Dict[str, Any]]
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class ExecuteRequest(BaseModel):
-    script_id: str
-    host_ids: List[str]
+class ExecuteProjectRequest(BaseModel):
+    """Request to execute a project"""
+    project_id: str
 
 
 # SSH Execution Function
