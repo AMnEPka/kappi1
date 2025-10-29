@@ -699,6 +699,14 @@ class SSHRunnerAPITester:
         """Clean up created test data"""
         print("\n🧹 Cleaning up test data...")
         
+        # Delete created projects (this should cascade delete tasks and executions)
+        for project_id in self.created_projects:
+            try:
+                requests.delete(f"{self.api_url}/projects/{project_id}", timeout=5)
+                print(f"Deleted project: {project_id}")
+            except:
+                pass
+        
         # Delete created hosts
         for host_id in self.created_hosts:
             try:
@@ -712,6 +720,22 @@ class SSHRunnerAPITester:
             try:
                 requests.delete(f"{self.api_url}/scripts/{script_id}", timeout=5)
                 print(f"Deleted script: {script_id}")
+            except:
+                pass
+        
+        # Delete created systems
+        for system_id in self.created_systems:
+            try:
+                requests.delete(f"{self.api_url}/systems/{system_id}", timeout=5)
+                print(f"Deleted system: {system_id}")
+            except:
+                pass
+        
+        # Delete created categories
+        for category_id in self.created_categories:
+            try:
+                requests.delete(f"{self.api_url}/categories/{category_id}", timeout=5)
+                print(f"Deleted category: {category_id}")
             except:
                 pass
 
