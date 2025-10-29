@@ -144,7 +144,9 @@ export default function ProjectWizard({ onNavigate }) {
 
   const canProceedToStep4 = () => {
     return projectData.tasks.every(
-      task => task.system_id && task.script_ids.length > 0
+      task => task.systems.length > 0 && task.systems.every(
+        sys => sys.system_id && sys.script_ids.length > 0
+      )
     );
   };
 
