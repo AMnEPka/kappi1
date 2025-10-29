@@ -741,7 +741,7 @@ class SSHRunnerAPITester:
 
     def run_all_tests(self):
         """Run all tests"""
-        print(f"🚀 Starting SSH Script Runner API Tests")
+        print(f"🚀 Starting SSH Script Runner API Tests - Phase 2 Project System")
         print(f"Backend URL: {self.base_url}")
         print("=" * 60)
         
@@ -756,10 +756,23 @@ class SSHRunnerAPITester:
                 print("❌ Cannot connect to backend, stopping tests")
                 return False
             
+            # Setup test data first
+            if not self.setup_test_data():
+                print("❌ Failed to setup test data, stopping tests")
+                return False
+            
             # Run all test suites
             self.test_hosts_crud()
-            self.test_scripts_crud() 
-            self.test_execution_api()
+            self.test_scripts_crud()
+            
+            # NEW: Project system tests
+            self.test_projects_crud()
+            self.test_project_tasks()
+            self.test_project_execution_sse()
+            self.test_project_executions_results()
+            self.test_legacy_execute_endpoint()
+            self.test_project_cascade_delete()
+            
             self.test_error_cases()
             
         except KeyboardInterrupt:
