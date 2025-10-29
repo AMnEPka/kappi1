@@ -16,7 +16,7 @@ const API = `${BACKEND_URL}/api`;
 const SystemsPage = () => {
   const [systems, setSystems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSystem, setEditingSystem] = useState(null);
   const [formData, setFormData] = useState({
