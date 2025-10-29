@@ -942,8 +942,7 @@ function App() {
             <Route path="/scripts" element={<ScriptsPage />} />
             <Route path="/execute" element={<ExecutePage />} />
             <Route path="/history" element={<HistoryPage />} />
-            <Route path="/admin/categories" element={<CategoriesPage />} />
-            <Route path="/admin/systems" element={<SystemsPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </Layout>
       </BrowserRouter>
