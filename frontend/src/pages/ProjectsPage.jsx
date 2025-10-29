@@ -105,7 +105,7 @@ export default function ProjectsPage({ onNavigate }) {
                       <CardDescription>{project.description}</CardDescription>
                     )}
                   </div>
-                  {getStatusBadge(project.status)}
+                  {project.status !== 'draft' && getStatusBadge(project.status)}
                 </div>
               </CardHeader>
               <CardContent>
