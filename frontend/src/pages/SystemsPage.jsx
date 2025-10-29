@@ -115,10 +115,6 @@ const SystemsPage = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Системы</h1>
-          <p className="text-slate-500 mt-1">Управление конкретными системами и программами</p>
-        </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);
           if (!open) resetForm();
