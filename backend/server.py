@@ -137,20 +137,26 @@ class Script(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    system_id: str  # ОБЯЗАТЕЛЬНАЯ связь с системой
     name: str
     description: Optional[str] = None
     content: str
+    order: int = 0  # Порядок отображения
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ScriptCreate(BaseModel):
+    system_id: str
     name: str
     description: Optional[str] = None
     content: str
+    order: int = 0
 
 class ScriptUpdate(BaseModel):
+    system_id: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
+    order: Optional[int] = None
 
 class ExecutionResult(BaseModel):
     host_id: str
