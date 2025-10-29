@@ -119,11 +119,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         setExecuting(false);
         
         if (logs.length === 0) {
-          toast({
-            title: "Ошибка подключения",
-            description: "Не удалось подключиться к серверу",
-            variant: "destructive",
-          });
+          toast.error("Не удалось подключиться к серверу");
         }
       };
 
