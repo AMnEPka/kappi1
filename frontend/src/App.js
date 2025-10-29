@@ -339,9 +339,9 @@ const ScriptsPage = () => {
   const fetchScripts = async () => {
     try {
       let url = `${API}/scripts`;
-      if (selectedSystem) {
+      if (selectedSystem && selectedSystem !== "all") {
         url += `?system_id=${selectedSystem}`;
-      } else if (selectedCategory) {
+      } else if (selectedCategory && selectedCategory !== "all") {
         url += `?category_id=${selectedCategory}`;
       }
       const response = await axios.get(url);
