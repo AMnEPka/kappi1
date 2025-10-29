@@ -256,10 +256,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Project execution page with real-time monitoring"
-    - "Project results page"
-    - "Navigation and routing for projects"
-  stuck_tasks: []
+    - "Project creation wizard (multi-step)"
+  stuck_tasks:
+    - "Project creation wizard (multi-step)"
   test_all: false
   test_priority: "high_first"
 
