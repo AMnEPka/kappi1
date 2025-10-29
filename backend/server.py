@@ -949,16 +949,8 @@ async def execute_script(execute_req: ExecuteRequest):
 @api_router.get("/executions", response_model=List[Execution])
 async def get_executions():
     """Get all executions"""
-    executions = await db.executions.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    
-    for execution in executions:
-        parse_from_mongo(execution)
-        # Parse timestamps in results
-        for result in execution.get('results', []):
-            if isinstance(result.get('timestamp'), str):
-                result['timestamp'] = datetime.fromisoformat(result['timestamp'])
-    
-    return [Execution(**execution) for execution in executions]
+    executions = await db.executions.find({}, {"_id": 0}).sort("executed_at", -1).to_list(1000)
+    return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
 @api_router.get("/executions/{execution_id}", response_model=Execution)
 async def get_execution(execution_id: str):
@@ -967,12 +959,7 @@ async def get_execution(execution_id: str):
     if not execution:
         raise HTTPException(status_code=404, detail="Выполнение не найдено")
     
-    parse_from_mongo(execution)
-    for result in execution.get('results', []):
-        if isinstance(result.get('timestamp'), str):
-            result['timestamp'] = datetime.fromisoformat(result['timestamp'])
-    
-    return Execution(**execution)
+    return Execution(**parse_from_mongo(execution))
 
 
 # Include the router in the main app
