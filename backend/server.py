@@ -470,17 +470,52 @@ async def delete_system(system_id: str):
 @api_router.post("/scripts", response_model=Script)
 async def create_script(script_input: ScriptCreate):
     """Create new script"""
+    # Verify system exists
+    system = await db.systems.find_one({"id": script_input.system_id})
+    if not system:
+        raise HTTPException(status_code=404, detail="Система не найдена")
+    
     script_obj = Script(**script_input.model_dump())
     doc = prepare_for_mongo(script_obj.model_dump())
     
     await db.scripts.insert_one(doc)
     return script_obj
 
-@api_router.get("/scripts", response_model=List[Script])
-async def get_scripts():
-    """Get all scripts"""
-    scripts = await db.scripts.find({}, {"_id": 0}).to_list(1000)
-    return [Script(**parse_from_mongo(script)) for script in scripts]
+@api_router.get("/scripts")
+async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str] = None):
+    """Get all scripts with filtering options"""
+    query = {}
+    
+    if system_id:
+        query["system_id"] = system_id
+    elif category_id:
+        # Find all systems in this category
+        systems = await db.systems.find({"category_id": category_id}, {"_id": 0}).to_list(1000)
+        system_ids = [sys["id"] for sys in systems]
+        query["system_id"] = {"$in": system_ids}
+    
+    scripts = await db.scripts.find(query, {"_id": 0}).sort("order", 1).to_list(1000)
+    
+    # Enrich with system and category info
+    enriched_scripts = []
+    for script in scripts:
+        script_data = parse_from_mongo(script)
+        
+        # Get system info
+        system = await db.systems.find_one({"id": script_data["system_id"]}, {"_id": 0})
+        if system:
+            script_data["system_name"] = system["name"]
+            script_data["system_os_type"] = system["os_type"]
+            
+            # Get category info
+            category = await db.categories.find_one({"id": system["category_id"]}, {"_id": 0})
+            if category:
+                script_data["category_name"] = category["name"]
+                script_data["category_icon"] = category.get("icon", "📁")
+        
+        enriched_scripts.append(script_data)
+    
+    return enriched_scripts
 
 @api_router.get("/scripts/{script_id}", response_model=Script)
 async def get_script(script_id: str):
