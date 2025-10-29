@@ -46,7 +46,7 @@ const SystemsPage = () => {
 
   const fetchSystems = async () => {
     try {
-      const url = selectedCategoryFilter 
+      const url = selectedCategoryFilter && selectedCategoryFilter !== "all"
         ? `${API}/systems?category_id=${selectedCategoryFilter}`
         : `${API}/systems`;
       const response = await axios.get(url);
