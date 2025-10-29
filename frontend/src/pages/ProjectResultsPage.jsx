@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { ChevronLeft, CheckCircle, XCircle, Eye } from "lucide-react";
-import { useToast } from "../hooks/use-toast";
+import { toast } from "sonner";
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
