@@ -278,13 +278,8 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
                 timeout=10
             )
         
-        # Execute command based on OS type
-        if host.os_type == "windows":
-            # For Windows, use cmd or powershell
-            exec_command = f"cmd /c {command}"
-        else:
-            # For Linux, use bash
-            exec_command = f"bash -c '{command}'"
+        # Execute command with bash
+        exec_command = f"bash -c '{command}'"
         
         stdin, stdout, stderr = ssh.exec_command(exec_command, timeout=30)
         
