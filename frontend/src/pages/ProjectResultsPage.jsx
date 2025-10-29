@@ -20,7 +20,6 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [groupedExecutions, setGroupedExecutions] = useState({});
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchData();
