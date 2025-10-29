@@ -560,7 +560,7 @@ const ScriptsPage = () => {
               <SelectValue placeholder="Все категории" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Все категории</SelectItem>
+              <SelectItem value="all">Все категории</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   {cat.icon} {cat.name}
@@ -572,12 +572,12 @@ const ScriptsPage = () => {
 
         <div>
           <Label>Система</Label>
-          <Select value={selectedSystem} onValueChange={setSelectedSystem} disabled={!selectedCategory}>
+          <Select value={selectedSystem} onValueChange={setSelectedSystem} disabled={selectedCategory === "all"}>
             <SelectTrigger>
-              <SelectValue placeholder={selectedCategory ? "Все системы категории" : "Сначала выберите категорию"} />
+              <SelectValue placeholder={selectedCategory !== "all" ? "Все системы категории" : "Сначала выберите категорию"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Все системы</SelectItem>
+              <SelectItem value="all">Все системы</SelectItem>
               {systems.map((sys) => (
                 <SelectItem key={sys.id} value={sys.id}>
                   {sys.name}
