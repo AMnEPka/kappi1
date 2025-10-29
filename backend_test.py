@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-SSH Script Runner Backend API Test Suite
-Tests all CRUD operations for hosts, scripts, and executions
+SSH Script Runner Backend API Test Suite - Phase 2 Project System
+Tests all CRUD operations for hosts, scripts, executions, and the new Project system
 """
 
 import requests
 import sys
 import json
+import time
 from datetime import datetime
 from typing import Dict, List, Any
 
@@ -18,6 +19,10 @@ class SSHRunnerAPITester:
         self.tests_passed = 0
         self.created_hosts = []
         self.created_scripts = []
+        self.created_categories = []
+        self.created_systems = []
+        self.created_projects = []
+        self.created_project_tasks = []
         self.test_results = []
 
     def log_test(self, name: str, success: bool, details: str = ""):
