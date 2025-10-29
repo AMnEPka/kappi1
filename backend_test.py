@@ -272,44 +272,318 @@ class SSHRunnerAPITester:
             "PUT", f"scripts/{script_id}", 200, update_data
         )
 
-    def test_execution_api(self):
-        """Test script execution API"""
-        print("\n🔍 Testing Script Execution API...")
+    def test_projects_crud(self):
+        """Test Project CRUD operations"""
+        print("\n🔍 Testing Projects CRUD Operations...")
         
-        if not self.created_scripts or not self.created_hosts:
-            self.log_test("Skip execution test", False, "No scripts or hosts available")
+        # Test 1: Create project
+        project_data = {
+            "name": "Test Project Alpha",
+            "description": "Test project for automated testing"
+        }
+        
+        success, response = self.run_test(
+            "Create project",
+            "POST", "projects", 200, project_data
+        )
+        
+        if success and 'id' in response:
+            self.created_projects.append(response['id'])
+            project_id = response['id']
+            
+            # Verify project defaults
+            if response.get('status') == 'draft':
+                self.log_test("Project created with draft status", True, "")
+            else:
+                self.log_test("Project created with draft status", False, f"Got status: {response.get('status')}")
+        else:
+            self.log_test("Project creation failed", False, "Cannot proceed with project tests")
             return
 
-        # Test 1: Execute script on host (expect connection error - normal behavior)
+        # Test 2: Get all projects
+        success, response = self.run_test(
+            "Get all projects",
+            "GET", "projects", 200
+        )
+        
+        if success and isinstance(response, list):
+            self.log_test(f"Projects list retrieved (found {len(response)})", len(response) >= 1, "")
+
+        # Test 3: Get specific project
+        success, response = self.run_test(
+            "Get specific project by ID",
+            "GET", f"projects/{project_id}", 200
+        )
+
+        # Test 4: Update project
+        update_data = {
+            "name": "Updated Test Project Alpha",
+            "description": "Updated description for testing"
+        }
+        success, response = self.run_test(
+            "Update project",
+            "PUT", f"projects/{project_id}", 200, update_data
+        )
+
+        # Test 5: Create second project for testing
+        project_data2 = {
+            "name": "Test Project Beta",
+            "description": "Second test project"
+        }
+        
+        success, response = self.run_test(
+            "Create second project",
+            "POST", "projects", 200, project_data2
+        )
+        
+        if success and 'id' in response:
+            self.created_projects.append(response['id'])
+
+    def test_project_tasks(self):
+        """Test Project Tasks operations"""
+        print("\n🔍 Testing Project Tasks Operations...")
+        
+        if not self.created_projects or not self.created_hosts or not self.created_systems or len(self.created_scripts) < 2:
+            self.log_test("Skip project tasks test", False, "Missing required data (projects, hosts, systems, or scripts)")
+            return
+
+        project_id = self.created_projects[0]
+        host_id = self.created_hosts[0]
+        system_id = self.created_systems[0]
+        script_ids = self.created_scripts[:2]  # Use first 2 scripts
+
+        # Test 1: Create project task
+        task_data = {
+            "host_id": host_id,
+            "system_id": system_id,
+            "script_ids": script_ids
+        }
+        
+        success, response = self.run_test(
+            "Create project task",
+            "POST", f"projects/{project_id}/tasks", 200, task_data
+        )
+        
+        if success and 'id' in response:
+            self.created_project_tasks.append(response['id'])
+            task_id = response['id']
+            
+            # Verify task defaults
+            if response.get('status') == 'pending':
+                self.log_test("Task created with pending status", True, "")
+            else:
+                self.log_test("Task created with pending status", False, f"Got status: {response.get('status')}")
+        else:
+            self.log_test("Task creation failed", False, "Cannot proceed with task tests")
+            return
+
+        # Test 2: Get all tasks for project
+        success, response = self.run_test(
+            "Get project tasks",
+            "GET", f"projects/{project_id}/tasks", 200
+        )
+        
+        if success and isinstance(response, list):
+            self.log_test(f"Project tasks retrieved (found {len(response)})", len(response) >= 1, "")
+
+        # Test 3: Create second task with different scripts
+        if len(self.created_scripts) >= 3:
+            task_data2 = {
+                "host_id": host_id,
+                "system_id": system_id,
+                "script_ids": [self.created_scripts[2]]  # Use third script
+            }
+            
+            success, response = self.run_test(
+                "Create second project task",
+                "POST", f"projects/{project_id}/tasks", 200, task_data2
+            )
+            
+            if success and 'id' in response:
+                self.created_project_tasks.append(response['id'])
+
+        # Test 4: Delete project task
+        if len(self.created_project_tasks) > 1:
+            task_to_delete = self.created_project_tasks[-1]
+            success, response = self.run_test(
+                "Delete project task",
+                "DELETE", f"projects/{project_id}/tasks/{task_to_delete}", 200
+            )
+            if success:
+                self.created_project_tasks.remove(task_to_delete)
+
+    def test_project_execution_sse(self):
+        """Test Project Execution with SSE real-time updates"""
+        print("\n🔍 Testing Project Execution with SSE...")
+        
+        if not self.created_projects or not self.created_project_tasks:
+            self.log_test("Skip project execution test", False, "No projects or tasks available")
+            return
+
+        project_id = self.created_projects[0]
+
+        # Test 1: Execute project via SSE endpoint
+        try:
+            url = f"{self.api_url}/projects/{project_id}/execute"
+            headers = {
+                'Accept': 'text/event-stream',
+                'Cache-Control': 'no-cache'
+            }
+            
+            response = requests.post(url, headers=headers, stream=True, timeout=30)
+            
+            if response.status_code == 200:
+                self.log_test("Project execution SSE endpoint accessible", True, "")
+                
+                # Read SSE events
+                events_received = []
+                event_types_seen = set()
+                
+                for line in response.iter_lines(decode_unicode=True):
+                    if line.startswith('data: '):
+                        try:
+                            event_data = json.loads(line[6:])  # Remove 'data: ' prefix
+                            events_received.append(event_data)
+                            event_types_seen.add(event_data.get('type', 'unknown'))
+                            
+                            # Stop after receiving completion event or error
+                            if event_data.get('type') in ['complete', 'error']:
+                                break
+                                
+                        except json.JSONDecodeError:
+                            continue
+                    
+                    # Safety timeout - don't wait forever
+                    if len(events_received) > 50:  # Reasonable limit
+                        break
+                
+                # Verify we received expected event types
+                expected_events = {'status', 'info', 'task_start'}
+                received_expected = expected_events.intersection(event_types_seen)
+                
+                self.log_test(
+                    f"SSE events received ({len(events_received)} events)",
+                    len(events_received) > 0,
+                    f"Event types: {list(event_types_seen)}"
+                )
+                
+                self.log_test(
+                    f"Expected SSE event types received",
+                    len(received_expected) >= 2,
+                    f"Got: {list(received_expected)}, Expected: {list(expected_events)}"
+                )
+                
+                # Check if we got completion or error
+                final_events = {'complete', 'error'}.intersection(event_types_seen)
+                self.log_test(
+                    "Project execution completed",
+                    len(final_events) > 0,
+                    f"Final event types: {list(final_events)}"
+                )
+                
+            else:
+                self.log_test(
+                    "Project execution SSE endpoint",
+                    False,
+                    f"Status: {response.status_code}, Response: {response.text[:200]}"
+                )
+                
+        except requests.exceptions.Timeout:
+            self.log_test("Project execution SSE", False, "Request timeout (expected for SSH connection failures)")
+        except Exception as e:
+            self.log_test("Project execution SSE", False, f"Exception: {str(e)}")
+
+    def test_project_executions_results(self):
+        """Test Project Executions Results endpoint"""
+        print("\n🔍 Testing Project Executions Results...")
+        
+        if not self.created_projects:
+            self.log_test("Skip project executions test", False, "No projects available")
+            return
+
+        project_id = self.created_projects[0]
+
+        # Test 1: Get project execution results
+        success, response = self.run_test(
+            "Get project execution results",
+            "GET", f"projects/{project_id}/executions", 200
+        )
+        
+        if success and isinstance(response, list):
+            self.log_test(
+                f"Project executions retrieved (found {len(response)})",
+                True,  # Any number is fine, including 0
+                f"Executions count: {len(response)}"
+            )
+            
+            # If we have executions, verify structure
+            if len(response) > 0:
+                execution = response[0]
+                required_fields = ['id', 'host_id', 'system_id', 'script_id', 'success', 'output']
+                missing_fields = [field for field in required_fields if field not in execution]
+                
+                self.log_test(
+                    "Execution record structure",
+                    len(missing_fields) == 0,
+                    f"Missing fields: {missing_fields}" if missing_fields else "All required fields present"
+                )
+                
+                # Check project linkage
+                if execution.get('project_id') == project_id:
+                    self.log_test("Execution linked to project", True, "")
+                else:
+                    self.log_test("Execution linked to project", False, f"Expected: {project_id}, Got: {execution.get('project_id')}")
+
+    def test_legacy_execute_endpoint(self):
+        """Test Legacy Execute endpoint compatibility"""
+        print("\n🔍 Testing Legacy Execute Endpoint...")
+        
+        if not self.created_scripts or not self.created_hosts:
+            self.log_test("Skip legacy execute test", False, "No scripts or hosts available")
+            return
+
+        # Test 1: Execute script on host using legacy endpoint
         execute_data = {
             "script_id": self.created_scripts[0],
             "host_ids": [self.created_hosts[0]]
         }
         
         success, response = self.run_test(
-            "Execute script on host",
+            "Legacy execute script on host",
             "POST", "execute", 200, execute_data
         )
         
         # Note: This will likely fail with connection error, which is expected
-        # since we don't have real SSH servers running
         if success and 'results' in response:
             results = response['results']
-            self.log_test(f"Execution returned results", len(results) > 0, f"Got {len(results)} results")
+            self.log_test(f"Legacy execution returned results", len(results) > 0, f"Got {len(results)} results")
             
-            # Check if we got expected connection errors
+            # Check if we got expected connection errors (normal in test environment)
             for result in results:
-                if 'error' in result and 'подключения' in str(result.get('error', '')):
+                if 'error' in result and any(keyword in str(result.get('error', '')).lower() 
+                                           for keyword in ['подключения', 'connection', 'timeout', 'ssh']):
                     self.log_test("Expected connection error received", True, "SSH connection failed as expected")
+                    break
 
-        # Test 2: Get executions history
+        # Test 2: Verify execution was recorded with new model structure
         success, response = self.run_test(
-            "Get executions history",
+            "Get executions after legacy execute",
             "GET", "executions", 200
         )
         
-        if success and isinstance(response, list):
-            self.log_test(f"Executions history available", len(response) >= 0, f"Found {len(response)} executions")
+        if success and isinstance(response, list) and len(response) > 0:
+            # Find the most recent execution
+            recent_execution = response[0]  # Should be sorted by executed_at desc
+            
+            # Verify new model fields are present
+            new_model_fields = ['script_name', 'system_id']
+            present_fields = [field for field in new_model_fields if field in recent_execution]
+            
+            self.log_test(
+                "Legacy execution uses new model structure",
+                len(present_fields) == len(new_model_fields),
+                f"Present fields: {present_fields}"
+            )
 
     def test_error_cases(self):
         """Test error handling"""
