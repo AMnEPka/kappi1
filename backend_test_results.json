@@ -1,142 +1,292 @@
 {
   "summary": {
-    "tests_run": 22,
-    "tests_passed": 21,
-    "success_rate": 95.45454545454545,
-    "timestamp": "2025-10-14T09:36:37.089335"
+    "tests_run": 47,
+    "tests_passed": 41,
+    "success_rate": 87.2340425531915,
+    "timestamp": "2025-10-29T12:30:49.130018"
   },
   "results": [
     {
       "test": "Backend connectivity",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.100958"
+      "timestamp": "2025-10-29T12:30:07.140731"
+    },
+    {
+      "test": "Create test category",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.209136"
+    },
+    {
+      "test": "Create test system",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.256743"
+    },
+    {
+      "test": "Create script: System Info Script",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.302160"
+    },
+    {
+      "test": "Create script: Disk Usage Script",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.337536"
+    },
+    {
+      "test": "Create script: Memory Info Script",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.373917"
     },
     {
       "test": "Create Linux host with password",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.168011"
+      "timestamp": "2025-10-29T12:30:07.438783"
     },
     {
       "test": "Create Windows host with SSH key",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.211561"
+      "timestamp": "2025-10-29T12:30:07.481545"
     },
     {
       "test": "Get all hosts",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.252033"
+      "timestamp": "2025-10-29T12:30:07.522242"
     },
     {
-      "test": "Verify hosts count (found 2)",
+      "test": "Verify hosts count (found 5)",
       "success": true,
       "details": "",
-      "timestamp": "2025-10-14T09:36:26.252690"
+      "timestamp": "2025-10-29T12:30:07.522991"
     },
     {
       "test": "Get specific host by ID",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.289595"
+      "timestamp": "2025-10-29T12:30:07.566885"
     },
     {
       "test": "Update host",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.324196"
+      "timestamp": "2025-10-29T12:30:07.607285"
     },
     {
-      "test": "Delete host",
+      "test": "Create project",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.402323"
+      "timestamp": "2025-10-29T12:30:07.659590"
     },
     {
-      "test": "Create bash script",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.451400"
-    },
-    {
-      "test": "Create second script",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.488229"
-    },
-    {
-      "test": "Get all scripts",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.565568"
-    },
-    {
-      "test": "Verify scripts count (found 2)",
+      "test": "Project created with draft status",
       "success": true,
       "details": "",
-      "timestamp": "2025-10-14T09:36:26.566314"
+      "timestamp": "2025-10-29T12:30:07.660328"
     },
     {
-      "test": "Get specific script by ID",
+      "test": "Get all projects",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.640674"
+      "timestamp": "2025-10-29T12:30:07.696711"
     },
     {
-      "test": "Update script",
+      "test": "Projects list retrieved (found 1)",
+      "success": true,
+      "details": "",
+      "timestamp": "2025-10-29T12:30:07.697437"
+    },
+    {
+      "test": "Get specific project by ID",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.678380"
+      "timestamp": "2025-10-29T12:30:07.732826"
     },
     {
-      "test": "Delete script",
+      "test": "Update project",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:26.713384"
+      "timestamp": "2025-10-29T12:30:07.769698"
     },
     {
-      "test": "Execute script on host",
+      "test": "Create second project",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.813020"
+    },
+    {
+      "test": "Create project task",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.863535"
+    },
+    {
+      "test": "Task created with pending status",
+      "success": true,
+      "details": "",
+      "timestamp": "2025-10-29T12:30:07.864240"
+    },
+    {
+      "test": "Get project tasks",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.901643"
+    },
+    {
+      "test": "Project tasks retrieved (found 1)",
+      "success": true,
+      "details": "",
+      "timestamp": "2025-10-29T12:30:07.902272"
+    },
+    {
+      "test": "Create second project task",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:07.941293"
+    },
+    {
+      "test": "Project execution SSE endpoint accessible",
+      "success": true,
+      "details": "",
+      "timestamp": "2025-10-29T12:30:07.983434"
+    },
+    {
+      "test": "SSE events received (13 events)",
+      "success": true,
+      "details": "Event types: ['info', 'task_start', 'task_complete', 'script_error', 'script_start', 'complete', 'status']",
+      "timestamp": "2025-10-29T12:30:38.036437"
+    },
+    {
+      "test": "Expected SSE event types received",
+      "success": true,
+      "details": "Got: ['info', 'task_start', 'status'], Expected: ['info', 'task_start', 'status']",
+      "timestamp": "2025-10-29T12:30:38.036449"
+    },
+    {
+      "test": "Project execution completed",
+      "success": true,
+      "details": "Final event types: ['complete']",
+      "timestamp": "2025-10-29T12:30:38.036454"
+    },
+    {
+      "test": "Get project execution results",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:38.110102"
+    },
+    {
+      "test": "Project executions retrieved (found 3)",
+      "success": true,
+      "details": "Executions count: 3",
+      "timestamp": "2025-10-29T12:30:38.110770"
+    },
+    {
+      "test": "Execution record structure",
+      "success": true,
+      "details": "All required fields present",
+      "timestamp": "2025-10-29T12:30:38.110781"
+    },
+    {
+      "test": "Execution linked to project",
+      "success": true,
+      "details": "",
+      "timestamp": "2025-10-29T12:30:38.110785"
+    },
+    {
+      "test": "Legacy execute script on host",
       "success": false,
-      "details": "Exception: HTTPSConnectionPool(host='bash-runner-web.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)",
-      "timestamp": "2025-10-14T09:36:36.750647"
+      "details": "Exception: HTTPSConnectionPool(host='script-hub-9.preview.emergentagent.com', port=443): Read timed out. (read timeout=10)",
+      "timestamp": "2025-10-29T12:30:48.148627"
     },
     {
-      "test": "Get executions history",
+      "test": "Get executions after legacy execute",
+      "success": false,
+      "details": "Status: 500, Expected: 200, Response: Internal Server Error",
+      "timestamp": "2025-10-29T12:30:48.212185"
+    },
+    {
+      "test": "Verify project exists before delete",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2025-10-14T09:36:36.807175"
+      "timestamp": "2025-10-29T12:30:48.252420"
     },
     {
-      "test": "Executions history available",
+      "test": "Delete project (cascade delete)",
       "success": true,
-      "details": "Found 1 executions",
-      "timestamp": "2025-10-14T09:36:36.807776"
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:48.296033"
+    },
+    {
+      "test": "Verify project deleted",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-10-29T12:30:48.336674"
+    },
+    {
+      "test": "Verify project tasks deleted",
+      "success": false,
+      "details": "Status: 200, Expected: 404, Response: []",
+      "timestamp": "2025-10-29T12:30:48.376065"
+    },
+    {
+      "test": "Verify project executions cleaned up",
+      "success": false,
+      "details": "Status: 200, Expected: 404, Response: []",
+      "timestamp": "2025-10-29T12:30:48.414032"
     },
     {
       "test": "Get non-existent host",
       "success": true,
       "details": "Status: 404",
-      "timestamp": "2025-10-14T09:36:36.852412"
+      "timestamp": "2025-10-29T12:30:48.491959"
     },
     {
       "test": "Get non-existent script",
       "success": true,
       "details": "Status: 404",
-      "timestamp": "2025-10-14T09:36:36.886969"
+      "timestamp": "2025-10-29T12:30:48.533178"
+    },
+    {
+      "test": "Get non-existent project",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-10-29T12:30:48.612332"
+    },
+    {
+      "test": "Execute non-existent project",
+      "success": false,
+      "details": "Status: 200, Expected: 404, Response: data: {\"type\": \"error\", \"message\": \"\\u041f\\u0440\\u043e\\u0435\\u043a\\u0442 \\u043d\\u0435 \\u043d\\u0430\\u0439\\u0434\\u0435\\u043d\"}\n\n",
+      "timestamp": "2025-10-29T12:30:48.650365"
+    },
+    {
+      "test": "Create task with invalid host_id",
+      "success": false,
+      "details": "Status: 200, Expected: 422, Response: {\"id\":\"4d1fbc5b-14ac-4a7d-b0a9-8ba462bc7db2\",\"project_id\":\"54ebabd4-e5fd-4490-ac34-cbb0d6d6b54e\",\"host_id\":\"invalid-host-id\",\"system_id\":\"17afc8ee-4472-4188-a435-e1c0b606ed0e\",\"script_ids\":[\"invalid-s",
+      "timestamp": "2025-10-29T12:30:48.689891"
+    },
+    {
+      "test": "Create task with invalid host_id (alt)",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-10-29T12:30:48.729657"
     },
     {
       "test": "Create host with missing fields",
       "success": true,
       "details": "Status: 422",
-      "timestamp": "2025-10-14T09:36:36.921989"
+      "timestamp": "2025-10-29T12:30:48.769471"
     },
     {
-      "test": "Create script with missing fields",
+      "test": "Create script with missing system_id",
       "success": true,
       "details": "Status: 422",
-      "timestamp": "2025-10-14T09:36:37.009906"
+      "timestamp": "2025-10-29T12:30:48.806113"
     }
   ]
 }
