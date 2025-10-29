@@ -89,8 +89,7 @@ const HostsPage = () => {
       username: "",
       auth_type: "password",
       password: "",
-      ssh_key: "",
-      os_type: "linux"
+      ssh_key: ""
     });
     setEditingHost(null);
   };
@@ -104,8 +103,7 @@ const HostsPage = () => {
       username: host.username,
       auth_type: host.auth_type,
       password: "",
-      ssh_key: host.ssh_key || "",
-      os_type: host.os_type
+      ssh_key: host.ssh_key || ""
     });
     setIsDialogOpen(true);
   };
