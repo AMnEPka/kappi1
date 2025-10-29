@@ -974,7 +974,7 @@ const Layout = ({ children }) => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
               <Terminal className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-bold">SSH Script Runner</span>
+              <span className="text-xl font-bold">OSIB</span>
             </div>
             <div className="flex gap-2">
               <Link to="/">
