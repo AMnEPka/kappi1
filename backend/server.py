@@ -898,16 +898,23 @@ async def get_project_executions(project_id: str):
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
 
-# API Routes - Execution
+# API Routes - Execution (Legacy single-script execution)
 @api_router.post("/execute")
 async def execute_script(execute_req: ExecuteRequest):
-    """Execute script on selected hosts"""
+    """Execute script on selected hosts (legacy endpoint)"""
     # Get script
     script_doc = await db.scripts.find_one({"id": execute_req.script_id}, {"_id": 0})
     if not script_doc:
         raise HTTPException(status_code=404, detail="Скрипт не найден")
     
     script = Script(**parse_from_mongo(script_doc))
+    
+    # Get system for this script
+    system_doc = await db.systems.find_one({"id": script.system_id}, {"_id": 0})
+    if not system_doc:
+        raise HTTPException(status_code=404, detail="Система не найдена")
+    
+    system = System(**parse_from_mongo(system_doc))
     
     # Get hosts
     hosts_cursor = db.hosts.find({"id": {"$in": execute_req.host_ids}}, {"_id": 0})
@@ -920,23 +927,24 @@ async def execute_script(execute_req: ExecuteRequest):
     tasks = [execute_ssh_command(host, script.content) for host in hosts]
     results = await asyncio.gather(*tasks)
     
-    # Save execution record
-    execution = Execution(
-        script_id=script.id,
-        script_name=script.name,
-        host_ids=execute_req.host_ids,
-        results=[r.model_dump() for r in results]
-    )
+    # Save execution records (one per host)
+    execution_ids = []
+    for host, result in zip(hosts, results):
+        execution = Execution(
+            host_id=host.id,
+            system_id=system.id,
+            script_id=script.id,
+            script_name=script.name,
+            success=result.success,
+            output=result.output,
+            error=result.error
+        )
+        
+        doc = prepare_for_mongo(execution.model_dump())
+        await db.executions.insert_one(doc)
+        execution_ids.append(execution.id)
     
-    doc = prepare_for_mongo(execution.model_dump())
-    # Prepare results for MongoDB
-    for result in doc['results']:
-        if isinstance(result.get('timestamp'), datetime):
-            result['timestamp'] = result['timestamp'].isoformat()
-    
-    await db.executions.insert_one(doc)
-    
-    return {"execution_id": execution.id, "results": results}
+    return {"execution_ids": execution_ids, "results": [r.model_dump() for r in results]}
 
 @api_router.get("/executions", response_model=List[Execution])
 async def get_executions():
