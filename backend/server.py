@@ -713,6 +713,191 @@ async def delete_project_task(project_id: str, task_id: str):
     return {"message": "Задание удалено"}
 
 
+# Project Execution with Real-time Updates (SSE)
+@api_router.post("/projects/{project_id}/execute")
+async def execute_project(project_id: str):
+    """Execute project with real-time updates via Server-Sent Events"""
+    
+    async def event_generator():
+        try:
+            # Get project
+            project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+            if not project:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Проект не найден'})}\n\n"
+                return
+            
+            # Update project status
+            await db.projects.update_one(
+                {"id": project_id},
+                {"$set": {
+                    "status": "running",
+                    "started_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Начало выполнения проекта', 'status': 'running'})}\n\n"
+            
+            # Get all tasks for this project
+            tasks_cursor = db.project_tasks.find({"project_id": project_id}, {"_id": 0})
+            tasks = await tasks_cursor.to_list(1000)
+            
+            if not tasks:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Нет заданий для выполнения'})}\n\n"
+                await db.projects.update_one(
+                    {"id": project_id},
+                    {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+                )
+                return
+            
+            total_tasks = len(tasks)
+            completed_tasks = 0
+            failed_tasks = 0
+            
+            yield f"data: {json.dumps({'type': 'info', 'message': f'Всего заданий: {total_tasks}'})}\n\n"
+            
+            # Process each task (each task = one host with multiple scripts)
+            for task in tasks:
+                task_obj = ProjectTask(**parse_from_mongo(task))
+                
+                # Get host
+                host_doc = await db.hosts.find_one({"id": task_obj.host_id}, {"_id": 0})
+                if not host_doc:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Хост не найден: {task_obj.host_id}'})}\n\n"
+                    failed_tasks += 1
+                    continue
+                
+                host = Host(**parse_from_mongo(host_doc))
+                
+                # Get system
+                system_doc = await db.systems.find_one({"id": task_obj.system_id}, {"_id": 0})
+                if not system_doc:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Система не найдена: {task_obj.system_id}'})}\n\n"
+                    failed_tasks += 1
+                    continue
+                
+                system = System(**parse_from_mongo(system_doc))
+                
+                # Get scripts
+                scripts_cursor = db.scripts.find({"id": {"$in": task_obj.script_ids}}, {"_id": 0})
+                scripts = [Script(**parse_from_mongo(s)) for s in await scripts_cursor.to_list(1000)]
+                
+                if not scripts:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Скрипты не найдены для задания'})}\n\n"
+                    failed_tasks += 1
+                    continue
+                
+                # Update task status
+                await db.project_tasks.update_one(
+                    {"id": task_obj.id},
+                    {"$set": {"status": "running"}}
+                )
+                
+                yield f"data: {json.dumps({'type': 'task_start', 'host_name': host.name, 'system_name': system.name, 'scripts_count': len(scripts)})}\n\n"
+                
+                # Execute all scripts on this host using ONE SSH connection
+                task_success = True
+                task_results = []
+                
+                try:
+                    # Execute scripts sequentially on the same host with one connection
+                    for script in scripts:
+                        yield f"data: {json.dumps({'type': 'script_start', 'host_name': host.name, 'script_name': script.name})}\n\n"
+                        
+                        result = await execute_ssh_command(host, script.content)
+                        
+                        # Save execution result
+                        execution = Execution(
+                            project_id=project_id,
+                            project_task_id=task_obj.id,
+                            host_id=host.id,
+                            system_id=system.id,
+                            script_id=script.id,
+                            script_name=script.name,
+                            success=result.success,
+                            output=result.output,
+                            error=result.error
+                        )
+                        
+                        exec_doc = prepare_for_mongo(execution.model_dump())
+                        await db.executions.insert_one(exec_doc)
+                        
+                        task_results.append(execution)
+                        
+                        if not result.success:
+                            task_success = False
+                            yield f"data: {json.dumps({'type': 'script_error', 'host_name': host.name, 'script_name': script.name, 'error': result.error})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'type': 'script_success', 'host_name': host.name, 'script_name': script.name})}\n\n"
+                    
+                    # Update task status
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "completed" if task_success else "failed"}}
+                    )
+                    
+                    if task_success:
+                        completed_tasks += 1
+                        yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': True})}\n\n"
+                    else:
+                        failed_tasks += 1
+                        yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': False})}\n\n"
+                
+                except Exception as e:
+                    failed_tasks += 1
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "failed"}}
+                    )
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': str(e)})}\n\n"
+            
+            # Update project status
+            final_status = "completed" if failed_tasks == 0 else "failed"
+            await db.projects.update_one(
+                {"id": project_id},
+                {"$set": {
+                    "status": final_status,
+                    "completed_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks})}\n\n"
+        
+        except Exception as e:
+            logger.error(f"Error during project execution: {str(e)}")
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Ошибка: {str(e)}'})}\n\n"
+            
+            # Update project status to failed
+            await db.projects.update_one(
+                {"id": project_id},
+                {"$set": {
+                    "status": "failed",
+                    "completed_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+# Get project execution results
+@api_router.get("/projects/{project_id}/executions", response_model=List[Execution])
+async def get_project_executions(project_id: str):
+    """Get all execution results for a project"""
+    executions = await db.executions.find(
+        {"project_id": project_id},
+        {"_id": 0}
+    ).sort("executed_at", -1).to_list(1000)
+    
+    return [Execution(**parse_from_mongo(execution)) for execution in executions]
+
+
 # API Routes - Execution
 @api_router.post("/execute")
 async def execute_script(execute_req: ExecuteRequest):
