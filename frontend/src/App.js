@@ -306,11 +306,11 @@ const ScriptsPage = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedCategory) {
+    if (selectedCategory && selectedCategory !== "all") {
       fetchSystemsByCategory(selectedCategory);
     } else {
       setSystems([]);
-      setSelectedSystem("");
+      setSelectedSystem("all");
     }
   }, [selectedCategory]);
 
