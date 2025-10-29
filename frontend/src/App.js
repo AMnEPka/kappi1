@@ -184,18 +184,6 @@ const HostsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label>ОС</Label>
-                  <Select value={formData.os_type} onValueChange={(value) => setFormData({...formData, os_type: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="linux">Linux</SelectItem>
-                      <SelectItem value="windows">Windows</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               {formData.auth_type === "password" ? (
