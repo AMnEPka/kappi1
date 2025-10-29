@@ -182,13 +182,15 @@ export default function ProjectWizard({ onNavigate }) {
 
       const projectId = projectResponse.data.id;
 
-      // Create tasks
+      // Create tasks - каждая система создаёт отдельную задачу
       for (const task of projectData.tasks) {
-        await axios.post(`${API_URL}/api/projects/${projectId}/tasks`, {
-          host_id: task.host_id,
-          system_id: task.system_id,
-          script_ids: task.script_ids,
-        });
+        for (const system of task.systems) {
+          await axios.post(`${API_URL}/api/projects/${projectId}/tasks`, {
+            host_id: task.host_id,
+            system_id: system.system_id,
+            script_ids: system.script_ids,
+          });
+        }
       }
 
       toast.success("Проект создан");
