@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { PlusCircle, Play, Trash2, Eye } from "lucide-react";
-import { useToast } from "../hooks/use-toast";
+import { toast } from "sonner";
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -10,7 +10,6 @@ const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 export default function ProjectsPage({ onNavigate }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchProjects();
