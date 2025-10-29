@@ -215,7 +215,7 @@ const SystemsPage = () => {
             <SelectValue placeholder="Все категории" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Все категории</SelectItem>
+            <SelectItem value="all">Все категории</SelectItem>
             {categories.map((cat) => (
               <SelectItem key={cat.id} value={cat.id}>
                 {cat.icon} {cat.name}
