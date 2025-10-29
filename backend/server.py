@@ -501,6 +501,16 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
     for script in scripts:
         script_data = parse_from_mongo(script)
         
+        # Check if script has system_id (old scripts might not have it)
+        if "system_id" not in script_data or not script_data["system_id"]:
+            # Skip old scripts without system_id or add default values
+            script_data["system_name"] = "Не назначена"
+            script_data["system_os_type"] = "linux"
+            script_data["category_name"] = "Без категории"
+            script_data["category_icon"] = "❓"
+            enriched_scripts.append(script_data)
+            continue
+        
         # Get system info
         system = await db.systems.find_one({"id": script_data["system_id"]}, {"_id": 0})
         if system:
@@ -512,6 +522,12 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
             if category:
                 script_data["category_name"] = category["name"]
                 script_data["category_icon"] = category.get("icon", "📁")
+        else:
+            # System not found
+            script_data["system_name"] = "Система удалена"
+            script_data["system_os_type"] = "linux"
+            script_data["category_name"] = "Без категории"
+            script_data["category_icon"] = "❓"
         
         enriched_scripts.append(script_data)
     
