@@ -803,19 +803,53 @@ const ExecutePage = () => {
 // History Page
 const HistoryPage = () => {
   const [executions, setExecutions] = useState([]);
+  const [hosts, setHosts] = useState({});
 
   useEffect(() => {
-    fetchExecutions();
+    fetchData();
   }, []);
 
-  const fetchExecutions = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get(`${API}/executions`);
-      setExecutions(response.data);
+      const [executionsRes, hostsRes] = await Promise.all([
+        axios.get(`${API}/executions`),
+        axios.get(`${API}/hosts`)
+      ]);
+      setExecutions(executionsRes.data);
+      
+      // Create hosts lookup map
+      const hostsMap = {};
+      hostsRes.data.forEach(host => {
+        hostsMap[host.id] = host;
+      });
+      setHosts(hostsMap);
     } catch (error) {
       toast.error("Ошибка загрузки истории");
     }
   };
+
+  // Group executions by project or by individual script execution
+  const groupedExecutions = executions.reduce((acc, execution) => {
+    if (execution.project_id) {
+      // Group by project
+      if (!acc[execution.project_id]) {
+        acc[execution.project_id] = {
+          type: 'project',
+          project_id: execution.project_id,
+          executions: [],
+          executed_at: execution.executed_at
+        };
+      }
+      acc[execution.project_id].executions.push(execution);
+    } else {
+      // Individual execution (legacy)
+      acc[execution.id] = {
+        type: 'single',
+        execution: execution
+      };
+    }
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -829,58 +863,120 @@ const HistoryPage = () => {
             <p className="text-slate-400 text-sm">Выполните скрипт для просмотра результатов</p>
           </div>
         ) : (
-          executions.map((execution) => (
-            <Card key={execution.id} data-testid={`execution-card-${execution.id}`}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Terminal className="h-5 w-5" />
-                      {execution.script_name}
-                    </CardTitle>
-                    <CardDescription>
-                      {new Date(execution.created_at).toLocaleString('ru-RU')}
-                    </CardDescription>
-                  </div>
-                  <Badge>
-                    {execution.results.filter(r => r.success).length}/{execution.results.length} успешно
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {execution.results.map((result, idx) => (
-                    <div key={idx} className="border rounded p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="font-semibold">{result.host_name}</div>
-                        <Badge variant={result.success ? "default" : "destructive"}>
-                          {result.success ? "Успех" : "Ошибка"}
-                        </Badge>
+          Object.values(groupedExecutions).map((group) => {
+            if (group.type === 'project') {
+              // Project execution display
+              const successCount = group.executions.filter(e => e.success).length;
+              const totalCount = group.executions.length;
+              
+              return (
+                <Card key={group.project_id} data-testid={`execution-card-${group.project_id}`}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Terminal className="h-5 w-5" />
+                          Проект (ID: {group.project_id.substring(0, 8)}...)
+                        </CardTitle>
+                        <CardDescription>
+                          {new Date(group.executed_at).toLocaleString('ru-RU')}
+                        </CardDescription>
                       </div>
+                      <Badge>
+                        {successCount}/{totalCount} успешно
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {group.executions.map((execution) => {
+                        const host = hosts[execution.host_id];
+                        return (
+                          <div key={execution.id} className="border rounded p-3">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <div className="font-semibold">{host?.name || execution.host_id}</div>
+                                <div className="text-sm text-gray-600">{execution.script_name}</div>
+                              </div>
+                              <Badge variant={execution.success ? "default" : "destructive"}>
+                                {execution.success ? "Успех" : "Ошибка"}
+                              </Badge>
+                            </div>
+                            
+                            {execution.output && (
+                              <div>
+                                <Label className="text-xs">Вывод:</Label>
+                                <pre className="bg-slate-900 text-slate-100 p-2 rounded text-xs overflow-x-auto mt-1 max-h-40">
+                                  {execution.output}
+                                </pre>
+                              </div>
+                            )}
+                            
+                            {execution.error && (
+                              <div className="mt-2">
+                                <Label className="text-xs text-red-600">Ошибка:</Label>
+                                <pre className="bg-red-50 text-red-800 p-2 rounded text-xs overflow-x-auto mt-1">
+                                  {execution.error}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            } else {
+              // Single script execution display (legacy)
+              const execution = group.execution;
+              const host = hosts[execution.host_id];
+              
+              return (
+                <Card key={execution.id} data-testid={`execution-card-${execution.id}`}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Terminal className="h-5 w-5" />
+                          {execution.script_name}
+                        </CardTitle>
+                        <CardDescription>
+                          {new Date(execution.executed_at).toLocaleString('ru-RU')}
+                        </CardDescription>
+                      </div>
+                      <Badge variant={execution.success ? "default" : "destructive"}>
+                        {execution.success ? "Успех" : "Ошибка"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded p-3">
+                      <div className="font-semibold mb-2">{host?.name || execution.host_id}</div>
                       
-                      {result.output && (
+                      {execution.output && (
                         <div>
                           <Label className="text-xs">Вывод:</Label>
                           <pre className="bg-slate-900 text-slate-100 p-2 rounded text-xs overflow-x-auto mt-1 max-h-40">
-                            {result.output}
+                            {execution.output}
                           </pre>
                         </div>
                       )}
                       
-                      {result.error && (
+                      {execution.error && (
                         <div className="mt-2">
                           <Label className="text-xs text-red-600">Ошибка:</Label>
                           <pre className="bg-red-50 text-red-800 p-2 rounded text-xs overflow-x-auto mt-1">
-                            {result.error}
+                            {execution.error}
                           </pre>
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                  </CardContent>
+                </Card>
+              );
+            }
+          })
         )}
       </div>
     </div>
