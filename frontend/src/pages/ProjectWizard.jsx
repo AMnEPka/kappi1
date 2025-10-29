@@ -163,19 +163,12 @@ export default function ProjectWizard({ onNavigate }) {
         });
       }
 
-      toast({
-        title: "Успешно",
-        description: "Проект создан",
-      });
+      toast.success("Проект создан");
 
       onNavigate('projects');
     } catch (error) {
       console.error('Error creating project:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось создать проект",
-        variant: "destructive",
-      });
+      toast.error("Не удалось создать проект");
     } finally {
       setLoading(false);
     }
