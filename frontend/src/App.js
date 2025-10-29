@@ -255,10 +255,7 @@ const HostsPage = () => {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>Пользователь: <strong>{host.username}</strong></div>
-                  <div className="flex gap-2">
-                    <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
-                    <Badge variant="outline">{host.os_type === "linux" ? "Linux" : "Windows"}</Badge>
-                  </div>
+                  <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
                 </div>
               </CardContent>
             </Card>
