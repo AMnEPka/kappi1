@@ -286,8 +286,8 @@ const ScriptsPage = () => {
   const [scripts, setScripts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedSystem, setSelectedSystem] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSystem, setSelectedSystem] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingScript, setEditingScript] = useState(null);
   const [formCategoryId, setFormCategoryId] = useState("");
