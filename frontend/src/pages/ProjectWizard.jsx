@@ -51,11 +51,7 @@ export default function ProjectWizard({ onNavigate }) {
       setScripts(scriptsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить данные",
-        variant: "destructive",
-      });
+      toast.error("Не удалось загрузить данные");
     }
   };
 
