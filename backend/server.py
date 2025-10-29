@@ -230,6 +230,11 @@ class ExecuteProjectRequest(BaseModel):
     """Request to execute a project"""
     project_id: str
 
+class ExecuteRequest(BaseModel):
+    """Legacy request to execute a single script on multiple hosts"""
+    script_id: str
+    host_ids: List[str]
+
 
 # SSH Execution Function
 async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
