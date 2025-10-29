@@ -124,27 +124,15 @@ export default function ProjectWizard({ onNavigate }) {
 
   const handleNext = () => {
     if (step === 1 && !canProceedToStep2()) {
-      toast({
-        title: "Ошибка",
-        description: "Введите название проекта",
-        variant: "destructive",
-      });
+      toast.error("Введите название проекта");
       return;
     }
     if (step === 2 && !canProceedToStep3()) {
-      toast({
-        title: "Ошибка",
-        description: "Выберите хотя бы один хост",
-        variant: "destructive",
-      });
+      toast.error("Выберите хотя бы один хост");
       return;
     }
     if (step === 3 && !canProceedToStep4()) {
-      toast({
-        title: "Ошибка",
-        description: "Для каждого хоста выберите систему и скрипты",
-        variant: "destructive",
-      });
+      toast.error("Для каждого хоста выберите систему и скрипты");
       return;
     }
     setStep(step + 1);
