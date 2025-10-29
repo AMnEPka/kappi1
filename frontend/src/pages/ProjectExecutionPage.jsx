@@ -106,11 +106,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
           } else if (data.type === 'error') {
             setExecuting(false);
             eventSource.close();
-            toast({
-              title: "Ошибка",
-              description: data.message,
-              variant: "destructive",
-            });
+            toast.error(`Ошибка: ${data.message}`);
           }
         } catch (error) {
           console.error('Error parsing SSE data:', error);
