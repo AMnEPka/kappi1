@@ -16,7 +16,6 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
     completed: 0,
     failed: 0,
   });
-  const { toast } = useToast();
   const eventSourceRef = useRef(null);
   const logsEndRef = useRef(null);
 
