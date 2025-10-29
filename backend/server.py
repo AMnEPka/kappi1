@@ -56,6 +56,49 @@ def parse_from_mongo(item: dict) -> dict:
 
 
 # Models
+# Category Model
+class Category(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    icon: str = "📁"
+    description: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CategoryCreate(BaseModel):
+    name: str
+    icon: str = "📁"
+    description: Optional[str] = None
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    icon: Optional[str] = None
+    description: Optional[str] = None
+
+# System Model
+class System(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    category_id: str
+    name: str
+    description: Optional[str] = None
+    os_type: str = "linux"  # "linux" or "windows"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SystemCreate(BaseModel):
+    category_id: str
+    name: str
+    description: Optional[str] = None
+    os_type: str = "linux"
+
+class SystemUpdate(BaseModel):
+    category_id: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    os_type: Optional[str] = None
+
 class Host(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
