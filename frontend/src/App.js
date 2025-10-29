@@ -458,11 +458,8 @@ const ScriptsPage = () => {
               <div>
                 <Label>Категория</Label>
                 <Select 
-                  value={categories.find(c => systems.find(s => s.id === formData.system_id)?.category_id === c.id)?.id || ""} 
-                  onValueChange={(value) => {
-                    fetchSystemsByCategory(value);
-                    setFormData({...formData, system_id: ""});
-                  }}
+                  value={formCategoryId} 
+                  onValueChange={handleCategoryChangeInForm}
                   required
                 >
                   <SelectTrigger>
@@ -484,12 +481,13 @@ const ScriptsPage = () => {
                   value={formData.system_id} 
                   onValueChange={(value) => setFormData({...formData, system_id: value})}
                   required
+                  disabled={!formCategoryId}
                 >
                   <SelectTrigger data-testid="script-system-select">
-                    <SelectValue placeholder="Выберите систему..." />
+                    <SelectValue placeholder={formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {systems.map((sys) => (
+                    {formSystems.map((sys) => (
                       <SelectItem key={sys.id} value={sys.id}>
                         {sys.name}
                       </SelectItem>
