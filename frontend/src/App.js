@@ -284,21 +284,65 @@ const HostsPage = () => {
 // Scripts Page
 const ScriptsPage = () => {
   const [scripts, setScripts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [systems, setSystems] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSystem, setSelectedSystem] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingScript, setEditingScript] = useState(null);
   const [formData, setFormData] = useState({
+    system_id: "",
     name: "",
     description: "",
-    content: ""
+    content: "",
+    order: 0
   });
 
   useEffect(() => {
+    fetchCategories();
     fetchScripts();
   }, []);
 
+  useEffect(() => {
+    if (selectedCategory) {
+      fetchSystemsByCategory(selectedCategory);
+    } else {
+      setSystems([]);
+      setSelectedSystem("");
+    }
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    fetchScripts();
+  }, [selectedSystem]);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`${API}/categories`);
+      setCategories(response.data);
+    } catch (error) {
+      toast.error("Ошибка загрузки категорий");
+    }
+  };
+
+  const fetchSystemsByCategory = async (categoryId) => {
+    try {
+      const response = await axios.get(`${API}/systems?category_id=${categoryId}`);
+      setSystems(response.data);
+    } catch (error) {
+      toast.error("Ошибка загрузки систем");
+    }
+  };
+
   const fetchScripts = async () => {
     try {
-      const response = await axios.get(`${API}/scripts`);
+      let url = `${API}/scripts`;
+      if (selectedSystem) {
+        url += `?system_id=${selectedSystem}`;
+      } else if (selectedCategory) {
+        url += `?category_id=${selectedCategory}`;
+      }
+      const response = await axios.get(url);
       setScripts(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки скриптов");
@@ -319,7 +363,7 @@ const ScriptsPage = () => {
       resetForm();
       fetchScripts();
     } catch (error) {
-      toast.error("Ошибка сохранения скрипта");
+      toast.error(error.response?.data?.detail || "Ошибка сохранения скрипта");
     }
   };
 
@@ -337,9 +381,11 @@ const ScriptsPage = () => {
 
   const resetForm = () => {
     setFormData({
+      system_id: "",
       name: "",
       description: "",
-      content: ""
+      content: "",
+      order: 0
     });
     setEditingScript(null);
   };
@@ -347,9 +393,11 @@ const ScriptsPage = () => {
   const openEditDialog = (script) => {
     setEditingScript(script);
     setFormData({
+      system_id: script.system_id,
       name: script.name,
       description: script.description || "",
-      content: script.content
+      content: script.content,
+      order: script.order || 0
     });
     setIsDialogOpen(true);
   };
@@ -357,7 +405,10 @@ const ScriptsPage = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Скрипты</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Скрипты проверок</h1>
+          <p className="text-slate-500 mt-1">Управление скриптами для проверки систем</p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);
           if (!open) resetForm();
@@ -371,14 +422,58 @@ const ScriptsPage = () => {
             <DialogHeader>
               <DialogTitle>{editingScript ? "Редактировать скрипт" : "Новый скрипт"}</DialogTitle>
               <DialogDescription>
-                Создайте bash скрипт для выполнения на удаленных хостах
+                Создайте скрипт проверки для конкретной системы
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label>Название</Label>
+                <Label>Категория</Label>
+                <Select 
+                  value={categories.find(c => systems.find(s => s.id === formData.system_id)?.category_id === c.id)?.id || ""} 
+                  onValueChange={(value) => {
+                    fetchSystemsByCategory(value);
+                    setFormData({...formData, system_id: ""});
+                  }}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите категорию..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Система</Label>
+                <Select 
+                  value={formData.system_id} 
+                  onValueChange={(value) => setFormData({...formData, system_id: value})}
+                  required
+                >
+                  <SelectTrigger data-testid="script-system-select">
+                    <SelectValue placeholder="Выберите систему..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {systems.map((sys) => (
+                      <SelectItem key={sys.id} value={sys.id}>
+                        {sys.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label>Название проверки</Label>
                 <Input
                   data-testid="script-name-input"
+                  placeholder="Проверка версии ядра"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   required
@@ -400,10 +495,20 @@ const ScriptsPage = () => {
                   data-testid="script-content-input"
                   value={formData.content}
                   onChange={(e) => setFormData({...formData, content: e.target.value})}
-                  placeholder="echo 'Hello World'\nls -la"
+                  placeholder="uname -r"
                   rows={12}
                   className="font-mono text-sm"
                   required
+                />
+              </div>
+
+              <div>
+                <Label>Порядок отображения</Label>
+                <Input
+                  type="number"
+                  value={formData.order}
+                  onChange={(e) => setFormData({...formData, order: parseInt(e.target.value)})}
+                  min="0"
                 />
               </div>
 
@@ -420,19 +525,60 @@ const ScriptsPage = () => {
         </Dialog>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div>
+          <Label>Категория</Label>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger>
+              <SelectValue placeholder="Все категории" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Все категории</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.icon} {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label>Система</Label>
+          <Select value={selectedSystem} onValueChange={setSelectedSystem} disabled={!selectedCategory}>
+            <SelectTrigger>
+              <SelectValue placeholder={selectedCategory ? "Все системы категории" : "Сначала выберите категорию"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Все системы</SelectItem>
+              {systems.map((sys) => (
+                <SelectItem key={sys.id} value={sys.id}>
+                  {sys.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {scripts.length === 0 ? (
           <div className="col-span-full text-center py-16">
             <FileCode className="h-16 w-16 mx-auto text-slate-300 mb-4" />
-            <p className="text-slate-500 text-lg mb-2">Нет созданных скриптов</p>
-            <p className="text-slate-400 text-sm">Создайте первый скрипт для выполнения на хостах</p>
+            <p className="text-slate-500 text-lg mb-2">Нет скриптов</p>
+            <p className="text-slate-400 text-sm">Создайте первый скрипт проверки</p>
           </div>
         ) : (
           scripts.map((script) => (
             <Card key={script.id} data-testid={`script-card-${script.id}`}>
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1">
+                    {script.category_name && (
+                      <div className="text-sm text-slate-500 mb-1">
+                        {script.category_icon} {script.category_name} → {script.system_name}
+                      </div>
+                    )}
                     <CardTitle className="flex items-center gap-2">
                       <FileCode className="h-5 w-5" />
                       {script.name}
