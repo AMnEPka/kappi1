@@ -121,12 +121,18 @@ export default function ProjectWizard({ onNavigate }) {
       ...prev,
       tasks: prev.tasks.map(task => {
         if (task.host_id === hostId) {
-          const newSystems = [...task.systems];
-          const system = newSystems[systemIndex];
-          const isSelected = system.script_ids.includes(scriptId);
-          system.script_ids = isSelected
-            ? system.script_ids.filter(id => id !== scriptId)
-            : [...system.script_ids, scriptId];
+          const newSystems = task.systems.map((system, idx) => {
+            if (idx === systemIndex) {
+              const isSelected = system.script_ids.includes(scriptId);
+              return {
+                ...system,
+                script_ids: isSelected
+                  ? system.script_ids.filter(id => id !== scriptId)
+                  : [...system.script_ids, scriptId]
+              };
+            }
+            return system;
+          });
           return { ...task, systems: newSystems };
         }
         return task;
