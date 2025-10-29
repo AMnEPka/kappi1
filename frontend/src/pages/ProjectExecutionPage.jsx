@@ -45,11 +45,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       }
     } catch (error) {
       console.error('Error fetching project:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить проект",
-        variant: "destructive",
-      });
+      toast.error("Не удалось загрузить проект");
     }
   };
 
