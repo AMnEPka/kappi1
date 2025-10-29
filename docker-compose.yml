@@ -36,7 +36,7 @@ services:
     environment:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=ssh_runner_db
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
     volumes:
       - ./backend:/app/backend
