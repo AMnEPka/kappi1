@@ -340,6 +340,132 @@ async def delete_host(host_id: str):
     return {"message": "Хост удален"}
 
 
+# API Routes - Categories
+@api_router.post("/categories", response_model=Category)
+async def create_category(category_input: CategoryCreate):
+    """Create new category (admin only in future)"""
+    category_obj = Category(**category_input.model_dump())
+    doc = prepare_for_mongo(category_obj.model_dump())
+    
+    await db.categories.insert_one(doc)
+    return category_obj
+
+@api_router.get("/categories", response_model=List[Category])
+async def get_categories():
+    """Get all categories"""
+    categories = await db.categories.find({}, {"_id": 0}).to_list(1000)
+    return [Category(**parse_from_mongo(cat)) for cat in categories]
+
+@api_router.get("/categories/{category_id}", response_model=Category)
+async def get_category(category_id: str):
+    """Get category by ID"""
+    category = await db.categories.find_one({"id": category_id}, {"_id": 0})
+    if not category:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    return Category(**parse_from_mongo(category))
+
+@api_router.put("/categories/{category_id}", response_model=Category)
+async def update_category(category_id: str, category_update: CategoryUpdate):
+    """Update category"""
+    update_data = category_update.model_dump(exclude_unset=True)
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Нет данных для обновления")
+    
+    result = await db.categories.update_one(
+        {"id": category_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    
+    updated_category = await db.categories.find_one({"id": category_id}, {"_id": 0})
+    return Category(**parse_from_mongo(updated_category))
+
+@api_router.delete("/categories/{category_id}")
+async def delete_category(category_id: str):
+    """Delete category"""
+    # Check if category has systems
+    systems = await db.systems.find_one({"category_id": category_id})
+    if systems:
+        raise HTTPException(status_code=400, detail="Невозможно удалить категорию с системами")
+    
+    result = await db.categories.delete_one({"id": category_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    return {"message": "Категория удалена"}
+
+
+# API Routes - Systems
+@api_router.post("/systems", response_model=System)
+async def create_system(system_input: SystemCreate):
+    """Create new system (admin only in future)"""
+    # Verify category exists
+    category = await db.categories.find_one({"id": system_input.category_id})
+    if not category:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    
+    system_obj = System(**system_input.model_dump())
+    doc = prepare_for_mongo(system_obj.model_dump())
+    
+    await db.systems.insert_one(doc)
+    return system_obj
+
+@api_router.get("/systems", response_model=List[System])
+async def get_systems(category_id: Optional[str] = None):
+    """Get all systems, optionally filtered by category"""
+    query = {"category_id": category_id} if category_id else {}
+    systems = await db.systems.find(query, {"_id": 0}).to_list(1000)
+    return [System(**parse_from_mongo(sys)) for sys in systems]
+
+@api_router.get("/systems/{system_id}", response_model=System)
+async def get_system(system_id: str):
+    """Get system by ID"""
+    system = await db.systems.find_one({"id": system_id}, {"_id": 0})
+    if not system:
+        raise HTTPException(status_code=404, detail="Система не найдена")
+    return System(**parse_from_mongo(system))
+
+@api_router.put("/systems/{system_id}", response_model=System)
+async def update_system(system_id: str, system_update: SystemUpdate):
+    """Update system"""
+    update_data = system_update.model_dump(exclude_unset=True)
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Нет данных для обновления")
+    
+    # If category_id is being updated, verify it exists
+    if 'category_id' in update_data:
+        category = await db.categories.find_one({"id": update_data['category_id']})
+        if not category:
+            raise HTTPException(status_code=404, detail="Категория не найдена")
+    
+    result = await db.systems.update_one(
+        {"id": system_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Система не найдена")
+    
+    updated_system = await db.systems.find_one({"id": system_id}, {"_id": 0})
+    return System(**parse_from_mongo(updated_system))
+
+@api_router.delete("/systems/{system_id}")
+async def delete_system(system_id: str):
+    """Delete system"""
+    # Check if system has scripts
+    scripts = await db.scripts.find_one({"system_id": system_id})
+    if scripts:
+        raise HTTPException(status_code=400, detail="Невозможно удалить систему со скриптами")
+    
+    result = await db.systems.delete_one({"id": system_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Система не найдена")
+    return {"message": "Система удалена"}
+
+
 # API Routes - Scripts
 @api_router.post("/scripts", response_model=Script)
 async def create_script(script_input: ScriptCreate):
