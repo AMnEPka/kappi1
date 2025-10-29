@@ -258,10 +258,8 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Project creation wizard (multi-step)"
-  stuck_tasks:
-    - "Project creation wizard (multi-step)"
+  current_focus: []
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
