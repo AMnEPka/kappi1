@@ -889,6 +889,12 @@ const Layout = ({ children }) => {
                   <History className="mr-2 h-4 w-4" /> История
                 </Button>
               </Link>
+              <div className="border-l mx-2 h-8"></div>
+              <Link to="/admin/categories">
+                <Button variant="ghost" data-testid="nav-admin">
+                  <Settings className="mr-2 h-4 w-4" /> Админ
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -910,6 +916,8 @@ function App() {
             <Route path="/scripts" element={<ScriptsPage />} />
             <Route path="/execute" element={<ExecutePage />} />
             <Route path="/history" element={<HistoryPage />} />
+            <Route path="/admin/categories" element={<CategoriesPage />} />
+            <Route path="/admin/systems" element={<SystemsPage />} />
           </Routes>
         </Layout>
       </BrowserRouter>
