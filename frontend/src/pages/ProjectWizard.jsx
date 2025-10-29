@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
-import { useToast } from "../hooks/use-toast";
+import { toast } from "sonner";
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -32,7 +32,6 @@ export default function ProjectWizard({ onNavigate }) {
   const [systems, setSystems] = useState([]);
   const [scripts, setScripts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchData();
