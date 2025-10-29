@@ -914,6 +914,11 @@ const Layout = ({ children }) => {
                   <Play className="mr-2 h-4 w-4" /> Выполнение
                 </Button>
               </Link>
+              <Link to="/projects">
+                <Button variant="ghost" data-testid="nav-projects">
+                  <Briefcase className="mr-2 h-4 w-4" /> Проекты
+                </Button>
+              </Link>
               <Link to="/history">
                 <Button variant="ghost" data-testid="nav-history">
                   <History className="mr-2 h-4 w-4" /> История
