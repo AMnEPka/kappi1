@@ -117,27 +117,34 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const handleTaskScriptToggle = (hostId, systemIndex, scriptId) => {
-    setProjectData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task => {
-        if (task.host_id === hostId) {
-          const newSystems = task.systems.map((system, idx) => {
-            if (idx === systemIndex) {
-              const isSelected = system.script_ids.includes(scriptId);
-              return {
-                ...system,
-                script_ids: isSelected
-                  ? system.script_ids.filter(id => id !== scriptId)
-                  : [...system.script_ids, scriptId]
-              };
-            }
-            return system;
-          });
-          return { ...task, systems: newSystems };
-        }
-        return task;
-      }),
-    }));
+    console.log('handleTaskScriptToggle called:', { hostId, systemIndex, scriptId });
+    setProjectData(prev => {
+      console.log('Previous state:', prev);
+      const newData = {
+        ...prev,
+        tasks: prev.tasks.map(task => {
+          if (task.host_id === hostId) {
+            const newSystems = task.systems.map((system, idx) => {
+              if (idx === systemIndex) {
+                const isSelected = system.script_ids.includes(scriptId);
+                console.log('Toggling script:', { scriptId, isSelected, currentScripts: system.script_ids });
+                return {
+                  ...system,
+                  script_ids: isSelected
+                    ? system.script_ids.filter(id => id !== scriptId)
+                    : [...system.script_ids, scriptId]
+                };
+              }
+              return system;
+            });
+            return { ...task, systems: newSystems };
+          }
+          return task;
+        }),
+      };
+      console.log('New state:', newData);
+      return newData;
+    });
   };
 
   const canProceedToStep2 = () => {
