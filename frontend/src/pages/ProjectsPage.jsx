@@ -35,18 +35,11 @@ export default function ProjectsPage({ onNavigate }) {
 
     try {
       await axios.delete(`${API_URL}/api/projects/${projectId}`);
-      toast({
-        title: "Успешно",
-        description: "Проект удален",
-      });
+      toast.success("Проект удален");
       fetchProjects();
     } catch (error) {
       console.error('Error deleting project:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось удалить проект",
-        variant: "destructive",
-      });
+      toast.error("Не удалось удалить проект");
     }
   };
 
