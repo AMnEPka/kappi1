@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Server, FileCode, Play, History, Plus, Edit, Trash2, Terminal, Settings, Folder, HardDrive } from "lucide-react";
+import { Server, FileCode, Play, History, Plus, Edit, Trash2, Terminal, Settings, Folder, HardDrive, Briefcase } from "lucide-react";
 import AdminPage from "@/pages/AdminPage";
+import ProjectsPage from "@/pages/ProjectsPage";
+import ProjectWizard from "@/pages/ProjectWizard";
+import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
+import ProjectResultsPage from "@/pages/ProjectResultsPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
