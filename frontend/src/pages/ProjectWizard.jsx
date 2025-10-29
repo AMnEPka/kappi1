@@ -240,7 +240,7 @@ export default function ProjectWizard({ onNavigate }) {
                 <div className="flex-1">
                   <p className="font-medium">{host.name}</p>
                   <p className="text-sm text-gray-500">
-                    {host.hostname}:{host.port} ({host.os_type})
+                    {host.hostname}:{host.port}
                   </p>
                 </div>
               </div>
