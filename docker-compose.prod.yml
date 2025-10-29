@@ -1,0 +1,54 @@
+# Production Docker Compose
+# Используйте: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://yourdomain.com}
+    command: uvicorn server:app --host 0.0.0.0 --port 8001 --workers 4
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mongodb:
+    restart: always
+    volumes:
+      - mongodb_data:/data/db:rw
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ssh-runner-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ssh-runner-network
