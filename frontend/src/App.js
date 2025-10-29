@@ -916,7 +916,7 @@ const Layout = ({ children }) => {
                 </Button>
               </Link>
               <div className="border-l mx-2 h-8"></div>
-              <Link to="/admin/categories">
+              <Link to="/admin">
                 <Button variant="ghost" data-testid="nav-admin">
                   <Settings className="mr-2 h-4 w-4" /> Админ
                 </Button>
