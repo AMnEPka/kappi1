@@ -389,10 +389,12 @@ const ScriptsPage = () => {
       content: "",
       order: 0
     });
+    setFormCategoryId("");
+    setFormSystems([]);
     setEditingScript(null);
   };
 
-  const openEditDialog = (script) => {
+  const openEditDialog = async (script) => {
     setEditingScript(script);
     setFormData({
       system_id: script.system_id,
@@ -401,7 +403,32 @@ const ScriptsPage = () => {
       content: script.content,
       order: script.order || 0
     });
+    
+    // Load category and systems for editing
+    try {
+      const systemRes = await axios.get(`${API}/systems/${script.system_id}`);
+      const system = systemRes.data;
+      setFormCategoryId(system.category_id);
+      
+      const systemsRes = await axios.get(`${API}/systems?category_id=${system.category_id}`);
+      setFormSystems(systemsRes.data);
+    } catch (error) {
+      console.error("Error loading system info:", error);
+    }
+    
     setIsDialogOpen(true);
+  };
+
+  const handleCategoryChangeInForm = async (categoryId) => {
+    setFormCategoryId(categoryId);
+    setFormData({...formData, system_id: ""});
+    
+    try {
+      const response = await axios.get(`${API}/systems?category_id=${categoryId}`);
+      setFormSystems(response.data);
+    } catch (error) {
+      toast.error("Ошибка загрузки систем");
+    }
   };
 
   return (
