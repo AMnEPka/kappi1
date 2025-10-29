@@ -48,11 +48,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
 
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить результаты",
-        variant: "destructive",
-      });
+      toast.error("Не удалось загрузить результаты");
     } finally {
       setLoading(false);
     }
