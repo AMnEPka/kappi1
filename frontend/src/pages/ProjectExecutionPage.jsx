@@ -98,11 +98,11 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
             // Refresh project status
             fetchProject();
 
-            toast({
-              title: data.status === 'completed' ? "Успешно" : "Завершено с ошибками",
-              description: `Выполнено: ${data.completed}, Ошибок: ${data.failed}`,
-              variant: data.status === 'completed' ? "default" : "destructive",
-            });
+            toast.success(
+              data.status === 'completed' 
+                ? `Выполнено успешно: ${data.completed}/${data.total}`
+                : `Завершено с ошибками: ${data.completed}/${data.total}, ошибок: ${data.failed}`
+            );
           } else if (data.type === 'error') {
             setExecuting(false);
             eventSource.close();
