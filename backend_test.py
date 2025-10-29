@@ -295,6 +295,50 @@ class SSHRunnerAPITester:
             if response.get('status') == 'draft':
                 self.log_test("Project created with draft status", True, "")
             else:
+                self.log_test("Project created with draft status", False, f"Got status: {response.get('status')}")
+        else:
+            self.log_test("Project creation failed", False, "Cannot proceed with project tests")
+            return
+
+        # Test 2: Get all projects
+        success, response = self.run_test(
+            "Get all projects",
+            "GET", "projects", 200
+        )
+        
+        if success and isinstance(response, list):
+            self.log_test(f"Projects list retrieved (found {len(response)})", len(response) >= 1, "")
+
+        # Test 3: Get specific project
+        success, response = self.run_test(
+            "Get specific project by ID",
+            "GET", f"projects/{project_id}", 200
+        )
+
+        # Test 4: Update project
+        update_data = {
+            "name": "Updated Test Project Alpha",
+            "description": "Updated description for testing"
+        }
+        success, response = self.run_test(
+            "Update project",
+            "PUT", f"projects/{project_id}", 200, update_data
+        )
+
+        # Test 5: Create second project for testing
+        project_data2 = {
+            "name": "Test Project Beta",
+            "description": "Second test project"
+        }
+        
+        success, response = self.run_test(
+            "Create second project",
+            "POST", "projects", 200, project_data2
+        )
+        
+        if success and 'id' in response:
+            self.created_projects.append(response['id'])
+
     def test_project_cascade_delete(self):
         """Test project cascade delete functionality"""
         print("\n🔍 Testing Project Cascade Delete...")
