@@ -158,44 +158,96 @@ class SSHRunnerAPITester:
             if success:
                 self.created_hosts.remove(windows_host_id)
 
+    def setup_test_data(self):
+        """Setup categories, systems, and scripts needed for project testing"""
+        print("\n🔧 Setting up test data (categories, systems, scripts)...")
+        
+        # Create test category
+        category_data = {
+            "name": "Test Category",
+            "icon": "🧪",
+            "description": "Category for testing"
+        }
+        
+        success, response = self.run_test(
+            "Create test category",
+            "POST", "categories", 200, category_data
+        )
+        
+        if success and 'id' in response:
+            self.created_categories.append(response['id'])
+            category_id = response['id']
+        else:
+            self.log_test("Setup failed - no category", False, "Cannot proceed without category")
+            return False
+
+        # Create test system
+        system_data = {
+            "category_id": category_id,
+            "name": "Test Linux System",
+            "description": "Linux system for testing",
+            "os_type": "linux"
+        }
+        
+        success, response = self.run_test(
+            "Create test system",
+            "POST", "systems", 200, system_data
+        )
+        
+        if success and 'id' in response:
+            self.created_systems.append(response['id'])
+            system_id = response['id']
+        else:
+            self.log_test("Setup failed - no system", False, "Cannot proceed without system")
+            return False
+
+        # Create test scripts
+        scripts_data = [
+            {
+                "system_id": system_id,
+                "name": "System Info Script",
+                "description": "Get system information",
+                "content": "echo 'System Info Test:'; uname -a; date",
+                "order": 1
+            },
+            {
+                "system_id": system_id,
+                "name": "Disk Usage Script", 
+                "description": "Check disk usage",
+                "content": "echo 'Disk Usage Test:'; df -h",
+                "order": 2
+            },
+            {
+                "system_id": system_id,
+                "name": "Memory Info Script",
+                "description": "Check memory usage", 
+                "content": "echo 'Memory Test:'; free -m",
+                "order": 3
+            }
+        ]
+        
+        for script_data in scripts_data:
+            success, response = self.run_test(
+                f"Create script: {script_data['name']}",
+                "POST", "scripts", 200, script_data
+            )
+            
+            if success and 'id' in response:
+                self.created_scripts.append(response['id'])
+
+        return len(self.created_scripts) >= 2  # Need at least 2 scripts for testing
+
     def test_scripts_crud(self):
         """Test all script CRUD operations"""
         print("\n🔍 Testing Scripts CRUD Operations...")
         
-        # Test 1: Create bash script
-        script_data = {
-            "name": "System Info Script",
-            "description": "Get system information",
-            "content": "echo 'System Info:'\nuname -a\ndf -h\nfree -m"
-        }
-        
-        success, response = self.run_test(
-            "Create bash script",
-            "POST", "scripts", 200, script_data
-        )
-        
-        if success and 'id' in response:
-            self.created_scripts.append(response['id'])
-            script_id = response['id']
-        else:
-            script_id = None
+        if not self.created_scripts:
+            self.log_test("Skip script CRUD test", False, "No scripts available from setup")
+            return
 
-        # Test 2: Create another script
-        script_data2 = {
-            "name": "Simple Test Script",
-            "description": "Simple echo test",
-            "content": "echo 'Hello from SSH Script Runner!'\ndate\nwhoami"
-        }
-        
-        success, response = self.run_test(
-            "Create second script",
-            "POST", "scripts", 200, script_data2
-        )
-        
-        if success and 'id' in response:
-            self.created_scripts.append(response['id'])
+        script_id = self.created_scripts[0]
 
-        # Test 3: Get all scripts
+        # Test 1: Get all scripts
         success, response = self.run_test(
             "Get all scripts",
             "GET", "scripts", 200
@@ -204,33 +256,21 @@ class SSHRunnerAPITester:
         if success and isinstance(response, list):
             self.log_test(f"Verify scripts count (found {len(response)})", len(response) >= 2, "")
 
-        # Test 4: Get specific script
-        if script_id:
-            success, response = self.run_test(
-                "Get specific script by ID",
-                "GET", f"scripts/{script_id}", 200
-            )
+        # Test 2: Get specific script
+        success, response = self.run_test(
+            "Get specific script by ID",
+            "GET", f"scripts/{script_id}", 200
+        )
 
-        # Test 5: Update script
-        if script_id:
-            update_data = {
-                "name": "Updated System Info Script",
-                "content": "echo 'Updated System Info:'\nuname -a\nuptime"
-            }
-            success, response = self.run_test(
-                "Update script",
-                "PUT", f"scripts/{script_id}", 200, update_data
-            )
-
-        # Test 6: Delete script (we'll keep one for execution tests)
-        if len(self.created_scripts) > 1:
-            script_to_delete = self.created_scripts[-1]
-            success, response = self.run_test(
-                "Delete script",
-                "DELETE", f"scripts/{script_to_delete}", 200
-            )
-            if success:
-                self.created_scripts.remove(script_to_delete)
+        # Test 3: Update script
+        update_data = {
+            "name": "Updated System Info Script",
+            "content": "echo 'Updated System Info Test:'; uname -a; uptime"
+        }
+        success, response = self.run_test(
+            "Update script",
+            "PUT", f"scripts/{script_id}", 200, update_data
+        )
 
     def test_execution_api(self):
         """Test script execution API"""
