@@ -101,3 +101,141 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Phase 2: Implementing "Project" system for SSH Script Runner application.
+  - Projects group multiple hosts with their assigned system-specific script tasks
+  - Multi-step wizard for project creation (Name -> Hosts -> Scripts per Host -> Confirmation)
+  - Execute projects with "one SSH connection per host" optimization
+  - Real-time execution monitoring via Server-Sent Events (SSE)
+  - Separate "Run Project" action (not automatic after creation)
+  - Detailed results page with drill-down into individual host/script results
+
+backend:
+  - task: "Project CRUD endpoints"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented Project and ProjectTask models with CRUD endpoints at /api/projects"
+  
+  - task: "Project execution with SSE real-time updates"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented POST /api/projects/{id}/execute with Server-Sent Events for real-time progress updates. Executes all scripts per host using one SSH connection. Updates project/task status in DB."
+  
+  - task: "Project executions results endpoint"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented GET /api/projects/{id}/executions to fetch all execution results for a project"
+  
+  - task: "Legacy execute endpoint compatibility"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated legacy /api/execute endpoint to work with new Execution model structure (removed old host_ids and results fields)"
+
+frontend:
+  - task: "Projects list page"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProjectsPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created ProjectsPage showing all projects with status badges, creation/execution dates, and action buttons (Run, View Results, Delete)"
+  
+  - task: "Project creation wizard (multi-step)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProjectWizard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created 4-step wizard: Step 1 (Name/Description), Step 2 (Select Hosts), Step 3 (Assign System/Scripts per Host), Step 4 (Confirmation). Creates project and tasks via API."
+  
+  - task: "Project execution page with real-time monitoring"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProjectExecutionPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created ProjectExecutionPage with SSE connection to monitor execution in real-time. Shows live logs, stats (completed/failed tasks), and auto-scrolls. 'Run Project' button for draft projects."
+  
+  - task: "Project results page"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProjectResultsPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created ProjectResultsPage showing overall stats and results grouped by host. Each script execution can be viewed in detail (output/error) via modal dialog."
+  
+  - task: "Navigation and routing for projects"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added 'Проекты' navigation link and routes: /projects, /projects/new, /projects/:id/execute, /projects/:id/results. Created wrapper components for routing integration."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Project execution with SSE real-time updates"
+    - "Project creation wizard (multi-step)"
+    - "Project execution page with real-time monitoring"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Phase 2 implementation complete. Backend has SSE-based project execution with one SSH connection per host. Frontend has 4-page flow: Projects list -> Wizard -> Execution monitor -> Results. Ready for backend testing."
