@@ -285,65 +285,101 @@ export default function ProjectWizard({ onNavigate }) {
     <Card>
       <CardHeader>
         <CardTitle>Шаг 3: Назначение скриптов</CardTitle>
-        <CardDescription>Для каждого хоста выберите систему и скрипты</CardDescription>
+        <CardDescription>Для каждого хоста выберите системы и скрипты</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
           {projectData.tasks.map((task) => {
             const host = getHostById(task.host_id);
-            const availableScripts = getScriptsBySystemId(task.system_id);
 
             return (
-              <div key={task.host_id} className="border rounded p-4">
-                <h3 className="font-bold mb-3">{host?.name}</h3>
+              <div key={task.host_id} className="border-2 rounded-lg p-4">
+                <h3 className="font-bold text-lg mb-4">{host?.name}</h3>
 
-                <div className="mb-4">
-                  <Label>Система</Label>
-                  <Select
-                    value={task.system_id}
-                    onValueChange={(value) => handleTaskSystemChange(task.host_id, value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Выберите систему" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {systems.map((system) => {
-                        const category = getCategoryById(system.category_id);
-                        return (
-                          <SelectItem key={system.id} value={system.id}>
-                            {category?.icon} {category?.name} → {system.name}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Список систем для этого хоста */}
+                {task.systems.map((system, systemIndex) => {
+                  const availableScripts = getScriptsBySystemId(system.system_id);
+                  const selectedSystem = getSystemById(system.system_id);
 
-                {task.system_id && (
-                  <div>
-                    <Label>Скрипты</Label>
-                    {availableScripts.length === 0 ? (
-                      <p className="text-gray-500 text-sm mt-2">Нет доступных скриптов</p>
-                    ) : (
-                      <div className="space-y-2 mt-2">
-                        {availableScripts.map((script) => (
-                          <div key={script.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              checked={task.script_ids.includes(script.id)}
-                              onCheckedChange={() => handleTaskScriptToggle(task.host_id, script.id)}
-                            />
-                            <div className="flex-1">
-                              <p className="font-medium text-sm">{script.name}</p>
-                              {script.description && (
-                                <p className="text-xs text-gray-500">{script.description}</p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                  return (
+                    <div key={systemIndex} className="mb-6 p-3 border rounded bg-gray-50">
+                      <div className="flex items-center justify-between mb-3">
+                        <Label className="text-base font-semibold">
+                          Система {systemIndex + 1}
+                        </Label>
+                        {task.systems.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveSystemFromHost(task.host_id, systemIndex)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
+
+                      <div className="mb-3">
+                        <Label className="text-sm">Выберите систему</Label>
+                        <Select
+                          value={system.system_id}
+                          onValueChange={(value) => handleTaskSystemChange(task.host_id, systemIndex, value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите систему" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {systems.map((sys) => {
+                              const category = getCategoryById(sys.category_id);
+                              return (
+                                <SelectItem key={sys.id} value={sys.id}>
+                                  {category?.icon} {category?.name} → {sys.name}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {system.system_id && (
+                        <div>
+                          <Label className="text-sm">Скрипты</Label>
+                          {availableScripts.length === 0 ? (
+                            <p className="text-gray-500 text-sm mt-2">Нет доступных скриптов</p>
+                          ) : (
+                            <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
+                              {availableScripts.map((script) => (
+                                <div key={script.id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    checked={system.script_ids.includes(script.id)}
+                                    onCheckedChange={() => handleTaskScriptToggle(task.host_id, systemIndex, script.id)}
+                                  />
+                                  <div className="flex-1">
+                                    <p className="font-medium text-sm">{script.name}</p>
+                                    {script.description && (
+                                      <p className="text-xs text-gray-500">{script.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Кнопка добавления системы */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAddSystemToHost(task.host_id)}
+                  className="w-full"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Добавить ещё систему
+                </Button>
               </div>
             );
           })}
