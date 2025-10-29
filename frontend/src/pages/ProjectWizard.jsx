@@ -160,7 +160,7 @@ export default function ProjectWizard({ onNavigate }) {
       return;
     }
     if (step === 3 && !canProceedToStep4()) {
-      toast.error("Для каждого хоста выберите систему и скрипты");
+      toast.error("Для каждого хоста добавьте хотя бы одну систему и выберите скрипты");
       return;
     }
     setStep(step + 1);
