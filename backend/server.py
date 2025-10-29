@@ -617,6 +617,95 @@ async def delete_script(script_id: str):
     return {"message": "Скрипт удален"}
 
 
+# API Routes - Projects
+@api_router.post("/projects", response_model=Project)
+async def create_project(project_input: ProjectCreate):
+    """Create new project"""
+    project_obj = Project(**project_input.model_dump())
+    doc = prepare_for_mongo(project_obj.model_dump())
+    
+    await db.projects.insert_one(doc)
+    return project_obj
+
+@api_router.get("/projects", response_model=List[Project])
+async def get_projects():
+    """Get all projects"""
+    projects = await db.projects.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return [Project(**parse_from_mongo(proj)) for proj in projects]
+
+@api_router.get("/projects/{project_id}", response_model=Project)
+async def get_project(project_id: str):
+    """Get project by ID"""
+    project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    return Project(**parse_from_mongo(project))
+
+@api_router.put("/projects/{project_id}", response_model=Project)
+async def update_project(project_id: str, project_update: ProjectUpdate):
+    """Update project"""
+    update_data = project_update.model_dump(exclude_unset=True)
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Нет данных для обновления")
+    
+    result = await db.projects.update_one(
+        {"id": project_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    updated_project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+    return Project(**parse_from_mongo(updated_project))
+
+@api_router.delete("/projects/{project_id}")
+async def delete_project(project_id: str):
+    """Delete project"""
+    # Delete associated tasks
+    await db.project_tasks.delete_many({"project_id": project_id})
+    
+    # Delete associated executions
+    await db.executions.delete_many({"project_id": project_id})
+    
+    # Delete project
+    result = await db.projects.delete_one({"id": project_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    return {"message": "Проект удален"}
+
+
+# API Routes - Project Tasks
+@api_router.post("/projects/{project_id}/tasks", response_model=ProjectTask)
+async def create_project_task(project_id: str, task_input: ProjectTaskCreate):
+    """Create task in project"""
+    # Verify project exists
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    task_obj = ProjectTask(project_id=project_id, **task_input.model_dump())
+    doc = prepare_for_mongo(task_obj.model_dump())
+    
+    await db.project_tasks.insert_one(doc)
+    return task_obj
+
+@api_router.get("/projects/{project_id}/tasks", response_model=List[ProjectTask])
+async def get_project_tasks(project_id: str):
+    """Get all tasks for a project"""
+    tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
+
+@api_router.delete("/projects/{project_id}/tasks/{task_id}")
+async def delete_project_task(project_id: str, task_id: str):
+    """Delete task from project"""
+    result = await db.project_tasks.delete_one({"id": task_id, "project_id": project_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    return {"message": "Задание удалено"}
+
+
 # API Routes - Execution
 @api_router.post("/execute")
 async def execute_script(execute_req: ExecuteRequest):
