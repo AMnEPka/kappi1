@@ -941,6 +941,57 @@ const Layout = ({ children }) => {
   );
 };
 
+// Wrapper components for project pages with routing
+const ProjectsPageWrapper = () => {
+  const navigate = useNavigate();
+  const handleNavigate = (page, id) => {
+    if (page === 'project-wizard') {
+      navigate('/projects/new');
+    } else if (page === 'project-execute') {
+      navigate(`/projects/${id}/execute`);
+    } else if (page === 'project-results') {
+      navigate(`/projects/${id}/results`);
+    } else if (page === 'projects') {
+      navigate('/projects');
+    }
+  };
+  return <ProjectsPage onNavigate={handleNavigate} />;
+};
+
+const ProjectWizardWrapper = () => {
+  const navigate = useNavigate();
+  const handleNavigate = (page) => {
+    if (page === 'projects') {
+      navigate('/projects');
+    }
+  };
+  return <ProjectWizard onNavigate={handleNavigate} />;
+};
+
+const ProjectExecutionPageWrapper = () => {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const handleNavigate = (page, id) => {
+    if (page === 'projects') {
+      navigate('/projects');
+    } else if (page === 'project-results') {
+      navigate(`/projects/${id || projectId}/results`);
+    }
+  };
+  return <ProjectExecutionPage projectId={projectId} onNavigate={handleNavigate} />;
+};
+
+const ProjectResultsPageWrapper = () => {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const handleNavigate = (page) => {
+    if (page === 'projects') {
+      navigate('/projects');
+    }
+  };
+  return <ProjectResultsPage projectId={projectId} onNavigate={handleNavigate} />;
+};
+
 function App() {
   return (
     <div className="App">
