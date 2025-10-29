@@ -69,11 +69,10 @@ export default function ProjectWizard({ onNavigate }) {
       } else {
         // Add host
         newHosts = [...prev.hosts, hostId];
-        // Add empty task for this host
+        // Add empty task structure for this host
         newTasks.push({
           host_id: hostId,
-          system_id: '',
-          script_ids: [],
+          systems: [], // Each system will be { system_id, script_ids }
         });
       }
 
@@ -81,27 +80,54 @@ export default function ProjectWizard({ onNavigate }) {
     });
   };
 
-  const handleTaskSystemChange = (hostId, systemId) => {
+  const handleAddSystemToHost = (hostId) => {
     setProjectData(prev => ({
       ...prev,
       tasks: prev.tasks.map(task =>
         task.host_id === hostId
-          ? { ...task, system_id: systemId, script_ids: [] }
+          ? { ...task, systems: [...task.systems, { system_id: '', script_ids: [] }] }
           : task
       ),
     }));
   };
 
-  const handleTaskScriptToggle = (hostId, scriptId) => {
+  const handleRemoveSystemFromHost = (hostId, systemIndex) => {
+    setProjectData(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(task =>
+        task.host_id === hostId
+          ? { ...task, systems: task.systems.filter((_, idx) => idx !== systemIndex) }
+          : task
+      ),
+    }));
+  };
+
+  const handleTaskSystemChange = (hostId, systemIndex, systemId) => {
     setProjectData(prev => ({
       ...prev,
       tasks: prev.tasks.map(task => {
         if (task.host_id === hostId) {
-          const isSelected = task.script_ids.includes(scriptId);
-          const newScriptIds = isSelected
-            ? task.script_ids.filter(id => id !== scriptId)
-            : [...task.script_ids, scriptId];
-          return { ...task, script_ids: newScriptIds };
+          const newSystems = [...task.systems];
+          newSystems[systemIndex] = { system_id: systemId, script_ids: [] };
+          return { ...task, systems: newSystems };
+        }
+        return task;
+      }),
+    }));
+  };
+
+  const handleTaskScriptToggle = (hostId, systemIndex, scriptId) => {
+    setProjectData(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(task => {
+        if (task.host_id === hostId) {
+          const newSystems = [...task.systems];
+          const system = newSystems[systemIndex];
+          const isSelected = system.script_ids.includes(scriptId);
+          system.script_ids = isSelected
+            ? system.script_ids.filter(id => id !== scriptId)
+            : [...system.script_ids, scriptId];
+          return { ...task, systems: newSystems };
         }
         return task;
       }),
