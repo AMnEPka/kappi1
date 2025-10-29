@@ -290,6 +290,8 @@ const ScriptsPage = () => {
   const [selectedSystem, setSelectedSystem] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingScript, setEditingScript] = useState(null);
+  const [formCategoryId, setFormCategoryId] = useState("");
+  const [formSystems, setFormSystems] = useState([]);
   const [formData, setFormData] = useState({
     system_id: "",
     name: "",
