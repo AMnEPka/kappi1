@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Server, FileCode, Play, History, Plus, Edit, Trash2, Terminal, Settings, Folder, HardDrive } from "lucide-react";
+import { Server, FileCode, Play, History, Plus, Edit, Trash2, Terminal, Settings, Folder, HardDrive, Briefcase } from "lucide-react";
 import AdminPage from "@/pages/AdminPage";
+import ProjectsPage from "@/pages/ProjectsPage";
+import ProjectWizard from "@/pages/ProjectWizard";
+import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
+import ProjectResultsPage from "@/pages/ProjectResultsPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -31,8 +35,7 @@ const HostsPage = () => {
     username: "",
     auth_type: "password",
     password: "",
-    ssh_key: "",
-    os_type: "linux"
+    ssh_key: ""
   });
 
   useEffect(() => {
@@ -86,8 +89,7 @@ const HostsPage = () => {
       username: "",
       auth_type: "password",
       password: "",
-      ssh_key: "",
-      os_type: "linux"
+      ssh_key: ""
     });
     setEditingHost(null);
   };
@@ -101,8 +103,7 @@ const HostsPage = () => {
       username: host.username,
       auth_type: host.auth_type,
       password: "",
-      ssh_key: host.ssh_key || "",
-      os_type: host.os_type
+      ssh_key: host.ssh_key || ""
     });
     setIsDialogOpen(true);
   };
@@ -183,18 +184,6 @@ const HostsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label>ОС</Label>
-                  <Select value={formData.os_type} onValueChange={(value) => setFormData({...formData, os_type: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="linux">Linux</SelectItem>
-                      <SelectItem value="windows">Windows</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               {formData.auth_type === "password" ? (
@@ -266,10 +255,7 @@ const HostsPage = () => {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>Пользователь: <strong>{host.username}</strong></div>
-                  <div className="flex gap-2">
-                    <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
-                    <Badge variant="outline">{host.os_type === "linux" ? "Linux" : "Windows"}</Badge>
-                  </div>
+                  <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -799,19 +785,53 @@ const ExecutePage = () => {
 // History Page
 const HistoryPage = () => {
   const [executions, setExecutions] = useState([]);
+  const [hosts, setHosts] = useState({});
 
   useEffect(() => {
-    fetchExecutions();
+    fetchData();
   }, []);
 
-  const fetchExecutions = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get(`${API}/executions`);
-      setExecutions(response.data);
+      const [executionsRes, hostsRes] = await Promise.all([
+        axios.get(`${API}/executions`),
+        axios.get(`${API}/hosts`)
+      ]);
+      setExecutions(executionsRes.data);
+      
+      // Create hosts lookup map
+      const hostsMap = {};
+      hostsRes.data.forEach(host => {
+        hostsMap[host.id] = host;
+      });
+      setHosts(hostsMap);
     } catch (error) {
       toast.error("Ошибка загрузки истории");
     }
   };
+
+  // Group executions by project or by individual script execution
+  const groupedExecutions = executions.reduce((acc, execution) => {
+    if (execution.project_id) {
+      // Group by project
+      if (!acc[execution.project_id]) {
+        acc[execution.project_id] = {
+          type: 'project',
+          project_id: execution.project_id,
+          executions: [],
+          executed_at: execution.executed_at
+        };
+      }
+      acc[execution.project_id].executions.push(execution);
+    } else {
+      // Individual execution (legacy)
+      acc[execution.id] = {
+        type: 'single',
+        execution: execution
+      };
+    }
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -825,58 +845,120 @@ const HistoryPage = () => {
             <p className="text-slate-400 text-sm">Выполните скрипт для просмотра результатов</p>
           </div>
         ) : (
-          executions.map((execution) => (
-            <Card key={execution.id} data-testid={`execution-card-${execution.id}`}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Terminal className="h-5 w-5" />
-                      {execution.script_name}
-                    </CardTitle>
-                    <CardDescription>
-                      {new Date(execution.created_at).toLocaleString('ru-RU')}
-                    </CardDescription>
-                  </div>
-                  <Badge>
-                    {execution.results.filter(r => r.success).length}/{execution.results.length} успешно
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {execution.results.map((result, idx) => (
-                    <div key={idx} className="border rounded p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="font-semibold">{result.host_name}</div>
-                        <Badge variant={result.success ? "default" : "destructive"}>
-                          {result.success ? "Успех" : "Ошибка"}
-                        </Badge>
+          Object.values(groupedExecutions).map((group) => {
+            if (group.type === 'project') {
+              // Project execution display
+              const successCount = group.executions.filter(e => e.success).length;
+              const totalCount = group.executions.length;
+              
+              return (
+                <Card key={group.project_id} data-testid={`execution-card-${group.project_id}`}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Terminal className="h-5 w-5" />
+                          Проект (ID: {group.project_id.substring(0, 8)}...)
+                        </CardTitle>
+                        <CardDescription>
+                          {new Date(group.executed_at).toLocaleString('ru-RU')}
+                        </CardDescription>
                       </div>
+                      <Badge>
+                        {successCount}/{totalCount} успешно
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {group.executions.map((execution) => {
+                        const host = hosts[execution.host_id];
+                        return (
+                          <div key={execution.id} className="border rounded p-3">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <div className="font-semibold">{host?.name || execution.host_id}</div>
+                                <div className="text-sm text-gray-600">{execution.script_name}</div>
+                              </div>
+                              <Badge variant={execution.success ? "default" : "destructive"}>
+                                {execution.success ? "Успех" : "Ошибка"}
+                              </Badge>
+                            </div>
+                            
+                            {execution.output && (
+                              <div>
+                                <Label className="text-xs">Вывод:</Label>
+                                <pre className="bg-slate-900 text-slate-100 p-2 rounded text-xs overflow-x-auto mt-1 max-h-40">
+                                  {execution.output}
+                                </pre>
+                              </div>
+                            )}
+                            
+                            {execution.error && (
+                              <div className="mt-2">
+                                <Label className="text-xs text-red-600">Ошибка:</Label>
+                                <pre className="bg-red-50 text-red-800 p-2 rounded text-xs overflow-x-auto mt-1">
+                                  {execution.error}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            } else {
+              // Single script execution display (legacy)
+              const execution = group.execution;
+              const host = hosts[execution.host_id];
+              
+              return (
+                <Card key={execution.id} data-testid={`execution-card-${execution.id}`}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Terminal className="h-5 w-5" />
+                          {execution.script_name}
+                        </CardTitle>
+                        <CardDescription>
+                          {new Date(execution.executed_at).toLocaleString('ru-RU')}
+                        </CardDescription>
+                      </div>
+                      <Badge variant={execution.success ? "default" : "destructive"}>
+                        {execution.success ? "Успех" : "Ошибка"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded p-3">
+                      <div className="font-semibold mb-2">{host?.name || execution.host_id}</div>
                       
-                      {result.output && (
+                      {execution.output && (
                         <div>
                           <Label className="text-xs">Вывод:</Label>
                           <pre className="bg-slate-900 text-slate-100 p-2 rounded text-xs overflow-x-auto mt-1 max-h-40">
-                            {result.output}
+                            {execution.output}
                           </pre>
                         </div>
                       )}
                       
-                      {result.error && (
+                      {execution.error && (
                         <div className="mt-2">
                           <Label className="text-xs text-red-600">Ошибка:</Label>
                           <pre className="bg-red-50 text-red-800 p-2 rounded text-xs overflow-x-auto mt-1">
-                            {result.error}
+                            {execution.error}
                           </pre>
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                  </CardContent>
+                </Card>
+              );
+            }
+          })
         )}
       </div>
     </div>
@@ -892,7 +974,7 @@ const Layout = ({ children }) => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
               <Terminal className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-bold">SSH Script Runner</span>
+              <span className="text-xl font-bold">OSIB</span>
             </div>
             <div className="flex gap-2">
               <Link to="/">
@@ -908,6 +990,11 @@ const Layout = ({ children }) => {
               <Link to="/execute">
                 <Button variant="ghost" data-testid="nav-execute">
                   <Play className="mr-2 h-4 w-4" /> Выполнение
+                </Button>
+              </Link>
+              <Link to="/projects">
+                <Button variant="ghost" data-testid="nav-projects">
+                  <Briefcase className="mr-2 h-4 w-4" /> Проекты
                 </Button>
               </Link>
               <Link to="/history">
@@ -932,6 +1019,57 @@ const Layout = ({ children }) => {
   );
 };
 
+// Wrapper components for project pages with routing
+const ProjectsPageWrapper = () => {
+  const navigate = useNavigate();
+  const handleNavigate = (page, id) => {
+    if (page === 'project-wizard') {
+      navigate('/projects/new');
+    } else if (page === 'project-execute') {
+      navigate(`/projects/${id}/execute`);
+    } else if (page === 'project-results') {
+      navigate(`/projects/${id}/results`);
+    } else if (page === 'projects') {
+      navigate('/projects');
+    }
+  };
+  return <ProjectsPage onNavigate={handleNavigate} />;
+};
+
+const ProjectWizardWrapper = () => {
+  const navigate = useNavigate();
+  const handleNavigate = (page) => {
+    if (page === 'projects') {
+      navigate('/projects');
+    }
+  };
+  return <ProjectWizard onNavigate={handleNavigate} />;
+};
+
+const ProjectExecutionPageWrapper = () => {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const handleNavigate = (page, id) => {
+    if (page === 'projects') {
+      navigate('/projects');
+    } else if (page === 'project-results') {
+      navigate(`/projects/${id || projectId}/results`);
+    }
+  };
+  return <ProjectExecutionPage projectId={projectId} onNavigate={handleNavigate} />;
+};
+
+const ProjectResultsPageWrapper = () => {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const handleNavigate = (page) => {
+    if (page === 'projects') {
+      navigate('/projects');
+    }
+  };
+  return <ProjectResultsPage projectId={projectId} onNavigate={handleNavigate} />;
+};
+
 function App() {
   return (
     <div className="App">
@@ -941,6 +1079,10 @@ function App() {
             <Route path="/" element={<HostsPage />} />
             <Route path="/scripts" element={<ScriptsPage />} />
             <Route path="/execute" element={<ExecutePage />} />
+            <Route path="/projects" element={<ProjectsPageWrapper />} />
+            <Route path="/projects/new" element={<ProjectWizardWrapper />} />
+            <Route path="/projects/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
+            <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Routes>

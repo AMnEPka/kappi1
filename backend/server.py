@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -13,6 +14,7 @@ import paramiko
 import asyncio
 from cryptography.fernet import Fernet
 import base64
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -110,7 +112,6 @@ class Host(BaseModel):
     auth_type: str  # "password" or "key"
     password: Optional[str] = None
     ssh_key: Optional[str] = None
-    os_type: str = "linux"  # "linux" or "windows"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class HostCreate(BaseModel):
@@ -121,7 +122,6 @@ class HostCreate(BaseModel):
     auth_type: str
     password: Optional[str] = None
     ssh_key: Optional[str] = None
-    os_type: str = "linux"
 
 class HostUpdate(BaseModel):
     name: Optional[str] = None
@@ -131,7 +131,6 @@ class HostUpdate(BaseModel):
     auth_type: Optional[str] = None
     password: Optional[str] = None
     ssh_key: Optional[str] = None
-    os_type: Optional[str] = None
 
 class Script(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -158,6 +157,48 @@ class ScriptUpdate(BaseModel):
     content: Optional[str] = None
     order: Optional[int] = None
 
+# Project Models
+class Project(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    status: str = "draft"  # draft, running, completed, failed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+
+# Project Task Models
+class ProjectTask(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    project_id: str
+    host_id: str
+    system_id: str
+    script_ids: List[str]
+    status: str = "pending"  # pending, running, completed, failed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProjectTaskCreate(BaseModel):
+    host_id: str
+    system_id: str
+    script_ids: List[str]
+
+class ProjectTaskUpdate(BaseModel):
+    script_ids: Optional[List[str]] = None
+    status: Optional[str] = None
+
 class ExecutionResult(BaseModel):
     host_id: str
     host_name: str
@@ -166,17 +207,28 @@ class ExecutionResult(BaseModel):
     error: Optional[str] = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Updated Execution Model
 class Execution(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    project_id: Optional[str] = None  # NEW: Link to project
+    project_task_id: Optional[str] = None  # NEW: Link to task
+    host_id: str
+    system_id: str
     script_id: str
     script_name: str
-    host_ids: List[str]
-    results: List[Dict[str, Any]]
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    success: bool
+    output: str
+    error: Optional[str] = None
+    executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ExecuteProjectRequest(BaseModel):
+    """Request to execute a project"""
+    project_id: str
 
 class ExecuteRequest(BaseModel):
+    """Legacy request to execute a single script on multiple hosts"""
     script_id: str
     host_ids: List[str]
 
@@ -226,13 +278,8 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
                 timeout=10
             )
         
-        # Execute command based on OS type
-        if host.os_type == "windows":
-            # For Windows, use cmd or powershell
-            exec_command = f"cmd /c {command}"
-        else:
-            # For Linux, use bash
-            exec_command = f"bash -c '{command}'"
+        # Execute command with bash
+        exec_command = f"bash -c '{command}'"
         
         stdin, stdout, stderr = ssh.exec_command(exec_command, timeout=30)
         
@@ -569,16 +616,297 @@ async def delete_script(script_id: str):
     return {"message": "Скрипт удален"}
 
 
-# API Routes - Execution
+# API Routes - Projects
+@api_router.post("/projects", response_model=Project)
+async def create_project(project_input: ProjectCreate):
+    """Create new project"""
+    project_obj = Project(**project_input.model_dump())
+    doc = prepare_for_mongo(project_obj.model_dump())
+    
+    await db.projects.insert_one(doc)
+    return project_obj
+
+@api_router.get("/projects", response_model=List[Project])
+async def get_projects():
+    """Get all projects"""
+    projects = await db.projects.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return [Project(**parse_from_mongo(proj)) for proj in projects]
+
+@api_router.get("/projects/{project_id}", response_model=Project)
+async def get_project(project_id: str):
+    """Get project by ID"""
+    project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    return Project(**parse_from_mongo(project))
+
+@api_router.put("/projects/{project_id}", response_model=Project)
+async def update_project(project_id: str, project_update: ProjectUpdate):
+    """Update project"""
+    update_data = project_update.model_dump(exclude_unset=True)
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Нет данных для обновления")
+    
+    result = await db.projects.update_one(
+        {"id": project_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    updated_project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+    return Project(**parse_from_mongo(updated_project))
+
+@api_router.delete("/projects/{project_id}")
+async def delete_project(project_id: str):
+    """Delete project"""
+    # Delete associated tasks
+    await db.project_tasks.delete_many({"project_id": project_id})
+    
+    # Delete associated executions
+    await db.executions.delete_many({"project_id": project_id})
+    
+    # Delete project
+    result = await db.projects.delete_one({"id": project_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    return {"message": "Проект удален"}
+
+
+# API Routes - Project Tasks
+@api_router.post("/projects/{project_id}/tasks", response_model=ProjectTask)
+async def create_project_task(project_id: str, task_input: ProjectTaskCreate):
+    """Create task in project"""
+    # Verify project exists
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    task_obj = ProjectTask(project_id=project_id, **task_input.model_dump())
+    doc = prepare_for_mongo(task_obj.model_dump())
+    
+    await db.project_tasks.insert_one(doc)
+    return task_obj
+
+@api_router.get("/projects/{project_id}/tasks", response_model=List[ProjectTask])
+async def get_project_tasks(project_id: str):
+    """Get all tasks for a project"""
+    tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
+
+@api_router.delete("/projects/{project_id}/tasks/{task_id}")
+async def delete_project_task(project_id: str, task_id: str):
+    """Delete task from project"""
+    result = await db.project_tasks.delete_one({"id": task_id, "project_id": project_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    return {"message": "Задание удалено"}
+
+
+# Project Execution with Real-time Updates (SSE)
+@api_router.post("/projects/{project_id}/execute")
+async def execute_project(project_id: str):
+    """Execute project with real-time updates via Server-Sent Events"""
+    
+    async def event_generator():
+        try:
+            # Get project
+            project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+            if not project:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Проект не найден'})}\n\n"
+                return
+            
+            # Update project status
+            await db.projects.update_one(
+                {"id": project_id},
+                {"$set": {
+                    "status": "running",
+                    "started_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Начало выполнения проекта', 'status': 'running'})}\n\n"
+            
+            # Get all tasks for this project
+            tasks_cursor = db.project_tasks.find({"project_id": project_id}, {"_id": 0})
+            tasks = await tasks_cursor.to_list(1000)
+            
+            if not tasks:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Нет заданий для выполнения'})}\n\n"
+                await db.projects.update_one(
+                    {"id": project_id},
+                    {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+                )
+                return
+            
+            total_tasks = len(tasks)
+            completed_tasks = 0
+            failed_tasks = 0
+            
+            yield f"data: {json.dumps({'type': 'info', 'message': f'Всего заданий: {total_tasks}'})}\n\n"
+            
+            # Process each task (each task = one host with multiple scripts)
+            for task in tasks:
+                task_obj = ProjectTask(**parse_from_mongo(task))
+                
+                # Get host
+                host_doc = await db.hosts.find_one({"id": task_obj.host_id}, {"_id": 0})
+                if not host_doc:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Хост не найден: {task_obj.host_id}'})}\n\n"
+                    failed_tasks += 1
+                    continue
+                
+                host = Host(**parse_from_mongo(host_doc))
+                
+                # Get system
+                system_doc = await db.systems.find_one({"id": task_obj.system_id}, {"_id": 0})
+                if not system_doc:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Система не найдена: {task_obj.system_id}'})}\n\n"
+                    failed_tasks += 1
+                    continue
+                
+                system = System(**parse_from_mongo(system_doc))
+                
+                # Get scripts
+                scripts_cursor = db.scripts.find({"id": {"$in": task_obj.script_ids}}, {"_id": 0})
+                scripts = [Script(**parse_from_mongo(s)) for s in await scripts_cursor.to_list(1000)]
+                
+                if not scripts:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Скрипты не найдены для задания'})}\n\n"
+                    failed_tasks += 1
+                    continue
+                
+                # Update task status
+                await db.project_tasks.update_one(
+                    {"id": task_obj.id},
+                    {"$set": {"status": "running"}}
+                )
+                
+                yield f"data: {json.dumps({'type': 'task_start', 'host_name': host.name, 'system_name': system.name, 'scripts_count': len(scripts)})}\n\n"
+                
+                # Execute all scripts on this host using ONE SSH connection
+                task_success = True
+                task_results = []
+                
+                try:
+                    # Execute scripts sequentially on the same host with one connection
+                    for script in scripts:
+                        yield f"data: {json.dumps({'type': 'script_start', 'host_name': host.name, 'script_name': script.name})}\n\n"
+                        
+                        result = await execute_ssh_command(host, script.content)
+                        
+                        # Save execution result
+                        execution = Execution(
+                            project_id=project_id,
+                            project_task_id=task_obj.id,
+                            host_id=host.id,
+                            system_id=system.id,
+                            script_id=script.id,
+                            script_name=script.name,
+                            success=result.success,
+                            output=result.output,
+                            error=result.error
+                        )
+                        
+                        exec_doc = prepare_for_mongo(execution.model_dump())
+                        await db.executions.insert_one(exec_doc)
+                        
+                        task_results.append(execution)
+                        
+                        if not result.success:
+                            task_success = False
+                            yield f"data: {json.dumps({'type': 'script_error', 'host_name': host.name, 'script_name': script.name, 'error': result.error})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'type': 'script_success', 'host_name': host.name, 'script_name': script.name})}\n\n"
+                    
+                    # Update task status
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "completed" if task_success else "failed"}}
+                    )
+                    
+                    if task_success:
+                        completed_tasks += 1
+                        yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': True})}\n\n"
+                    else:
+                        failed_tasks += 1
+                        yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': False})}\n\n"
+                
+                except Exception as e:
+                    failed_tasks += 1
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "failed"}}
+                    )
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': str(e)})}\n\n"
+            
+            # Update project status
+            final_status = "completed" if failed_tasks == 0 else "failed"
+            await db.projects.update_one(
+                {"id": project_id},
+                {"$set": {
+                    "status": final_status,
+                    "completed_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks})}\n\n"
+        
+        except Exception as e:
+            logger.error(f"Error during project execution: {str(e)}")
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Ошибка: {str(e)}'})}\n\n"
+            
+            # Update project status to failed
+            await db.projects.update_one(
+                {"id": project_id},
+                {"$set": {
+                    "status": "failed",
+                    "completed_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+# Get project execution results
+@api_router.get("/projects/{project_id}/executions", response_model=List[Execution])
+async def get_project_executions(project_id: str):
+    """Get all execution results for a project"""
+    executions = await db.executions.find(
+        {"project_id": project_id},
+        {"_id": 0}
+    ).sort("executed_at", -1).to_list(1000)
+    
+    return [Execution(**parse_from_mongo(execution)) for execution in executions]
+
+
+# API Routes - Execution (Legacy single-script execution)
 @api_router.post("/execute")
 async def execute_script(execute_req: ExecuteRequest):
-    """Execute script on selected hosts"""
+    """Execute script on selected hosts (legacy endpoint)"""
     # Get script
     script_doc = await db.scripts.find_one({"id": execute_req.script_id}, {"_id": 0})
     if not script_doc:
         raise HTTPException(status_code=404, detail="Скрипт не найден")
     
     script = Script(**parse_from_mongo(script_doc))
+    
+    # Get system for this script
+    system_doc = await db.systems.find_one({"id": script.system_id}, {"_id": 0})
+    if not system_doc:
+        raise HTTPException(status_code=404, detail="Система не найдена")
+    
+    system = System(**parse_from_mongo(system_doc))
     
     # Get hosts
     hosts_cursor = db.hosts.find({"id": {"$in": execute_req.host_ids}}, {"_id": 0})
@@ -591,37 +919,30 @@ async def execute_script(execute_req: ExecuteRequest):
     tasks = [execute_ssh_command(host, script.content) for host in hosts]
     results = await asyncio.gather(*tasks)
     
-    # Save execution record
-    execution = Execution(
-        script_id=script.id,
-        script_name=script.name,
-        host_ids=execute_req.host_ids,
-        results=[r.model_dump() for r in results]
-    )
+    # Save execution records (one per host)
+    execution_ids = []
+    for host, result in zip(hosts, results):
+        execution = Execution(
+            host_id=host.id,
+            system_id=system.id,
+            script_id=script.id,
+            script_name=script.name,
+            success=result.success,
+            output=result.output,
+            error=result.error
+        )
+        
+        doc = prepare_for_mongo(execution.model_dump())
+        await db.executions.insert_one(doc)
+        execution_ids.append(execution.id)
     
-    doc = prepare_for_mongo(execution.model_dump())
-    # Prepare results for MongoDB
-    for result in doc['results']:
-        if isinstance(result.get('timestamp'), datetime):
-            result['timestamp'] = result['timestamp'].isoformat()
-    
-    await db.executions.insert_one(doc)
-    
-    return {"execution_id": execution.id, "results": results}
+    return {"execution_ids": execution_ids, "results": [r.model_dump() for r in results]}
 
 @api_router.get("/executions", response_model=List[Execution])
 async def get_executions():
     """Get all executions"""
-    executions = await db.executions.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    
-    for execution in executions:
-        parse_from_mongo(execution)
-        # Parse timestamps in results
-        for result in execution.get('results', []):
-            if isinstance(result.get('timestamp'), str):
-                result['timestamp'] = datetime.fromisoformat(result['timestamp'])
-    
-    return [Execution(**execution) for execution in executions]
+    executions = await db.executions.find({}, {"_id": 0}).sort("executed_at", -1).to_list(1000)
+    return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
 @api_router.get("/executions/{execution_id}", response_model=Execution)
 async def get_execution(execution_id: str):
@@ -630,12 +951,7 @@ async def get_execution(execution_id: str):
     if not execution:
         raise HTTPException(status_code=404, detail="Выполнение не найдено")
     
-    parse_from_mongo(execution)
-    for result in execution.get('results', []):
-        if isinstance(result.get('timestamp'), str):
-            result['timestamp'] = datetime.fromisoformat(result['timestamp'])
-    
-    return Execution(**execution)
+    return Execution(**parse_from_mongo(execution))
 
 
 # Include the router in the main app
