@@ -228,6 +228,7 @@ class Execution(BaseModel):
     success: bool
     output: str
     error: Optional[str] = None
+    check_status: Optional[str] = None  # NEW: Пройдена, Не пройдена, Ошибка, Оператор
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ExecuteProjectRequest(BaseModel):
