@@ -1066,7 +1066,7 @@ async def execute_script(execute_req: ExecuteRequest):
         raise HTTPException(status_code=404, detail="Хосты не найдены")
     
     # Execute on all hosts concurrently
-    tasks = [execute_ssh_command(host, script.content) for host in hosts]
+    tasks = [execute_check_with_processor(host, script.content, script.processor_script) for host in hosts]
     results = await asyncio.gather(*tasks)
     
     # Save execution records (one per host)
