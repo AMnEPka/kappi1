@@ -106,7 +106,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const getHostName = (hostId) => {
     const host = hosts[hostId];
     if (host) {
-      return `${host.name} (${host.host})`;
+      return `${host.name} (${host.hostname})`;
     }
     return `Host ${hostId.substring(0, 8)}`;
   };
