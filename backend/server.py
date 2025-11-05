@@ -257,6 +257,72 @@ async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
             error=f"Ошибка выполнения: {str(e)}"
         )
 
+async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None) -> ExecutionResult:
+    """Execute check command and process results"""
+    # Step 1: Execute the main command
+    main_result = await execute_ssh_command(host, command)
+    
+    if not processor_script:
+        # No processor - return as is
+        return main_result
+    
+    if not main_result.success:
+        # Main command failed - return error
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output=main_result.output,
+            error=main_result.error
+        )
+    
+    # Step 2: Run processor script with main command output as input
+    try:
+        loop = asyncio.get_event_loop()
+        # Create processor command that receives output via stdin
+        processor_cmd = f"cat <<'EOFCHECK'\n{main_result.output}\nEOFCHECK\n | bash -c '{processor_script}'"
+        processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
+        
+        # Parse processor output to determine check result
+        output = processor_result.output.strip()
+        check_status = None
+        
+        # Look for status keywords
+        for line in output.split('\n'):
+            line_lower = line.strip().lower()
+            if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
+                check_status = 'Пройдена'
+                break
+            elif 'не пройдена' in line_lower:
+                check_status = 'Не пройдена'
+                break
+            elif 'ошибка' in line_lower:
+                check_status = 'Ошибка'
+                break
+            elif 'оператор' in line_lower:
+                check_status = 'Оператор'
+                break
+        
+        # Build result message
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Результат обработки ===\n{output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
+        
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=(check_status == 'Пройдена'),
+            output=result_output,
+            error=processor_result.error if processor_result.error else None
+        )
+        
+    except Exception as e:
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output=main_result.output,
+            error=f"Ошибка обработчика: {str(e)}"
+        )
+
 def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
     """Internal function to connect via SSH and execute command"""
     ssh = paramiko.SSHClient()
