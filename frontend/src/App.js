@@ -310,6 +310,8 @@ const ScriptsPage = () => {
     name: "",
     description: "",
     content: "",
+    processor_script: "",
+    has_reference_files: false,
     order: 0
   });
 
