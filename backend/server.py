@@ -1002,30 +1002,13 @@ async def execute_project(project_id: str):
                     )
                     yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': str(e)})}\n\n"
             
-            # Update project status
+            # Send completion event (don't update project status - project is reusable)
             final_status = "completed" if failed_tasks == 0 else "failed"
-            await db.projects.update_one(
-                {"id": project_id},
-                {"$set": {
-                    "status": final_status,
-                    "completed_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            
-            yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks})}\n\n"
+            yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks, 'session_id': session_id})}\n\n"
         
         except Exception as e:
             logger.error(f"Error during project execution: {str(e)}")
             yield f"data: {json.dumps({'type': 'error', 'message': f'Ошибка: {str(e)}'})}\n\n"
-            
-            # Update project status to failed
-            await db.projects.update_one(
-                {"id": project_id},
-                {"$set": {
-                    "status": "failed",
-                    "completed_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
     
     return StreamingResponse(
         event_generator(),
