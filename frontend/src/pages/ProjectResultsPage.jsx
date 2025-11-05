@@ -169,6 +169,41 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
         </div>
       </div>
 
+      {/* Session selector */}
+      {sessions.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Выбор запуска</CardTitle>
+            <CardDescription>Просмотр результатов конкретного запуска проекта</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedSession} onValueChange={setSelectedSession}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Выберите запуск" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.map((session, index) => (
+                  <SelectItem key={session.session_id} value={session.session_id}>
+                    {index === 0 ? '🆕 ' : ''}
+                    {formatDate(session.executed_at)} 
+                    {' - '}
+                    {session.successful_checks}/{session.total_checks} успешно
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
+      {sessions.length === 0 && (
+        <Card className="mb-6">
+          <CardContent className="p-6 text-center">
+            <p className="text-gray-500">Проект ещё не запускался</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Overall Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <Card>
