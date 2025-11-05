@@ -1028,9 +1028,7 @@ const HistoryPage = () => {
                           {new Date(execution.executed_at).toLocaleString('ru-RU')}
                         </CardDescription>
                       </div>
-                      <Badge variant={execution.success ? "default" : "destructive"}>
-                        {execution.success ? "Успех" : "Ошибка"}
-                      </Badge>
+                      {getCheckStatusBadge(execution)}
                     </div>
                   </CardHeader>
                   <CardContent>
