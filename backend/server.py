@@ -1032,6 +1032,44 @@ async def get_project_executions(project_id: str):
     
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
+# Get execution sessions for project (list of unique session runs)
+@api_router.get("/projects/{project_id}/sessions")
+async def get_project_sessions(project_id: str):
+    """Get list of execution sessions for a project"""
+    # Get distinct session IDs with their timestamps
+    pipeline = [
+        {"$match": {"project_id": project_id, "execution_session_id": {"$ne": None}}},
+        {"$group": {
+            "_id": "$execution_session_id",
+            "executed_at": {"$first": "$executed_at"},
+            "count": {"$sum": 1},
+            "success_count": {
+                "$sum": {"$cond": ["$success", 1, 0]}
+            }
+        }},
+        {"$sort": {"executed_at": -1}}
+    ]
+    
+    sessions = await db.executions.aggregate(pipeline).to_list(1000)
+    
+    return [{
+        "session_id": s["_id"],
+        "executed_at": s["executed_at"],
+        "total_checks": s["count"],
+        "successful_checks": s["success_count"]
+    } for s in sessions]
+
+# Get executions for specific session
+@api_router.get("/projects/{project_id}/sessions/{session_id}/executions", response_model=List[Execution])
+async def get_session_executions(project_id: str, session_id: str):
+    """Get all executions for a specific session"""
+    executions = await db.executions.find(
+        {"project_id": project_id, "execution_session_id": session_id},
+        {"_id": 0}
+    ).sort("executed_at", 1).to_list(1000)
+    
+    return [Execution(**parse_from_mongo(execution)) for execution in executions]
+
 
 # API Routes - Execution (Legacy single-script execution)
 @api_router.post("/execute")
