@@ -1037,6 +1037,7 @@ async def get_project_executions(project_id: str):
 async def get_project_sessions(project_id: str):
     """Get list of execution sessions for a project"""
     # Get distinct session IDs with their timestamps and check status counts
+    # If check_status is not one of the expected values, count it as error
     pipeline = [
         {"$match": {"project_id": project_id, "execution_session_id": {"$ne": None}}},
         {"$group": {
@@ -1049,11 +1050,28 @@ async def get_project_sessions(project_id: str):
             "failed_count": {
                 "$sum": {"$cond": [{"$eq": ["$check_status", "Не пройдена"]}, 1, 0]}
             },
-            "error_count": {
-                "$sum": {"$cond": [{"$eq": ["$check_status", "Ошибка"]}, 1, 0]}
-            },
             "operator_count": {
                 "$sum": {"$cond": [{"$eq": ["$check_status", "Оператор"]}, 1, 0]}
+            },
+            "explicit_error_count": {
+                "$sum": {"$cond": [{"$eq": ["$check_status", "Ошибка"]}, 1, 0]}
+            },
+            # Count executions with null, empty, or unexpected check_status as errors
+            "other_count": {
+                "$sum": {
+                    "$cond": [
+                        {
+                            "$and": [
+                                {"$ne": ["$check_status", "Пройдена"]},
+                                {"$ne": ["$check_status", "Не пройдена"]},
+                                {"$ne": ["$check_status", "Оператор"]},
+                                {"$ne": ["$check_status", "Ошибка"]}
+                            ]
+                        },
+                        1,
+                        0
+                    ]
+                }
             }
         }},
         {"$sort": {"executed_at": -1}}
@@ -1067,7 +1085,8 @@ async def get_project_sessions(project_id: str):
         "total_checks": s["count"],
         "passed_count": s["passed_count"],
         "failed_count": s["failed_count"],
-        "error_count": s["error_count"],
+        # Combine explicit errors and unknown statuses
+        "error_count": s["explicit_error_count"] + s["other_count"],
         "operator_count": s["operator_count"]
     } for s in sessions]
 
