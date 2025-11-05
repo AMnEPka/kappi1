@@ -884,16 +884,11 @@ async def execute_project(project_id: str):
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Проект не найден'})}\n\n"
                 return
             
-            # Update project status
-            await db.projects.update_one(
-                {"id": project_id},
-                {"$set": {
-                    "status": "running",
-                    "started_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
+            # Create unique session ID for this execution
+            session_id = str(uuid.uuid4())
             
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Начало выполнения проекта', 'status': 'running'})}\n\n"
+            # Don't update project status - projects are reusable templates now
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Начало выполнения проекта', 'session_id': session_id})}\n\n"
             
             # Get all tasks for this project
             tasks_cursor = db.project_tasks.find({"project_id": project_id}, {"_id": 0})
@@ -901,10 +896,6 @@ async def execute_project(project_id: str):
             
             if not tasks:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Нет заданий для выполнения'})}\n\n"
-                await db.projects.update_one(
-                    {"id": project_id},
-                    {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
-                )
                 return
             
             total_tasks = len(tasks)
