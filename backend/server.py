@@ -1241,8 +1241,10 @@ async def execute_project(project_id: str):
                     yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': str(e)})}\n\n"
             
             # Send completion event (don't update project status - project is reusable)
+            # completed_tasks = hosts that passed all preliminary checks
+            successful_hosts = completed_tasks
             final_status = "completed" if failed_tasks == 0 else "failed"
-            yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks, 'session_id': session_id})}\n\n"
+            yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks, 'successful_hosts': successful_hosts, 'session_id': session_id})}\n\n"
         
         except Exception as e:
             logger.error(f"Error during project execution: {str(e)}")
