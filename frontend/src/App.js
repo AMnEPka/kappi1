@@ -402,6 +402,8 @@ const ScriptsPage = () => {
       name: "",
       description: "",
       content: "",
+      processor_script: "",
+      has_reference_files: false,
       order: 0
     });
     setFormCategoryId("");
@@ -416,6 +418,8 @@ const ScriptsPage = () => {
       name: script.name,
       description: script.description || "",
       content: script.content,
+      processor_script: script.processor_script || "",
+      has_reference_files: script.has_reference_files || false,
       order: script.order || 0
     });
     
