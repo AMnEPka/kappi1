@@ -1,95 +1,108 @@
 <analysis>
-The AI engineer successfully built an SSH script runner application from MVP to a more structured version. The initial phase involved setting up a React frontend and FastAPI backend with MongoDB, implementing basic CRUD for hosts and scripts, and handling SSH execution. The AI diligently addressed UI/UX issues, including modal overlaps, empty states, and component-specific errors ( values, ). Crucially, it integrated a hierarchical script management system ( and ) in , modifying both backend models/APIs and frontend components/navigation. It also provided comprehensive Docker deployment instructions for local setup. Currently, the AI is implementing , introducing a Project concept for running multiple script sets on various hosts, leveraging a single SSH connection per host for efficiency.
+The AI engineer iteratively developed an SSH script runner application, moving from an MVP to a feature-rich system. Key phases included setting up the core React/FastAPI/MongoDB stack, implementing CRUD for hosts and scripts, and introducing a hierarchical script management (Categories, Systems) in Phase 1. Phase 2 focused on a robust Project system for multi-host, multi-script executions with real-time feedback via SSE. The engineer diligently addressed numerous bugs, UI/UX issues, and implemented user-requested features such as custom script fields, SSH connection testing, app rebranding, and adapting for offline environments. The latest work involved re-architecting projects for multiple execution sessions and fixing a persistent CORS issue, but concluded with a frontend build failure related to .
 </analysis>
 
 <product_requirements>
-The user requires a web interface for managing and executing Bash scripts on remote PCs via SSH. The application needs to store hosts and scripts in a database and display execution results. Key requirements included:
-1.  **Host and Script Management:** CRUD operations for hosts and scripts.
-2.  **Script Execution:** Ability to run scripts on selected hosts.
-3.  **Result Output:** Display success/error status and command output.
-4.  **Language:** User interface in Russian.
-5.  **Multi-Host Execution:** Execute scripts on multiple hosts concurrently.
-6.  **OS Compatibility:** Support for both Linux and Windows hosts (requiring SSH server on Windows).
-7.  **Script Hierarchy (Phase 1):** Implement a 3-level nested structure for scripts:
-    *   **Level 1 (Category):** Type of system (e.g., Windows, Linux). DBMS types (like PostgreSQL) are nested within Windows/Linux.
-    *   **Level 2 (System):** Specific system name (e.g., Astra Linux 1.6, Windows Server 2011).
-    *   **Level 3 (Scripts):** 10-50 scripts associated with a specific system.
-    *   **UI/Workflow:** Admin panel for managing categories/systems. Scripts are linked to a single system. Script management uses dropdowns for filtering. Script creation mandates category and system selection.
-8.  **Project System (Phase 2):** Introduce Projects to group multiple hosts and their assigned system-specific script tasks for a single execution run.
-    *   **Project Workflow:** Multi-page wizard for project creation: Project Name -> Select Hosts -> Assign Systems/Scripts per Host -> Confirmation.
-    *   **Execution Logic:** Single SSH connection per host to execute all assigned scripts for that host efficiently.
-    *   **Result Reporting:** Centralized report for the entire project, with detailed drill-down into individual host/script results.
+The application is a web interface for managing and executing Bash scripts on remote PCs via SSH, storing hosts and scripts, and displaying results.
+Initial requirements:
+1.  **Host and Script Management:** CRUD for hosts and scripts.
+2.  **Script Execution:** Run scripts on selected hosts, display output.
+3.  **Multi-Host Execution:** Concurrent script execution.
+4.  **Language:** Russian UI.
+5.  **OS Compatibility:** Linux/Windows (via SSH).
+
+Phase 1: **Script Hierarchy**
+    *   3-level nested structure: Category (e.g., Windows/Linux) -> System (e.g., Astra Linux 1.6) -> Scripts.
+    *   Admin panel for categories/systems, script linking to a single system, dropdown filters.
+
+Phase 2: **Project System (initial)**
+    *   Group multiple hosts/scripts for a single run.
+    *   Multi-page wizard (Name -> Hosts -> Systems/Scripts per Host -> Confirmation).
+    *   Single SSH connection per host for efficiency.
+    *   Centralized project result reporting.
+    *   Explicit requests: Запустить проект action, real-time execution updates via SSE.
+
+Subsequent User Enhancements:
+    *   Remove ОС field from hosts (backend & frontend).
+    *   Allow selecting multiple systems for one host within a project.
+    *   Remove Черновик label post-project creation.
+    *   Rename SSH Script Runner to OSIB.
+    *   Remove Made with Emergent badge.
+    *   Redefine Script as Проверка with new fields: Команды (short), Скрипт-обработчик (processor script returning Пройдена, Не пройдена, Ошибка, Оператор), Эталонные файлы (checkbox).
+    *   Provide command output to Скрипт-обработчик via  env var and stdin.
+    *   Visual distinction for check statuses (green for Пройдена, yellow for Не пройдена, red for Ошибка, blue for Оператор).
+    *   Remove redundant Результат обработки display.
+    *   Ensure offline functionality (no external CDN, local fonts).
+    *   Project Re-architecture: Projects as multi-execution templates, Запустить and Просмотр результатов always present, results viewable for current and previous runs (session history).
 </product_requirements>
 
 <key_technical_concepts>
-- **Full-stack Development:** React (frontend), FastAPI (backend), MongoDB (database).
-- **SSH Connectivity:**  library for SSH script execution.
-- **UI/UX:** Shadcn UI components, Tailwind CSS.
-- **Data Serialization:** Pydantic for FastAPI models, UUIDs for MongoDB IDs, ISO format for datetime.
-- **Deployment:** Docker, .
-- **API Communication:** Axios,  prefix for backend routes, CORS handling.
-- **Error Handling:** Global error listeners for  issues,  checks.
+-   **Full-stack:** React (frontend), FastAPI (backend), MongoDB (database).
+-   **SSH:**  library for remote execution.
+-   **UI/UX:** Shadcn UI, Tailwind CSS,  for toasts.
+-   **Data:** Pydantic for models, UUIDs for IDs, ISO datetime.
+-   **Deployment:** Docker, .
+-   **API:** Axios,  prefix, CORS, SSE (Server-Sent Events) for real-time updates.
+-   **Bash Scripting:** Heredoc and Base64 for safe multi-line script execution.
 </key_technical_concepts>
 
 <code_architecture>
-The application uses a standard React frontend, FastAPI backend, and MongoDB database.
+The application follows a standard React, FastAPI, MongoDB architecture.
 
 
 
-- ****:
-    - **Purpose**: Main FastAPI application handling all backend logic, API endpoints, and database interactions.
-    - **Changes**:
-        - **Initial**: Implemented CRUD for  and  models, and a basic  endpoint.
-        - **Phase 1**: Added  and  Pydantic models. Modified  model to include . Implemented CRUD endpoints for , . Updated  to filter and create scripts with . Added logic to handle existing scripts without  to prevent .
-        - **Phase 2 (Ongoing)**: Added  and  Pydantic models. Updated  model to include  and . Started implementing CRUD endpoints for  and is currently replacing the old  logic with a project-based execution.
-- ****:
-    - **Purpose**: Main React component, handles routing, global state, and renders different pages/components.
-    - **Changes**:
-        - **Initial**: Basic layout, navigation, and pages for Hosts, Scripts, Execute, History.
-        - **Bug Fixes**: Addressed UI issues like modal overlaps, checkbox functionality (), and empty state messages.
-        - **Phase 1**: Integrated  and  (initially as separate paths, then combined into  with tabs). Updated  to include dropdown filters for categories and systems. Refactored navigation and routing. Fixed  value issue from  to .
-        - **Phase 2 (Ongoing)**: Will be updated significantly for the Projects system, including a new , a multi-step project creation wizard, and project results pages.
-- ****:
-    - **Purpose**: Entry point for the React application.
-    - **Changes**: Added global error handlers to suppress  console errors. Integrated  component.
-- ****:
-    - **Purpose**: Admin interface for managing script categories.
-    - **Changes**: Created during Phase 1. Initially had its own header, later integrated as a tab within .
-- ****:
-    - **Purpose**: Admin interface for managing specific systems within categories.
-    - **Changes**: Created during Phase 1. Initially had its own header, later integrated as a tab within . Fixed  value issue.
-- ****:
-    - **Purpose**: Centralized admin panel with tabs for Categories and Systems.
-    - **Changes**: Created during Phase 1 to consolidate admin functions.
-- ****:
-    - **Purpose**: Manages frontend dependencies.
-    - **Changes**: Updated  to  and  to  to resolve Docker build issues.
-- **, , **:
-    - **Purpose**: Docker setup for local development.
-    - **Changes**: Created to facilitate local deployment.  was updated to include  in CORS origins.
+-   ****:
+    -   **Importance**: Central FastAPI application for API endpoints, database, and SSH execution logic.
+    -   **Changes**:
+        -   **Models**: ,  models added.  model updated with , , , .  model updated with , .
+        -   **Endpoints**: CRUD for  (existing).  adapted to GET with SSE for real-time updates. Legacy  endpoint updated to match new  model.  and  functions enhanced for detailed logging, error handling, and / for safe script execution, passing  via env/stdin. New  for SSH diagnostics. Removed  usage in SSH logic. Added  endpoint.
+        -   Removed  from output.
+-   ****:
+    -   **Importance**: Main React component, handles routing and global state.
+    -   **Changes**: Integrated new project pages (, , , ) into routing and navigation.  rewritten to handle new  model structure and display colored status badges. Removed  from Host forms and display cards. Replaced Скрипт with Проверка throughout. Removed Порядок отображения from script form. Corrected  fallback for .
+-   ****:
+    -   **Importance**: React entry point.
+    -   **Changes**: Global error handlers for , integrated .
+-   ****:
+    -   **Importance**: Displays a list of projects.
+    -   **Changes**: Removed Черновик status badge. Modified to always show Запустить and Просмотр результатов buttons. Status labels removed from project cards, as projects are now multi-execution templates.
+-   ****:
+    -   **Importance**: Multi-step form for project creation.
+    -   **Changes**: Fixed  to  usage. Implemented logic to support selecting multiple systems for a single host, updating  structure, , validation, and /. Removed  mentions.
+-   ****:
+    -   **Importance**: Displays real-time project execution status via SSE.
+    -   **Changes**: Fixed a bug related to duplicate POST/GET requests for SSE, now uses a single GET  connection. Fixed  to  usage.
+-   ****:
+    -   **Importance**: Displays results of project executions.
+    -   **Changes**: Fixed  to  usage. Implemented  for colored check statuses (green, yellow, red, blue). Added a dropdown for selecting specific execution sessions for a project.
+-   ****:
+    -   **Importance**: Global styles.
+    -   **Changes**: Removed Google Fonts import, replaced with system fonts for offline compatibility.
+-   ****:
+    -   **Importance**: Main HTML file.
+    -   **Changes**: Removed external CDN links for Emergent, rrweb, PostHog, and  badge for offline compatibility and branding. Updated app title to OSIB.
+-   **, **:
+    -   **Importance**: Docker Compose configurations.
+    -   **Changes**: Removed the deprecated  attribute.
+-   ****:
+    -   **Importance**: New documentation for offline setup.
+    -   **Changes**: Created to document external dependencies and their removal.
 </code_architecture>
 
 <pending_tasks>
-- Complete the implementation of the Project system in the backend, specifically the execution logic with one SSH connection per host.
-- Implement the Project system in the frontend, including the main projects page, the multi-page project creation wizard, and the project results viewing pages.
-- Update the documentation (, ) to reflect the new project structure and deployment instructions accurately.
+-   Update documentation (, ) to reflect new project structure and deployment instructions.
+-   Fix the  build failure.
 </pending_tasks>
 
 <current_work>
-The AI engineer is currently in **Phase 2: Implementing the Project system**.
-This involves:
-1.  **Backend Model Updates:**
-    *   Adding new Pydantic models  and  in .
-    *   Updating the  model to link results to  and .
-2.  **Backend API Development:**
-    *   Implementing CRUD endpoints for  ().
-    *   Adding basic  endpoints.
-    *   The most recent action is to replace the old  endpoint with the new project execution logic that will handle multiple hosts and scripts within a single project, utilizing the optimized one SSH connection per host approach.
+The AI engineer was immediately engaged in re-architecting the project system to support multiple execution sessions. This involved:
+1.  **Backend ():** Adding  to the  model, modifying the project execution logic to generate and associate this ID, removing the project status update after execution, and adding an endpoint () to retrieve all session IDs for a given project.
+2.  **Frontend ():** Removing the display of overall project status (e.g., Ошибка) from project cards and ensuring both Запустить and Просмотр результатов buttons are always visible, as projects are now templates for multiple runs.
+3.  **Frontend ():** Implementing logic to fetch all execution sessions for a project and adding a dropdown menu to allow users to select and view results from different past execution sessions.
 
-This is a significant architectural change, moving from individual script executions to a structured project-based auditing system. The frontend modifications for the new Projects pages and wizard are still pending.
+Immediately after these changes and a backend restart, a frontend build error occurred, specifically a  in  at line 86, related to the  block in an asynchronous function.
 </current_work>
 
 <optional_next_step>
-Implement the  endpoint logic in  following the one SSH connection per host approach.
+Fix the  in  reported in the last message.
 </optional_next_step>
-

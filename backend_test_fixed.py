@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Any
 
 class SSHRunnerAPITester:
-    def __init__(self, base_url="https://script-hub-9.preview.emergentagent.com"):
+    def __init__(self, base_url="https://script-exec.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.tests_run = 0
