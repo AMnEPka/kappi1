@@ -272,7 +272,18 @@ const HostsPage = () => {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>Пользователь: <strong>{host.username}</strong></div>
-                  <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full mt-2"
+                    onClick={() => handleTestConnection(host.id)}
+                    disabled={testingHostId === host.id}
+                  >
+                    {testingHostId === host.id ? "Тестирование..." : "Тест подключения"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
