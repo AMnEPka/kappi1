@@ -64,8 +64,18 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         try {
           const data = JSON.parse(event.data);
           
-          // Add log entry
-          setLogs(prev => [...prev, data]);
+          // Add log entry - but replace previous progress if new progress comes
+          setLogs(prev => {
+            if (data.type === 'script_progress') {
+              // Replace last progress entry if it exists
+              const lastIndex = prev.length - 1;
+              if (lastIndex >= 0 && prev[lastIndex].type === 'script_progress' && 
+                  prev[lastIndex].host_name === data.host_name) {
+                return [...prev.slice(0, lastIndex), data];
+              }
+            }
+            return [...prev, data];
+          });
 
           // Update stats
           if (data.type === 'info') {
