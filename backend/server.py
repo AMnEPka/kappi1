@@ -15,6 +15,7 @@ import asyncio
 from cryptography.fernet import Fernet
 import base64
 import json
+import socket
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
