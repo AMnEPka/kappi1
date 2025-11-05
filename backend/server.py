@@ -140,7 +140,9 @@ class Script(BaseModel):
     system_id: str  # ОБЯЗАТЕЛЬНАЯ связь с системой
     name: str
     description: Optional[str] = None
-    content: str
+    content: str  # Команда (короткая, 1-2 строки)
+    processor_script: Optional[str] = None  # Скрипт-обработчик результатов
+    has_reference_files: bool = False  # Есть ли эталонные файлы
     order: int = 0  # Порядок отображения
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -149,6 +151,8 @@ class ScriptCreate(BaseModel):
     name: str
     description: Optional[str] = None
     content: str
+    processor_script: Optional[str] = None
+    has_reference_files: bool = False
     order: int = 0
 
 class ScriptUpdate(BaseModel):
@@ -156,6 +160,8 @@ class ScriptUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
+    processor_script: Optional[str] = None
+    has_reference_files: Optional[bool] = None
     order: Optional[int] = None
 
 # Project Models
