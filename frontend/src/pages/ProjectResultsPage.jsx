@@ -29,6 +29,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [executions, setExecutions] = useState([]);
   const [groupedExecutions, setGroupedExecutions] = useState({});
   const [selectedExecution, setSelectedExecution] = useState(null);
+  const [hosts, setHosts] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
