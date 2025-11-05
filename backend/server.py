@@ -220,8 +220,9 @@ class Execution(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    project_id: Optional[str] = None  # NEW: Link to project
-    project_task_id: Optional[str] = None  # NEW: Link to task
+    project_id: Optional[str] = None  # Link to project
+    project_task_id: Optional[str] = None  # Link to task
+    execution_session_id: Optional[str] = None  # NEW: Group executions by session (each project run)
     host_id: str
     system_id: str
     script_id: str
@@ -229,7 +230,7 @@ class Execution(BaseModel):
     success: bool
     output: str
     error: Optional[str] = None
-    check_status: Optional[str] = None  # NEW: Пройдена, Не пройдена, Ошибка, Оператор
+    check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ExecuteProjectRequest(BaseModel):
