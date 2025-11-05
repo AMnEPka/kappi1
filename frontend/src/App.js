@@ -532,16 +532,44 @@ const ScriptsPage = () => {
               </div>
 
               <div>
-                <Label>Команды</Label>
+                <Label>Команда</Label>
                 <Textarea
                   data-testid="script-content-input"
                   value={formData.content}
                   onChange={(e) => setFormData({...formData, content: e.target.value})}
-                  placeholder="uname -r"
-                  rows={12}
+                  placeholder="cat /etc/hostname"
+                  rows={2}
                   className="font-mono text-sm"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">Короткая команда (1-2 строки)</p>
+              </div>
+
+              <div>
+                <Label>Скрипт-обработчик</Label>
+                <Textarea
+                  value={formData.processor_script}
+                  onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
+                  placeholder="#!/bin/bash
+# Обработка результата
+# Выведите: 'Пройдена', 'Не пройдена', 'Ошибка' или 'Оператор'"
+                  rows={8}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Возможные результаты: Пройдена, Не пройдена, Ошибка, Оператор
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="has_reference_files"
+                  checked={formData.has_reference_files}
+                  onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
+                />
+                <Label htmlFor="has_reference_files" className="cursor-pointer">
+                  Есть эталонные файлы
+                </Label>
               </div>
 
               <div>
