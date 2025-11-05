@@ -468,9 +468,9 @@ const ScriptsPage = () => {
           </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingScript ? "Редактировать скрипт" : "Новый скрипт"}</DialogTitle>
+              <DialogTitle>{editingScript ? "Редактировать проверку" : "Новая проверка"}</DialogTitle>
               <DialogDescription>
-                Создайте скрипт проверки для конкретной системы
+                Создайте проверку для конкретной системы
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
