@@ -277,10 +277,10 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         </CardContent>
       </Card>
 
-      {!executing && project.status === 'completed' && (
+      {!executing && logs.length > 0 && (
         <div className="mt-6 text-center">
-          <Button onClick={() => onNavigate('project-results', projectId)}>
-            Просмотреть полные результаты
+          <Button onClick={() => onNavigate('project-results', projectId)} size="lg">
+            Просмотр результатов
           </Button>
         </div>
       )}
