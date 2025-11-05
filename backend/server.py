@@ -279,8 +279,19 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
     # Step 2: Run processor script with main command output as input
     try:
         loop = asyncio.get_event_loop()
-        # Create processor command that receives output via stdin
-        processor_cmd = f"cat <<'EOFCHECK'\n{main_result.output}\nEOFCHECK\n | bash -c '{processor_script}'"
+        
+        # Escape single quotes in output for bash
+        escaped_output = main_result.output.replace("'", "'\"'\"'")
+        
+        # Create processor command with output available via:
+        # 1. Environment variable CHECK_OUTPUT
+        # 2. stdin (via echo and pipe)
+        processor_cmd = f"""
+export CHECK_OUTPUT='{escaped_output}'
+echo '{escaped_output}' | {{
+{processor_script}
+}}
+"""
         processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
         
         # Parse processor output to determine check result
