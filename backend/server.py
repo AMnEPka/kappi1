@@ -1079,11 +1079,108 @@ async def execute_project(project_id: str):
                     {"$set": {"status": "running"}}
                 )
                 
-                yield f"data: {json.dumps({'type': 'task_start', 'host_name': host.name, 'system_name': system.name, 'scripts_count': len(scripts)})}\n\n"
+                yield f"data: {json.dumps({'type': 'task_start', 'host_name': host.name, 'host_address': host.hostname, 'system_name': system.name, 'scripts_count': len(scripts)})}\n\n"
                 
-                # Execute all scripts on this host using ONE SSH connection
+                # Perform preliminary checks
+                loop = asyncio.get_event_loop()
+                
+                # 1. Check network access
+                network_ok, network_msg = await loop.run_in_executor(None, _check_network_access, host)
+                yield f"data: {json.dumps({'type': 'check_network', 'host_name': host.name, 'success': network_ok, 'message': network_msg})}\n\n"
+                
+                if not network_ok:
+                    # Mark all scripts as failed with network error
+                    for script in scripts:
+                        execution = Execution(
+                            project_id=project_id,
+                            project_task_id=task_obj.id,
+                            execution_session_id=session_id,
+                            host_id=host.id,
+                            system_id=system.id,
+                            script_id=script.id,
+                            script_name=script.name,
+                            success=False,
+                            output="",
+                            error=network_msg,
+                            check_status="Ошибка"
+                        )
+                        exec_doc = prepare_for_mongo(execution.model_dump())
+                        await db.executions.insert_one(exec_doc)
+                    
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "failed"}}
+                    )
+                    failed_tasks += 1
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': network_msg})}\n\n"
+                    continue
+                
+                # 2. Check SSH login
+                login_ok, login_msg = await loop.run_in_executor(None, _check_ssh_login, host)
+                yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg})}\n\n"
+                
+                if not login_ok:
+                    # Mark all scripts as failed with login error
+                    for script in scripts:
+                        execution = Execution(
+                            project_id=project_id,
+                            project_task_id=task_obj.id,
+                            execution_session_id=session_id,
+                            host_id=host.id,
+                            system_id=system.id,
+                            script_id=script.id,
+                            script_name=script.name,
+                            success=False,
+                            output="",
+                            error=login_msg,
+                            check_status="Ошибка"
+                        )
+                        exec_doc = prepare_for_mongo(execution.model_dump())
+                        await db.executions.insert_one(exec_doc)
+                    
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "failed"}}
+                    )
+                    failed_tasks += 1
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg})}\n\n"
+                    continue
+                
+                # 3. Check sudo access
+                sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_sudo_access, host)
+                yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg})}\n\n"
+                
+                if not sudo_ok:
+                    # Mark all scripts as failed with sudo error
+                    for script in scripts:
+                        execution = Execution(
+                            project_id=project_id,
+                            project_task_id=task_obj.id,
+                            execution_session_id=session_id,
+                            host_id=host.id,
+                            system_id=system.id,
+                            script_id=script.id,
+                            script_name=script.name,
+                            success=False,
+                            output="",
+                            error=sudo_msg,
+                            check_status="Ошибка"
+                        )
+                        exec_doc = prepare_for_mongo(execution.model_dump())
+                        await db.executions.insert_one(exec_doc)
+                    
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "failed"}}
+                    )
+                    failed_tasks += 1
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': sudo_msg})}\n\n"
+                    continue
+                
+                # All checks passed, proceed with script execution
                 task_success = True
                 task_results = []
+                scripts_completed = 0
                 
                 try:
                     # Execute scripts sequentially on the same host with one connection
