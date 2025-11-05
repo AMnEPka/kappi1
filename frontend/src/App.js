@@ -555,14 +555,30 @@ const ScriptsPage = () => {
                   value={formData.processor_script}
                   onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
                   placeholder="#!/bin/bash
-# Обработка результата
-# Выведите: 'Пройдена', 'Не пройдена', 'Ошибка' или 'Оператор'"
-                  rows={8}
+# Результат команды доступен в переменной $CHECK_OUTPUT
+# Также доступен через stdin (можно читать через 'read' или 'cat')
+
+# Пример 1: Через переменную
+if echo '$CHECK_OUTPUT' | grep -q 'нужная строка'; then
+    echo 'Пройдена'
+else
+    echo 'Не пройдена'
+fi
+
+# Пример 2: Через stdin
+# while read line; do
+#     # обработка каждой строки
+# done"
+                  rows={10}
                   className="font-mono text-sm"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Возможные результаты: Пройдена, Не пройдена, Ошибка, Оператор
-                </p>
+                <div className="text-xs text-gray-500 mt-1 space-y-1">
+                  <p className="font-semibold">Доступ к результату команды:</p>
+                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
+                  <p>• Stdin: читайте через <code className="bg-gray-100 px-1 rounded">read</code> или обрабатывайте в цикле</p>
+                  <p className="font-semibold mt-2">Возможные результаты:</p>
+                  <p>Выведите одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>
+                </div>
               </div>
 
               <div className="flex items-center space-x-2">
