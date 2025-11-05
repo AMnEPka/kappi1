@@ -17,29 +17,58 @@ const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
   const [executions, setExecutions] = useState([]);
   const [groupedExecutions, setGroupedExecutions] = useState({});
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    fetchProjectAndSessions();
   }, [projectId]);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    if (selectedSession) {
+      fetchSessionExecutions(selectedSession);
+    }
+  }, [selectedSession]);
+
+  const fetchProjectAndSessions = async () => {
     try {
       setLoading(true);
-      const [projectRes, executionsRes] = await Promise.all([
+      const [projectRes, sessionsRes] = await Promise.all([
         axios.get(`${API_URL}/api/projects/${projectId}`),
-        axios.get(`${API_URL}/api/projects/${projectId}/executions`),
+        axios.get(`${API_URL}/api/projects/${projectId}/sessions`),
       ]);
 
       setProject(projectRes.data);
-      setExecutions(executionsRes.data);
+      setSessions(sessionsRes.data);
+      
+      // Auto-select latest session
+      if (sessionsRes.data.length > 0) {
+        setSelectedSession(sessionsRes.data[0].session_id);
+      }
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error("Не удалось загрузить проект");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSessionExecutions = async (sessionId) => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/projects/${projectId}/sessions/${sessionId}/executions`
+      );
+      
+      setExecutions(response.data);
 
       // Group executions by host
       const grouped = {};
-      executionsRes.data.forEach(exec => {
+      response.data.forEach(exec => {
         if (!grouped[exec.host_id]) {
           grouped[exec.host_id] = [];
         }
@@ -48,6 +77,10 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       setGroupedExecutions(grouped);
 
     } catch (error) {
+      console.error('Error fetching session executions:', error);
+      toast.error("Не удалось загрузить результаты сессии");
+    }
+  };
       console.error('Error fetching data:', error);
       toast.error("Не удалось загрузить результаты");
     } finally {
