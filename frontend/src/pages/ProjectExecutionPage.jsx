@@ -189,12 +189,9 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
   const getLogClassName = (log) => {
     switch (log.type) {
-      case 'script_error':
       case 'task_error':
       case 'error':
         return 'text-red-400';
-      case 'script_success':
-        return 'text-green-400';
       case 'check_network':
       case 'check_login':
       case 'check_sudo':
@@ -203,6 +200,8 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         return 'text-yellow-400';
       case 'task_start':
         return 'text-blue-400 font-bold text-lg';
+      case 'task_complete':
+        return 'text-green-400';
       case 'complete':
         return 'text-blue-400 font-bold';
       default:
