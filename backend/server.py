@@ -413,6 +413,25 @@ async def get_host(host_id: str):
         raise HTTPException(status_code=404, detail="Хост не найден")
     return Host(**parse_from_mongo(host))
 
+@api_router.post("/hosts/{host_id}/test")
+async def test_host_connection(host_id: str):
+    """Test SSH connection to host"""
+    host_doc = await db.hosts.find_one({"id": host_id}, {"_id": 0})
+    if not host_doc:
+        raise HTTPException(status_code=404, detail="Хост не найден")
+    
+    host = Host(**parse_from_mongo(host_doc))
+    
+    # Try simple command
+    result = await execute_ssh_command(host, "echo 'Connection test successful'")
+    
+    return {
+        "success": result.success,
+        "output": result.output,
+        "error": result.error,
+        "message": "Подключение успешно" if result.success else "Ошибка подключения"
+    }
+
 @api_router.put("/hosts/{host_id}", response_model=Host)
 async def update_host(host_id: str, host_update: HostUpdate):
     """Update host"""
