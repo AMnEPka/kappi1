@@ -285,11 +285,11 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
                 Журнал пуст. Нажмите "Запустить проект" для начала выполнения.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {logs.map((log, index) => (
                   <div key={index} className="flex items-start gap-2">
                     <span className="flex-shrink-0 mt-0.5">{getLogIcon(log.type)}</span>
-                    <span className={getLogClassName(log.type)}>
+                    <span className={getLogClassName(log)}>
                       {getLogMessage(log)}
                     </span>
                   </div>
