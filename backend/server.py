@@ -1185,8 +1185,6 @@ async def execute_project(project_id: str):
                 try:
                     # Execute scripts sequentially on the same host with one connection
                     for idx, script in enumerate(scripts, 1):
-                        yield f"data: {json.dumps({'type': 'script_start', 'host_name': host.name, 'script_name': script.name})}\n\n"
-                        
                         # Use processor if available
                         result = await execute_check_with_processor(host, script.content, script.processor_script)
                         
@@ -1215,22 +1213,16 @@ async def execute_project(project_id: str):
                         
                         if not result.success:
                             task_success = False
-                            yield f"data: {json.dumps({'type': 'script_error', 'host_name': host.name, 'script_name': script.name, 'error': result.error})}\n\n"
-                        else:
-                            yield f"data: {json.dumps({'type': 'script_success', 'host_name': host.name, 'script_name': script.name})}\n\n"
                     
-                    # Update task status
+                    # Update task status - host is successful if all preliminary checks passed
                     await db.project_tasks.update_one(
                         {"id": task_obj.id},
-                        {"$set": {"status": "completed" if task_success else "failed"}}
+                        {"$set": {"status": "completed"}}
                     )
                     
-                    if task_success:
-                        completed_tasks += 1
-                        yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': True})}\n\n"
-                    else:
-                        failed_tasks += 1
-                        yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': False})}\n\n"
+                    # Host completed successfully (passed preliminary checks)
+                    completed_tasks += 1
+                    yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': True})}\n\n"
                 
                 except Exception as e:
                     failed_tasks += 1
