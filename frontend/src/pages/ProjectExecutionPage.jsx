@@ -55,15 +55,8 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       setLogs([]);
       setStats({ total: 0, completed: 0, failed: 0 });
 
-      // Trigger execution if needed
-      if (shouldTrigger) {
-        // Just trigger, don't wait for response
-        axios.post(`${API_URL}/api/projects/${projectId}/execute`).catch(err => {
-          console.error('Error triggering execution:', err);
-        });
-      }
-
-      // Connect to SSE for real-time updates
+      // Connect to SSE for real-time updates (EventSource uses GET by default)
+      // The backend endpoint will start execution when first connected
       const eventSource = new EventSource(`${API_URL}/api/projects/${projectId}/execute`);
       eventSourceRef.current = eventSource;
 
