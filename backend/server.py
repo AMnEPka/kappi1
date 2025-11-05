@@ -410,8 +410,8 @@ def _check_ssh_login(host: Host) -> tuple[bool, str]:
         ssh.close()
         return True, "Логин успешен"
     
-    except paramiko.AuthenticationException as e:
-        return False, f"Ошибка аутентификации: неверный логин/пароль/ключ"
+    except paramiko.AuthenticationException:
+        return False, "Ошибка аутентификации: неверный логин/пароль/ключ"
     except Exception as e:
         return False, f"Ошибка логина: {str(e)}"
 
@@ -1069,7 +1069,7 @@ async def execute_project(project_id: str):
                 scripts = [Script(**parse_from_mongo(s)) for s in await scripts_cursor.to_list(1000)]
                 
                 if not scripts:
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'Скрипты не найдены для задания'})}\n\n"
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'Скрипты не найдены для задания'})}\n\n"
                     failed_tasks += 1
                     continue
                 
