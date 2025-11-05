@@ -198,46 +198,6 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
         </Card>
       )}
 
-      {/* Overall Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold">{Object.keys(groupedExecutions).length}</p>
-              <p className="text-gray-600 text-sm">Хостов</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold">{executions.length}</p>
-              <p className="text-gray-600 text-sm">Всего выполнений</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">
-                {executions.filter(e => e.success).length}
-              </p>
-              <p className="text-gray-600 text-sm">Успешно</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-red-600">
-                {executions.filter(e => !e.success).length}
-              </p>
-              <p className="text-gray-600 text-sm">Ошибок</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Results by Host */}
       <Card>
         <CardHeader>
