@@ -1184,11 +1184,14 @@ async def execute_project(project_id: str):
                 
                 try:
                     # Execute scripts sequentially on the same host with one connection
-                    for script in scripts:
+                    for idx, script in enumerate(scripts, 1):
                         yield f"data: {json.dumps({'type': 'script_start', 'host_name': host.name, 'script_name': script.name})}\n\n"
                         
                         # Use processor if available
                         result = await execute_check_with_processor(host, script.content, script.processor_script)
+                        
+                        scripts_completed += 1
+                        yield f"data: {json.dumps({'type': 'script_progress', 'host_name': host.name, 'completed': scripts_completed, 'total': len(scripts)})}\n\n"
                         
                         # Save execution result with session_id
                         execution = Execution(
