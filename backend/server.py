@@ -287,11 +287,12 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         # Create processor command with output available via:
         # 1. Environment variable CHECK_OUTPUT (decoded from base64)
         # 2. stdin (decoded and piped)
+        # Use heredoc to pass the script properly
         processor_cmd = f"""
 export CHECK_OUTPUT=$(echo '{encoded_output}' | base64 -d)
-echo '{encoded_output}' | base64 -d | bash -c '
+echo '{encoded_output}' | base64 -d | bash <<'EOF_PROCESSOR'
 {processor_script}
-'
+EOF_PROCESSOR
 """
         processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
         
