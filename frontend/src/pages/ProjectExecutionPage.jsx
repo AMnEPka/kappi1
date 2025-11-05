@@ -208,7 +208,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
             <p className="text-gray-600 mt-1">{project.description}</p>
           )}
         </div>
-        {project.status === 'draft' && !executing && (
+        {!executing && (
           <Button onClick={() => startExecution(true)} size="lg">
             <Play className="mr-2 h-4 w-4" />
             Запустить проект
