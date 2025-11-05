@@ -462,7 +462,7 @@ const ScriptsPage = () => {
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button data-testid="add-script-btn">
+            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} data-testid="add-script-btn">
               <Plus className="mr-2 h-4 w-4" /> Добавить проверку
             </Button>
           </DialogTrigger>
