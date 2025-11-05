@@ -983,9 +983,7 @@ const HistoryPage = () => {
                                 <div className="font-semibold">{host?.name || execution.host_id}</div>
                                 <div className="text-sm text-gray-600">{execution.script_name}</div>
                               </div>
-                              <Badge variant={execution.success ? "default" : "destructive"}>
-                                {execution.success ? "Успех" : "Ошибка"}
-                              </Badge>
+                              {getCheckStatusBadge(execution)}
                             </div>
                             
                             {execution.output && (
