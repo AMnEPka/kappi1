@@ -212,6 +212,7 @@ class ExecutionResult(BaseModel):
     success: bool
     output: str
     error: Optional[str] = None
+    check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Updated Execution Model
