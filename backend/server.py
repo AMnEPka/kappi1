@@ -318,8 +318,8 @@ EOF_PROCESSOR
                 check_status = 'Оператор'
                 break
         
-        # Build result message
-        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Результат обработки ===\n{output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
+        # Build result message - only command output and final status
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
         
         return ExecutionResult(
             host_id=host.id,
