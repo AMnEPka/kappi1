@@ -45,13 +45,21 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const fetchProjectAndSessions = async () => {
     try {
       setLoading(true);
-      const [projectRes, sessionsRes] = await Promise.all([
+      const [projectRes, sessionsRes, hostsRes] = await Promise.all([
         axios.get(`${API_URL}/api/projects/${projectId}`),
         axios.get(`${API_URL}/api/projects/${projectId}/sessions`),
+        axios.get(`${API_URL}/api/hosts`),
       ]);
 
       setProject(projectRes.data);
       setSessions(sessionsRes.data);
+      
+      // Create hosts map
+      const hostsMap = {};
+      hostsRes.data.forEach(host => {
+        hostsMap[host.id] = host;
+      });
+      setHosts(hostsMap);
       
       // Auto-select latest session
       if (sessionsRes.data.length > 0) {
