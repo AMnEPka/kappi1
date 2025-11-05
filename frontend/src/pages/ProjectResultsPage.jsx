@@ -114,26 +114,28 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const getHostStats = (hostId) => {
     const hostExecutions = groupedExecutions[hostId] || [];
     const total = hostExecutions.length;
-    const successful = hostExecutions.filter(e => e.success).length;
-    const failed = total - successful;
-    return { total, successful, failed };
+    const passed = hostExecutions.filter(e => e.check_status === 'Пройдена').length;
+    const failed = hostExecutions.filter(e => e.check_status === 'Не пройдена').length;
+    const error = hostExecutions.filter(e => e.check_status === 'Ошибка' || (!e.check_status && !e.success)).length;
+    const operator = hostExecutions.filter(e => e.check_status === 'Оператор').length;
+    return { total, passed, failed, error, operator };
   };
 
   // Get badge by check status with colors
   const getCheckStatusBadge = (execution) => {
     const status = execution.check_status;
     
+    // Check explicit statuses first before fallback
     if (status === 'Пройдена') {
       return <Badge className="bg-green-500 hover:bg-green-600">Пройдена</Badge>;
     } else if (status === 'Не пройдена') {
       return <Badge className="bg-yellow-500 hover:bg-yellow-600">Не пройдена</Badge>;
-    } else if (status === 'Ошибка' || !execution.success) {
-      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
     } else if (status === 'Оператор') {
       return <Badge className="bg-blue-500 hover:bg-blue-600">Оператор</Badge>;
-    } else if (execution.success) {
-      return <Badge className="bg-green-500 hover:bg-green-600">Успех</Badge>;
+    } else if (status === 'Ошибка') {
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
     } else {
+      // Fallback for undefined status
       return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
     }
   };
