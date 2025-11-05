@@ -88,12 +88,6 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       toast.error("Не удалось загрузить результаты сессии");
     }
   };
-      console.error('Error fetching data:', error);
-      toast.error("Не удалось загрузить результаты");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
