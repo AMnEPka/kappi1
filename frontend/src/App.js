@@ -463,7 +463,7 @@ const ScriptsPage = () => {
         }}>
           <DialogTrigger asChild>
             <Button data-testid="add-script-btn">
-              <Plus className="mr-2 h-4 w-4" /> Создать скрипт
+              <Plus className="mr-2 h-4 w-4" /> Добавить проверку
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
