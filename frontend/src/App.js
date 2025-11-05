@@ -894,6 +894,25 @@ const HistoryPage = () => {
     }
   };
 
+  // Get badge configuration by check status
+  const getCheckStatusBadge = (execution) => {
+    const status = execution.check_status;
+    
+    if (status === 'Пройдена') {
+      return <Badge className="bg-green-500 hover:bg-green-600">Пройдена</Badge>;
+    } else if (status === 'Не пройдена') {
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Не пройдена</Badge>;
+    } else if (status === 'Ошибка' || !execution.success) {
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
+    } else if (status === 'Оператор') {
+      return <Badge className="bg-blue-500 hover:bg-blue-600">Оператор</Badge>;
+    } else if (execution.success) {
+      return <Badge className="bg-green-500 hover:bg-green-600">Успех</Badge>;
+    } else {
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
+    }
+  };
+
   // Group executions by project or by individual script execution
   const groupedExecutions = executions.reduce((acc, execution) => {
     if (execution.project_id) {
