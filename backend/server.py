@@ -256,36 +256,69 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
     try:
+        logger.info(f"Attempting SSH connection to {host.hostname}:{host.port} as {host.username}")
+        
         # Connect with appropriate authentication
         if host.auth_type == "password":
+            logger.info(f"Using password authentication for {host.name}")
             password = decrypt_password(host.password) if host.password else None
+            if not password:
+                raise Exception("Пароль не указан или не удалось расшифровать")
             ssh.connect(
                 hostname=host.hostname,
                 port=host.port,
                 username=host.username,
                 password=password,
-                timeout=10
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
             )
         else:  # key-based auth
+            logger.info(f"Using key-based authentication for {host.name}")
             from io import StringIO
+            if not host.ssh_key:
+                raise Exception("SSH ключ не указан")
             key_file = StringIO(host.ssh_key)
-            pkey = paramiko.RSAKey.from_private_key(key_file)
+            try:
+                pkey = paramiko.RSAKey.from_private_key(key_file)
+            except:
+                # Try DSA key
+                key_file = StringIO(host.ssh_key)
+                try:
+                    pkey = paramiko.DSSKey.from_private_key(key_file)
+                except:
+                    # Try ECDSA key
+                    key_file = StringIO(host.ssh_key)
+                    try:
+                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                    except:
+                        # Try Ed25519 key
+                        key_file = StringIO(host.ssh_key)
+                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
             ssh.connect(
                 hostname=host.hostname,
                 port=host.port,
                 username=host.username,
                 pkey=pkey,
-                timeout=10
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
             )
+        
+        logger.info(f"Successfully connected to {host.name}")
         
         # Execute command with bash
         exec_command = f"bash -c '{command}'"
+        logger.info(f"Executing command on {host.name}: {exec_command[:100]}...")
         
         stdin, stdout, stderr = ssh.exec_command(exec_command, timeout=30)
         
         output = stdout.read().decode('utf-8', errors='replace')
         error = stderr.read().decode('utf-8', errors='replace')
         exit_status = stdout.channel.recv_exit_status()
+        
+        logger.info(f"Command completed on {host.name} with exit status {exit_status}")
         
         ssh.close()
         
@@ -297,15 +330,17 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
             error=error if error else None
         )
     
-    except paramiko.AuthenticationException:
+    except paramiko.AuthenticationException as e:
+        logger.error(f"Authentication failed for {host.name}: {str(e)}")
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
             success=False,
             output="",
-            error="Ошибка аутентификации"
+            error=f"Ошибка аутентификации: {str(e)}"
         )
     except paramiko.SSHException as e:
+        logger.error(f"SSH error for {host.name}: {str(e)}")
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
@@ -313,7 +348,26 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
             output="",
             error=f"SSH ошибка: {str(e)}"
         )
+    except socket.timeout:
+        logger.error(f"Connection timeout for {host.name}")
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output="",
+            error=f"Превышено время ожидания подключения к {host.hostname}:{host.port}"
+        )
+    except socket.gaierror as e:
+        logger.error(f"DNS resolution failed for {host.name}: {str(e)}")
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output="",
+            error=f"Не удалось разрешить имя хоста {host.hostname}: {str(e)}"
+        )
     except Exception as e:
+        logger.error(f"Connection error for {host.name}: {str(e)}")
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
@@ -322,7 +376,10 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
             error=f"Ошибка подключения: {str(e)}"
         )
     finally:
-        ssh.close()
+        try:
+            ssh.close()
+        except:
+            pass
 
 
 # API Routes - Hosts
