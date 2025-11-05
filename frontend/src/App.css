@@ -18,8 +18,9 @@ body {
   min-height: 100vh;
 }
 
-code, pre {
-  font-family: 'Monaco', 'Courier New', monospace;
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
 }
 
 /* Smooth transitions for interactive elements */
