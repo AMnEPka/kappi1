@@ -214,11 +214,6 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                             className="flex items-center justify-between p-3 border rounded hover:bg-gray-50"
                           >
                             <div className="flex items-center gap-3">
-                              {execution.success ? (
-                                <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                              )}
                               <div>
                                 <p className="font-medium">{execution.script_name}</p>
                                 <p className="text-xs text-gray-500">
@@ -226,14 +221,17 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                                 </p>
                               </div>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setSelectedExecution(execution)}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              Детали
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              {getCheckStatusBadge(execution)}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setSelectedExecution(execution)}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                Детали
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
