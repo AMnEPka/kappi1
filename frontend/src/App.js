@@ -362,7 +362,7 @@ const ScriptsPage = () => {
       const response = await axios.get(url);
       setScripts(response.data);
     } catch (error) {
-      toast.error("Ошибка загрузки скриптов");
+      toast.error("Ошибка загрузки проверок");
     }
   };
 
@@ -371,27 +371,27 @@ const ScriptsPage = () => {
     try {
       if (editingScript) {
         await axios.put(`${API}/scripts/${editingScript.id}`, formData);
-        toast.success("Скрипт обновлен");
+        toast.success("Проверка обновлен");
       } else {
         await axios.post(`${API}/scripts`, formData);
-        toast.success("Скрипт создан");
+        toast.success("Проверка создан");
       }
       setIsDialogOpen(false);
       resetForm();
       fetchScripts();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Ошибка сохранения скрипта");
+      toast.error(error.response?.data?.detail || "Ошибка сохранения проверки");
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Удалить скрипт?")) {
+    if (window.confirm("Удалить проверку?")) {
       try {
         await axios.delete(`${API}/scripts/${id}`);
-        toast.success("Скрипт удален");
+        toast.success("Проверка удален");
         fetchScripts();
       } catch (error) {
-        toast.error("Ошибка удаления скрипта");
+        toast.error("Ошибка удаления проверки");
       }
     }
   };
@@ -639,8 +639,8 @@ const ScriptsPage = () => {
         {scripts.length === 0 ? (
           <div className="col-span-full text-center py-16">
             <FileCode className="h-16 w-16 mx-auto text-slate-300 mb-4" />
-            <p className="text-slate-500 text-lg mb-2">Нет скриптов</p>
-            <p className="text-slate-400 text-sm">Создайте первый скрипт проверки</p>
+            <p className="text-slate-500 text-lg mb-2">Нет проверок</p>
+            <p className="text-slate-400 text-sm">Создайте первый проверку проверки</p>
           </div>
         ) : (
           scripts.map((script) => (
@@ -728,7 +728,7 @@ const ExecutePage = () => {
 
   const handleExecute = async () => {
     if (!selectedScript || selectedHosts.length === 0) {
-      toast.error("Выберите скрипт и хосты");
+      toast.error("Выберите проверку и хосты");
       return;
     }
 
@@ -746,7 +746,7 @@ const ExecutePage = () => {
         navigate('/history');
       }, 1000);
     } catch (error) {
-      toast.error("Ошибка выполнения скрипта");
+      toast.error("Ошибка выполнения проверки");
     } finally {
       setIsExecuting(false);
     }
@@ -770,22 +770,22 @@ const ExecutePage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Выполнение скрипта</h1>
+      <h1 className="text-3xl font-bold">Выполнение проверки</h1>
       
       <Card>
         <CardHeader>
-          <CardTitle>Выберите скрипт</CardTitle>
+          <CardTitle>Выберите проверку</CardTitle>
         </CardHeader>
         <CardContent>
           {scripts.length === 0 ? (
             <div className="text-center py-8 text-slate-500">
-              Нет доступных скриптов. Создайте скрипты на странице "Скрипты".
+              Нет доступных проверок. Создайте проверкуы на странице "Проверки".
             </div>
           ) : (
             <>
               <Select value={selectedScript} onValueChange={setSelectedScript}>
                 <SelectTrigger data-testid="select-script">
-                  <SelectValue placeholder="Выберите скрипт..." />
+                  <SelectValue placeholder="Выберите проверку..." />
                 </SelectTrigger>
                 <SelectContent>
                   {scripts.map((script) => (
@@ -798,7 +798,7 @@ const ExecutePage = () => {
               
               {selectedScript && (
                 <div className="mt-4">
-                  <Label>Содержимое скрипта:</Label>
+                  <Label>Содержимое проверки:</Label>
                   <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto mt-2">
                     {scripts.find(s => s.id === selectedScript)?.content}
                   </pre>
@@ -920,7 +920,7 @@ const HistoryPage = () => {
           <div className="text-center py-16">
             <History className="h-16 w-16 mx-auto text-slate-300 mb-4" />
             <p className="text-slate-500 text-lg mb-2">История выполнений пуста</p>
-            <p className="text-slate-400 text-sm">Выполните скрипт для просмотра результатов</p>
+            <p className="text-slate-400 text-sm">Выполните проверку для просмотра результатов</p>
           </div>
         ) : (
           Object.values(groupedExecutions).map((group) => {
@@ -1062,7 +1062,7 @@ const Layout = ({ children }) => {
               </Link>
               <Link to="/scripts">
                 <Button variant="ghost" data-testid="nav-scripts">
-                  <FileCode className="mr-2 h-4 w-4" /> Скрипты
+                  <FileCode className="mr-2 h-4 w-4" /> Проверки
                 </Button>
               </Link>
               <Link to="/execute">
