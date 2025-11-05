@@ -944,7 +944,8 @@ async def execute_project(project_id: str):
                     for script in scripts:
                         yield f"data: {json.dumps({'type': 'script_start', 'host_name': host.name, 'script_name': script.name})}\n\n"
                         
-                        result = await execute_ssh_command(host, script.content)
+                        # Use processor if available
+                        result = await execute_check_with_processor(host, script.content, script.processor_script)
                         
                         # Save execution result
                         execution = Execution(
