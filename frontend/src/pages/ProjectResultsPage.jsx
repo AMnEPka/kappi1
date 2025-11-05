@@ -72,6 +72,25 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     return { total, successful, failed };
   };
 
+  // Get badge by check status with colors
+  const getCheckStatusBadge = (execution) => {
+    const status = execution.check_status;
+    
+    if (status === 'Пройдена') {
+      return <Badge className="bg-green-500 hover:bg-green-600">Пройдена</Badge>;
+    } else if (status === 'Не пройдена') {
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Не пройдена</Badge>;
+    } else if (status === 'Ошибка' || !execution.success) {
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
+    } else if (status === 'Оператор') {
+      return <Badge className="bg-blue-500 hover:bg-blue-600">Оператор</Badge>;
+    } else if (execution.success) {
+      return <Badge className="bg-green-500 hover:bg-green-600">Успех</Badge>;
+    } else {
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6">
