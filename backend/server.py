@@ -280,17 +280,18 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
     try:
         loop = asyncio.get_event_loop()
         
-        # Escape single quotes in output for bash
-        escaped_output = main_result.output.replace("'", "'\"'\"'")
+        # Encode output as base64 to safely pass any characters
+        import base64
+        encoded_output = base64.b64encode(main_result.output.encode('utf-8')).decode('ascii')
         
         # Create processor command with output available via:
-        # 1. Environment variable CHECK_OUTPUT
-        # 2. stdin (via echo and pipe)
+        # 1. Environment variable CHECK_OUTPUT (decoded from base64)
+        # 2. stdin (decoded and piped)
         processor_cmd = f"""
-export CHECK_OUTPUT='{escaped_output}'
-echo '{escaped_output}' | {{
+export CHECK_OUTPUT=$(echo '{encoded_output}' | base64 -d)
+echo '{encoded_output}' | base64 -d | bash -c '
 {processor_script}
-}}
+'
 """
         processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
         
