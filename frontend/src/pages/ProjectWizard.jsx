@@ -166,7 +166,7 @@ export default function ProjectWizard({ onNavigate }) {
       return;
     }
     if (step === 3 && !canProceedToStep4()) {
-      toast.error("Для каждого хоста добавьте хотя бы одну систему и выберите скрипты");
+      toast.error("Для каждого хоста добавьте хотя бы одну систему и выберите проверкуы");
       return;
     }
     setStep(step + 1);
@@ -260,7 +260,7 @@ export default function ProjectWizard({ onNavigate }) {
     <Card>
       <CardHeader>
         <CardTitle>Шаг 2: Выбор хостов</CardTitle>
-        <CardDescription>Выберите хосты для выполнения скриптов</CardDescription>
+        <CardDescription>Выберите хосты для выполнения проверок</CardDescription>
       </CardHeader>
       <CardContent>
         {hosts.length === 0 ? (
@@ -290,8 +290,8 @@ export default function ProjectWizard({ onNavigate }) {
   const renderStep3 = () => (
     <Card>
       <CardHeader>
-        <CardTitle>Шаг 3: Назначение скриптов</CardTitle>
-        <CardDescription>Для каждого хоста выберите системы и скрипты</CardDescription>
+        <CardTitle>Шаг 3: Назначение проверок</CardTitle>
+        <CardDescription>Для каждого хоста выберите системы и проверкуы</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -349,9 +349,9 @@ export default function ProjectWizard({ onNavigate }) {
 
                       {system.system_id && (
                         <div>
-                          <Label className="text-sm">Скрипты</Label>
+                          <Label className="text-sm">Проверки</Label>
                           {availableScripts.length === 0 ? (
-                            <p className="text-gray-500 text-sm mt-2">Нет доступных скриптов</p>
+                            <p className="text-gray-500 text-sm mt-2">Нет доступных проверок</p>
                           ) : (
                             <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
                               {availableScripts.map((script) => (
@@ -434,7 +434,7 @@ export default function ProjectWizard({ onNavigate }) {
                             Система: {systemInfo?.name}
                           </p>
                           <p className="text-sm text-gray-600">
-                            Скрипты ({taskScripts.length}):
+                            Проверки ({taskScripts.length}):
                           </p>
                           <ul className="list-disc list-inside text-sm text-gray-600 ml-2">
                             {taskScripts.map(script => (
