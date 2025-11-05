@@ -326,7 +326,8 @@ EOF_PROCESSOR
             host_name=host.name,
             success=(check_status == 'Пройдена'),
             output=result_output,
-            error=processor_result.error if processor_result.error else None
+            error=processor_result.error if processor_result.error else None,
+            check_status=check_status
         )
         
     except Exception as e:
