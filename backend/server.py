@@ -973,7 +973,8 @@ async def execute_project(project_id: str):
                             script_name=script.name,
                             success=result.success,
                             output=result.output,
-                            error=result.error
+                            error=result.error,
+                            check_status=result.check_status
                         )
                         
                         exec_doc = prepare_for_mongo(execution.model_dump())
