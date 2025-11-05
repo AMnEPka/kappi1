@@ -234,17 +234,25 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                         <div>
                           <CardTitle className="text-lg">{getHostName(hostId)}</CardTitle>
                           <CardDescription>
-                            Выполнено: {stats.successful}/{stats.total} скриптов
+                            Всего проверок: {stats.total}
                           </CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                          <span className="text-green-600 flex items-center gap-1">
+                        <div className="flex gap-3">
+                          <span className="text-green-600 flex items-center gap-1" title="Пройдена">
                             <CheckCircle className="h-4 w-4" />
-                            {stats.successful}
+                            {stats.passed}
                           </span>
-                          <span className="text-red-600 flex items-center gap-1">
+                          <span className="text-yellow-600 flex items-center gap-1" title="Не пройдена">
                             <XCircle className="h-4 w-4" />
                             {stats.failed}
+                          </span>
+                          <span className="text-red-600 flex items-center gap-1" title="Ошибка">
+                            <XCircle className="h-4 w-4" />
+                            {stats.error}
+                          </span>
+                          <span className="text-blue-600 flex items-center gap-1" title="Требует участия оператора">
+                            <CheckCircle className="h-4 w-4" />
+                            {stats.operator}
                           </span>
                         </div>
                       </div>
