@@ -129,23 +129,20 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       case 'info':
         return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
       case 'task_start':
-      case 'script_start':
         return <Play className="h-4 w-4 text-blue-500" />;
       case 'check_network':
       case 'check_login':
       case 'check_sudo':
         return null; // Will be determined by success/failure in color
       case 'script_progress':
-        return <Loader2 className="h-4 w-4 text-yellow-500" />;
-      case 'script_success':
+        return null; // No icon for progress
       case 'task_complete':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'script_error':
+        return null;
       case 'task_error':
       case 'error':
         return <XCircle className="h-4 w-4 text-red-500" />;
       case 'complete':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return null;
       default:
         return null;
     }
@@ -167,14 +164,8 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         return log.message;
       case 'script_progress':
         return `Проверки проведены ${log.completed}/${log.total}`;
-      case 'script_start':
-        return `Выполнение проверки: ${log.script_name}`;
-      case 'script_success':
-        return `✓ Проверка "${log.script_name}" выполнена успешно`;
-      case 'script_error':
-        return `✗ Ошибка при выполнении проверки "${log.script_name}": ${log.error}`;
       case 'task_complete':
-        return log.success ? '✓ Все проверки завершены успешно' : '✗ Проверки завершены с ошибками';
+        return 'Проверки завершены';
       case 'task_error':
         return `Ошибка на хосте ${log.host_name}: ${log.error}`;
       case 'complete':
