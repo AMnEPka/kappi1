@@ -104,8 +104,11 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   };
 
   const getHostName = (hostId) => {
-    const firstExec = executions.find(e => e.host_id === hostId);
-    return firstExec ? `Host ${hostId.substring(0, 8)}` : hostId;
+    const host = hosts[hostId];
+    if (host) {
+      return `${host.name} (${host.host})`;
+    }
+    return `Host ${hostId.substring(0, 8)}`;
   };
 
   const getHostStats = (hostId) => {
