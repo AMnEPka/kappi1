@@ -576,16 +576,6 @@ const ScriptsPage = () => {
                 </Label>
               </div>
 
-              <div>
-                <Label>Порядок отображения</Label>
-                <Input
-                  type="number"
-                  value={formData.order}
-                  onChange={(e) => setFormData({...formData, order: parseInt(e.target.value)})}
-                  min="0"
-                />
-              </div>
-
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Отмена
