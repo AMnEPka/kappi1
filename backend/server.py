@@ -1096,7 +1096,8 @@ async def execute_script(execute_req: ExecuteRequest):
             script_name=script.name,
             success=result.success,
             output=result.output,
-            error=result.error
+            error=result.error,
+            check_status=result.check_status
         )
         
         doc = prepare_for_mongo(execution.model_dump())
