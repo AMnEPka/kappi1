@@ -28,6 +28,7 @@ const HostsPage = () => {
   const [hosts, setHosts] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingHost, setEditingHost] = useState(null);
+  const [testingHostId, setTestingHostId] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     hostname: "",
