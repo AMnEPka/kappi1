@@ -82,6 +82,22 @@ const HostsPage = () => {
     }
   };
 
+  const handleTestConnection = async (hostId) => {
+    setTestingHostId(hostId);
+    try {
+      const response = await axios.post(`${API}/hosts/${hostId}/test`);
+      if (response.data.success) {
+        toast.success(`✅ ${response.data.message}\n${response.data.output}`);
+      } else {
+        toast.error(`❌ ${response.data.message}\n${response.data.error}`);
+      }
+    } catch (error) {
+      toast.error(`Ошибка тестирования: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setTestingHostId(null);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
