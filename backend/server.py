@@ -955,10 +955,11 @@ async def execute_project(project_id: str):
                         # Use processor if available
                         result = await execute_check_with_processor(host, script.content, script.processor_script)
                         
-                        # Save execution result
+                        # Save execution result with session_id
                         execution = Execution(
                             project_id=project_id,
                             project_task_id=task_obj.id,
+                            execution_session_id=session_id,  # NEW: Link to session
                             host_id=host.id,
                             system_id=system.id,
                             script_id=script.id,
