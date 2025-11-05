@@ -668,9 +668,25 @@ const ScriptsPage = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto max-h-40">
-                  {script.content}
-                </pre>
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="text-gray-600">Команда:</span>
+                    <code className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded">
+                      {script.content.length > 50 ? script.content.substring(0, 50) + '...' : script.content}
+                    </code>
+                  </div>
+                  {script.processor_script && (
+                    <Badge variant="outline" className="text-xs">
+                      <Terminal className="h-3 w-3 mr-1" />
+                      Есть обработчик
+                    </Badge>
+                  )}
+                  {script.has_reference_files && (
+                    <Badge variant="outline" className="text-xs">
+                      📁 Эталонные файлы
+                    </Badge>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))
