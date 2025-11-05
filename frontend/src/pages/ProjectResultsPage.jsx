@@ -181,7 +181,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                     {index === 0 ? '🆕 ' : ''}
                     {formatDate(session.executed_at)} 
                     {' - '}
-                    {session.successful_checks}/{session.total_checks} успешно
+                    Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
                   </SelectItem>
                 ))}
               </SelectContent>
