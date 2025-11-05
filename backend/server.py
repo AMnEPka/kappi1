@@ -867,7 +867,7 @@ async def delete_project_task(project_id: str, task_id: str):
 
 
 # Project Execution with Real-time Updates (SSE)
-@api_router.post("/projects/{project_id}/execute")
+@api_router.get("/projects/{project_id}/execute")
 async def execute_project(project_id: str):
     """Execute project with real-time updates via Server-Sent Events"""
     
