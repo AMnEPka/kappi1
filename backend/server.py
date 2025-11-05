@@ -339,6 +339,145 @@ echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | b
             error=f"Ошибка обработчика: {str(e)}"
         )
 
+def _check_network_access(host: Host) -> tuple[bool, str]:
+    """Check if host is reachable via network"""
+    import socket
+    try:
+        # Try to connect to SSH port
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        result = sock.connect_ex((host.hostname, host.port))
+        sock.close()
+        
+        if result == 0:
+            return True, "Сетевой доступ есть"
+        else:
+            return False, f"Сетевой доступ отсутствует (порт {host.port} недоступен)"
+    except socket.gaierror:
+        return False, f"Не удается разрешить имя хоста {host.hostname}"
+    except Exception as e:
+        return False, f"Ошибка проверки сетевого доступа: {str(e)}"
+
+def _check_ssh_login(host: Host) -> tuple[bool, str]:
+    """Check if SSH login is successful"""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        # Connect with appropriate authentication
+        if host.auth_type == "password":
+            password = decrypt_password(host.password) if host.password else None
+            if not password:
+                return False, "Пароль не указан или не удалось расшифровать"
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                password=password,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
+            )
+        else:  # key-based auth
+            from io import StringIO
+            if not host.ssh_key:
+                return False, "SSH ключ не указан"
+            key_file = StringIO(host.ssh_key)
+            try:
+                pkey = paramiko.RSAKey.from_private_key(key_file)
+            except:
+                key_file = StringIO(host.ssh_key)
+                try:
+                    pkey = paramiko.DSSKey.from_private_key(key_file)
+                except:
+                    key_file = StringIO(host.ssh_key)
+                    try:
+                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                    except:
+                        key_file = StringIO(host.ssh_key)
+                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                pkey=pkey,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
+            )
+        
+        ssh.close()
+        return True, "Логин успешен"
+    
+    except paramiko.AuthenticationException as e:
+        return False, f"Ошибка аутентификации: неверный логин/пароль/ключ"
+    except Exception as e:
+        return False, f"Ошибка логина: {str(e)}"
+
+def _check_sudo_access(host: Host) -> tuple[bool, str]:
+    """Check if sudo is available and working"""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        # Connect with appropriate authentication
+        if host.auth_type == "password":
+            password = decrypt_password(host.password) if host.password else None
+            if not password:
+                return False, "Пароль не указан"
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                password=password,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
+            )
+        else:
+            from io import StringIO
+            if not host.ssh_key:
+                return False, "SSH ключ не указан"
+            key_file = StringIO(host.ssh_key)
+            try:
+                pkey = paramiko.RSAKey.from_private_key(key_file)
+            except:
+                key_file = StringIO(host.ssh_key)
+                try:
+                    pkey = paramiko.DSSKey.from_private_key(key_file)
+                except:
+                    key_file = StringIO(host.ssh_key)
+                    try:
+                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                    except:
+                        key_file = StringIO(host.ssh_key)
+                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                pkey=pkey,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
+            )
+        
+        # Test sudo with a simple command
+        stdin, stdout, stderr = ssh.exec_command("sudo -n true", timeout=10)
+        exit_status = stdout.channel.recv_exit_status()
+        
+        ssh.close()
+        
+        if exit_status == 0:
+            return True, "sudo доступен"
+        else:
+            return False, "sudo недоступен (требуется настройка NOPASSWD или пароль)"
+    
+    except Exception as e:
+        return False, f"Ошибка проверки sudo: {str(e)}"
+
 def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
     """Internal function to connect via SSH and execute command"""
     ssh = paramiko.SSHClient()
