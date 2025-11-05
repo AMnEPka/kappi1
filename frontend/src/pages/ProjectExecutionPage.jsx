@@ -131,6 +131,12 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       case 'task_start':
       case 'script_start':
         return <Play className="h-4 w-4 text-blue-500" />;
+      case 'check_network':
+      case 'check_login':
+      case 'check_sudo':
+        return null; // Will be determined by success/failure in color
+      case 'script_progress':
+        return <Loader2 className="h-4 w-4 text-yellow-500" />;
       case 'script_success':
       case 'task_complete':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -152,19 +158,29 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       case 'error':
         return log.message;
       case 'task_start':
-        return `Начало выполнения на хосте: ${log.host_name} (${log.system_name}), скриптов: ${log.scripts_count}`;
+        return `\nХост ${log.host_name}`;
+      case 'check_network':
+        return log.message;
+      case 'check_login':
+        return log.message;
+      case 'check_sudo':
+        return log.message;
+      case 'script_progress':
+        return `Проверки проведены ${log.completed}/${log.total}`;
       case 'script_start':
-        return `Выполнение скрипта: ${log.script_name} на ${log.host_name}`;
+        return `Выполнение проверки: ${log.script_name}`;
       case 'script_success':
-        return `✓ Скрипт "${log.script_name}" выполнен успешно на ${log.host_name}`;
+        return `✓ Проверка "${log.script_name}" выполнена успешно`;
       case 'script_error':
-        return `✗ Ошибка при выполнении скрипта "${log.script_name}" на ${log.host_name}: ${log.error}`;
+        return `✗ Ошибка при выполнении проверки "${log.script_name}": ${log.error}`;
       case 'task_complete':
-        return `Хост ${log.host_name}: ${log.success ? '✓ Завершено успешно' : '✗ Завершено с ошибками'}`;
+        return log.success ? '✓ Все проверки завершены успешно' : '✗ Проверки завершены с ошибками';
       case 'task_error':
         return `Ошибка на хосте ${log.host_name}: ${log.error}`;
       case 'complete':
-        return `Проект завершен. Статус: ${log.status}. Выполнено: ${log.completed}/${log.total}, Ошибок: ${log.failed}`;
+        const totalHosts = log.total;
+        const successfulHosts = log.successful_hosts || log.completed;
+        return `\nПроверки проведены успешно на ${successfulHosts} ${successfulHosts === 1 ? 'хосте' : 'хостах'} из ${totalHosts}`;
       default:
         return JSON.stringify(log);
     }
