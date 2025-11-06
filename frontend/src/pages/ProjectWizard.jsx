@@ -460,19 +460,19 @@ export default function ProjectWizard({ onNavigate }) {
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Создание проекта</h1>
         <div className="flex items-center gap-2 mt-4">
-          {[1, 2, 3, 4].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className="flex items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  s <= step ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-600'
+                  s <= step ? 'bg-yellow-500 text-white' : 'bg-gray-300 text-gray-600'
                 }`}
               >
                 {s < step ? <Check className="h-4 w-4" /> : s}
               </div>
-              {s < 4 && (
+              {s < 5 && (
                 <div
                   className={`w-16 h-1 ${
-                    s < step ? 'bg-blue-500' : 'bg-gray-300'
+                    s < step ? 'bg-yellow-500' : 'bg-gray-300'
                   }`}
                 />
               )}
