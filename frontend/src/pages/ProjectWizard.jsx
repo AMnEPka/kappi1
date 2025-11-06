@@ -166,9 +166,26 @@ export default function ProjectWizard({ onNavigate }) {
       return;
     }
     if (step === 3 && !canProceedToStep4()) {
-      toast.error("Для каждого хоста добавьте хотя бы одну систему и выберите проверкуы");
+      toast.error("Для каждого хоста добавьте хотя бы одну систему и выберите проверки");
       return;
     }
+    
+    // Skip step 4 if no reference files needed
+    if (step === 3) {
+      const hasReferenceFiles = projectData.tasks.some(task =>
+        task.systems.some(system =>
+          system.script_ids.some(scriptId => {
+            const script = scripts.find(s => s.id === scriptId);
+            return script && script.has_reference_files;
+          })
+        )
+      );
+      if (!hasReferenceFiles) {
+        setStep(5); // Skip to confirmation
+        return;
+      }
+    }
+    
     setStep(step + 1);
   };
 
