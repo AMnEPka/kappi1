@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import ProjectWizard from "@/pages/ProjectWizard";
 import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
 import ProjectResultsPage from "@/pages/ProjectResultsPage";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin.replace(':3000', ':8001').replace('127.0.0.1', 'localhost');
 const API = `${BACKEND_URL}/api`;
 
 // Hosts Page
@@ -28,6 +28,7 @@ const HostsPage = () => {
   const [hosts, setHosts] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingHost, setEditingHost] = useState(null);
+  const [testingHostId, setTestingHostId] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     hostname: "",
@@ -78,6 +79,22 @@ const HostsPage = () => {
       } catch (error) {
         toast.error("Ошибка удаления хоста");
       }
+    }
+  };
+
+  const handleTestConnection = async (hostId) => {
+    setTestingHostId(hostId);
+    try {
+      const response = await axios.post(`${API}/hosts/${hostId}/test`);
+      if (response.data.success) {
+        toast.success(`✅ ${response.data.message}\n${response.data.output}`);
+      } else {
+        toast.error(`❌ ${response.data.message}\n${response.data.error}`);
+      }
+    } catch (error) {
+      toast.error(`Ошибка тестирования: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setTestingHostId(null);
     }
   };
 
@@ -243,10 +260,10 @@ const HostsPage = () => {
                     <CardDescription>{host.hostname}:{host.port}</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(host)}>
+                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(host)} className="hover:bg-yellow-50 hover:text-yellow-600">
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(host.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(host.id)} className="hover:bg-red-50 hover:text-red-600">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -255,7 +272,18 @@ const HostsPage = () => {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>Пользователь: <strong>{host.username}</strong></div>
-                  <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full mt-2"
+                    onClick={() => handleTestConnection(host.id)}
+                    disabled={testingHostId === host.id}
+                  >
+                    {testingHostId === host.id ? "Тестирование..." : "Тест подключения"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -282,6 +310,8 @@ const ScriptsPage = () => {
     name: "",
     description: "",
     content: "",
+    processor_script: "",
+    has_reference_files: false,
     order: 0
   });
 
@@ -332,7 +362,7 @@ const ScriptsPage = () => {
       const response = await axios.get(url);
       setScripts(response.data);
     } catch (error) {
-      toast.error("Ошибка загрузки скриптов");
+      toast.error("Ошибка загрузки проверок");
     }
   };
 
@@ -341,27 +371,27 @@ const ScriptsPage = () => {
     try {
       if (editingScript) {
         await axios.put(`${API}/scripts/${editingScript.id}`, formData);
-        toast.success("Скрипт обновлен");
+        toast.success("Проверка обновлен");
       } else {
         await axios.post(`${API}/scripts`, formData);
-        toast.success("Скрипт создан");
+        toast.success("Проверка создан");
       }
       setIsDialogOpen(false);
       resetForm();
       fetchScripts();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Ошибка сохранения скрипта");
+      toast.error(error.response?.data?.detail || "Ошибка сохранения проверки");
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Удалить скрипт?")) {
+    if (window.confirm("Удалить проверку?")) {
       try {
         await axios.delete(`${API}/scripts/${id}`);
-        toast.success("Скрипт удален");
+        toast.success("Проверка удален");
         fetchScripts();
       } catch (error) {
-        toast.error("Ошибка удаления скрипта");
+        toast.error("Ошибка удаления проверки");
       }
     }
   };
@@ -372,6 +402,8 @@ const ScriptsPage = () => {
       name: "",
       description: "",
       content: "",
+      processor_script: "",
+      has_reference_files: false,
       order: 0
     });
     setFormCategoryId("");
@@ -386,6 +418,8 @@ const ScriptsPage = () => {
       name: script.name,
       description: script.description || "",
       content: script.content,
+      processor_script: script.processor_script || "",
+      has_reference_files: script.has_reference_files || false,
       order: script.order || 0
     });
     
@@ -420,23 +454,23 @@ const ScriptsPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Скрипты проверок</h1>
-          <p className="text-slate-500 mt-1">Управление скриптами для проверки систем</p>
+          <h1 className="text-3xl font-bold">Проверки</h1>
+          <p className="text-slate-600 mt-1">Управление проверками для систем</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button data-testid="add-script-btn">
-              <Plus className="mr-2 h-4 w-4" /> Создать скрипт
+            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} data-testid="add-script-btn">
+              <Plus className="mr-2 h-4 w-4" /> Добавить проверку
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingScript ? "Редактировать скрипт" : "Новый скрипт"}</DialogTitle>
+              <DialogTitle>{editingScript ? "Редактировать проверку" : "Новая проверка"}</DialogTitle>
               <DialogDescription>
-                Создайте скрипт проверки для конкретной системы
+                Создайте проверку для конкретной системы
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -502,26 +536,62 @@ const ScriptsPage = () => {
               </div>
 
               <div>
-                <Label>Команды</Label>
+                <Label>Команда</Label>
                 <Textarea
                   data-testid="script-content-input"
                   value={formData.content}
                   onChange={(e) => setFormData({...formData, content: e.target.value})}
-                  placeholder="uname -r"
-                  rows={12}
+                  placeholder="cat /etc/hostname"
+                  rows={2}
                   className="font-mono text-sm"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">Короткая команда (1-2 строки)</p>
               </div>
 
               <div>
-                <Label>Порядок отображения</Label>
-                <Input
-                  type="number"
-                  value={formData.order}
-                  onChange={(e) => setFormData({...formData, order: parseInt(e.target.value)})}
-                  min="0"
+                <Label>Скрипт-обработчик</Label>
+                <Textarea
+                  value={formData.processor_script}
+                  onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
+                  placeholder="#!/bin/bash
+# Результат команды доступен в переменной $CHECK_OUTPUT
+# Также доступен через stdin (можно читать через 'read' или 'cat')
+
+# Пример 1: Через переменную
+if echo '$CHECK_OUTPUT' | grep -q 'нужная строка'; then
+    echo 'Пройдена'
+else
+    echo 'Не пройдена'
+fi
+
+# Пример 2: Через stdin
+# while read line; do
+#     # обработка каждой строки
+# done"
+                  rows={10}
+                  className="font-mono text-sm"
                 />
+                <div className="text-xs text-gray-500 mt-1 space-y-1">
+                  <p className="font-semibold">Доступ к результату команды:</p>
+                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
+                  <p>• Stdin: читайте через <code className="bg-gray-100 px-1 rounded">read</code> или обрабатывайте в цикле</p>
+                  <p className="font-semibold mt-2">Возможные результаты:</p>
+                  <p>Выведите одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>
+                  <p className="font-semibold">Доступ к эталонным файлам:</p>
+                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>                    
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="has_reference_files"
+                  checked={formData.has_reference_files}
+                  onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
+                />
+                <Label htmlFor="has_reference_files" className="cursor-pointer">
+                  Есть эталонные файлы
+                </Label>
               </div>
 
               <div className="flex justify-end gap-2">
@@ -577,8 +647,8 @@ const ScriptsPage = () => {
         {scripts.length === 0 ? (
           <div className="col-span-full text-center py-16">
             <FileCode className="h-16 w-16 mx-auto text-slate-300 mb-4" />
-            <p className="text-slate-500 text-lg mb-2">Нет скриптов</p>
-            <p className="text-slate-400 text-sm">Создайте первый скрипт проверки</p>
+            <p className="text-slate-500 text-lg mb-2">Нет проверок</p>
+            <p className="text-slate-400 text-sm">Создайте первый проверку проверки</p>
           </div>
         ) : (
           scripts.map((script) => (
@@ -610,9 +680,25 @@ const ScriptsPage = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto max-h-40">
-                  {script.content}
-                </pre>
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="text-gray-600">Команда:</span>
+                    <code className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded">
+                      {script.content.length > 50 ? script.content.substring(0, 50) + '...' : script.content}
+                    </code>
+                  </div>
+                  {script.processor_script && (
+                    <Badge variant="outline" className="text-xs">
+                      <Terminal className="h-3 w-3 mr-1" />
+                      Есть обработчик
+                    </Badge>
+                  )}
+                  {script.has_reference_files && (
+                    <Badge variant="outline" className="text-xs">
+                      📁 Эталонные файлы
+                    </Badge>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))
@@ -650,7 +736,7 @@ const ExecutePage = () => {
 
   const handleExecute = async () => {
     if (!selectedScript || selectedHosts.length === 0) {
-      toast.error("Выберите скрипт и хосты");
+      toast.error("Выберите проверку и хосты");
       return;
     }
 
@@ -668,7 +754,7 @@ const ExecutePage = () => {
         navigate('/history');
       }, 1000);
     } catch (error) {
-      toast.error("Ошибка выполнения скрипта");
+      toast.error("Ошибка выполнения проверки");
     } finally {
       setIsExecuting(false);
     }
@@ -692,22 +778,22 @@ const ExecutePage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Выполнение скрипта</h1>
+      <h1 className="text-3xl font-bold">Выполнение проверки</h1>
       
       <Card>
         <CardHeader>
-          <CardTitle>Выберите скрипт</CardTitle>
+          <CardTitle>Выберите проверку</CardTitle>
         </CardHeader>
         <CardContent>
           {scripts.length === 0 ? (
             <div className="text-center py-8 text-slate-500">
-              Нет доступных скриптов. Создайте скрипты на странице "Скрипты".
+              Нет доступных проверок. Создайте проверкуы на странице "Проверки".
             </div>
           ) : (
             <>
               <Select value={selectedScript} onValueChange={setSelectedScript}>
                 <SelectTrigger data-testid="select-script">
-                  <SelectValue placeholder="Выберите скрипт..." />
+                  <SelectValue placeholder="Выберите проверку..." />
                 </SelectTrigger>
                 <SelectContent>
                   {scripts.map((script) => (
@@ -720,7 +806,7 @@ const ExecutePage = () => {
               
               {selectedScript && (
                 <div className="mt-4">
-                  <Label>Содержимое скрипта:</Label>
+                  <Label>Содержимое проверки:</Label>
                   <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-x-auto mt-2">
                     {scripts.find(s => s.id === selectedScript)?.content}
                   </pre>
@@ -810,6 +896,25 @@ const HistoryPage = () => {
     }
   };
 
+  // Get badge configuration by check status
+  const getCheckStatusBadge = (execution) => {
+    const status = execution.check_status;
+    
+    if (status === 'Пройдена') {
+      return <Badge className="bg-green-500 hover:bg-green-600">Пройдена</Badge>;
+    } else if (status === 'Не пройдена') {
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Не пройдена</Badge>;
+    } else if (status === 'Ошибка' || !execution.success) {
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
+    } else if (status === 'Оператор') {
+      return <Badge className="bg-blue-500 hover:bg-blue-600">Оператор</Badge>;
+    } else if (execution.success) {
+      return <Badge className="bg-green-500 hover:bg-green-600">Успех</Badge>;
+    } else {
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
+    }
+  };
+
   // Group executions by project or by individual script execution
   const groupedExecutions = executions.reduce((acc, execution) => {
     if (execution.project_id) {
@@ -842,7 +947,7 @@ const HistoryPage = () => {
           <div className="text-center py-16">
             <History className="h-16 w-16 mx-auto text-slate-300 mb-4" />
             <p className="text-slate-500 text-lg mb-2">История выполнений пуста</p>
-            <p className="text-slate-400 text-sm">Выполните скрипт для просмотра результатов</p>
+            <p className="text-slate-400 text-sm">Выполните проверку для просмотра результатов</p>
           </div>
         ) : (
           Object.values(groupedExecutions).map((group) => {
@@ -880,9 +985,7 @@ const HistoryPage = () => {
                                 <div className="font-semibold">{host?.name || execution.host_id}</div>
                                 <div className="text-sm text-gray-600">{execution.script_name}</div>
                               </div>
-                              <Badge variant={execution.success ? "default" : "destructive"}>
-                                {execution.success ? "Успех" : "Ошибка"}
-                              </Badge>
+                              {getCheckStatusBadge(execution)}
                             </div>
                             
                             {execution.output && (
@@ -927,9 +1030,7 @@ const HistoryPage = () => {
                           {new Date(execution.executed_at).toLocaleString('ru-RU')}
                         </CardDescription>
                       </div>
-                      <Badge variant={execution.success ? "default" : "destructive"}>
-                        {execution.success ? "Успех" : "Ошибка"}
-                      </Badge>
+                      {getCheckStatusBadge(execution)}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -967,44 +1068,58 @@ const HistoryPage = () => {
 
 // Main Layout
 const Layout = ({ children }) => {
+  const location = useLocation();
+  
+  const isActive = (path) => {
+    if (path === '/hosts') return location.pathname === '/hosts';
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
+  
+  const navLinkClass = (path) => {
+    return isActive(path) 
+      ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700" 
+      : "hover:bg-gray-100";
+  };
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
-      <nav className="bg-white border-b shadow-sm">
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <Terminal className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-bold">OSIB</span>
-            </div>
+            <Link to="/" className="flex items-center gap-3">
+              <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
+              <span className="text-2xl font-bold text-gray-800">OSIB</span>
+            </Link>
             <div className="flex gap-2">
               <Link to="/">
-                <Button variant="ghost" data-testid="nav-hosts">
+                <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/')}>
+                  <Briefcase className="mr-2 h-4 w-4" /> Проекты
+                </Button>
+              </Link>
+              <Link to="/hosts">
+                <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/hosts')}>
                   <Server className="mr-2 h-4 w-4" /> Хосты
                 </Button>
               </Link>
               <Link to="/scripts">
-                <Button variant="ghost" data-testid="nav-scripts">
-                  <FileCode className="mr-2 h-4 w-4" /> Скрипты
+                <Button variant="ghost" data-testid="nav-scripts" className={navLinkClass('/scripts')}>
+                  <FileCode className="mr-2 h-4 w-4" /> Проверки
                 </Button>
               </Link>
               <Link to="/execute">
-                <Button variant="ghost" data-testid="nav-execute">
+                <Button variant="ghost" data-testid="nav-execute" className={navLinkClass('/execute')}>
                   <Play className="mr-2 h-4 w-4" /> Выполнение
                 </Button>
               </Link>
-              <Link to="/projects">
-                <Button variant="ghost" data-testid="nav-projects">
-                  <Briefcase className="mr-2 h-4 w-4" /> Проекты
-                </Button>
-              </Link>
               <Link to="/history">
-                <Button variant="ghost" data-testid="nav-history">
+                <Button variant="ghost" data-testid="nav-history" className={navLinkClass('/history')}>
                   <History className="mr-2 h-4 w-4" /> История
                 </Button>
               </Link>
-              <div className="border-l mx-2 h-8"></div>
+              <div className="border-l mx-2 h-8 border-gray-200"></div>
               <Link to="/admin">
-                <Button variant="ghost" data-testid="nav-admin">
+                <Button variant="ghost" data-testid="nav-admin" className={navLinkClass('/admin')}>
                   <Settings className="mr-2 h-4 w-4" /> Админ
                 </Button>
               </Link>
@@ -1030,7 +1145,7 @@ const ProjectsPageWrapper = () => {
     } else if (page === 'project-results') {
       navigate(`/projects/${id}/results`);
     } else if (page === 'projects') {
-      navigate('/projects');
+      navigate('/');
     }
   };
   return <ProjectsPage onNavigate={handleNavigate} />;
@@ -1040,7 +1155,7 @@ const ProjectWizardWrapper = () => {
   const navigate = useNavigate();
   const handleNavigate = (page) => {
     if (page === 'projects') {
-      navigate('/projects');
+      navigate('/');
     }
   };
   return <ProjectWizard onNavigate={handleNavigate} />;
@@ -1051,7 +1166,7 @@ const ProjectExecutionPageWrapper = () => {
   const navigate = useNavigate();
   const handleNavigate = (page, id) => {
     if (page === 'projects') {
-      navigate('/projects');
+      navigate('/');
     } else if (page === 'project-results') {
       navigate(`/projects/${id || projectId}/results`);
     }
@@ -1064,7 +1179,7 @@ const ProjectResultsPageWrapper = () => {
   const navigate = useNavigate();
   const handleNavigate = (page) => {
     if (page === 'projects') {
-      navigate('/projects');
+      navigate('/');
     }
   };
   return <ProjectResultsPage projectId={projectId} onNavigate={handleNavigate} />;
@@ -1076,10 +1191,10 @@ function App() {
       <BrowserRouter>
         <Layout>
           <Routes>
-            <Route path="/" element={<HostsPage />} />
+            <Route path="/" element={<ProjectsPageWrapper />} />
+            <Route path="/hosts" element={<HostsPage />} />
             <Route path="/scripts" element={<ScriptsPage />} />
             <Route path="/execute" element={<ExecutePage />} />
-            <Route path="/projects" element={<ProjectsPageWrapper />} />
             <Route path="/projects/new" element={<ProjectWizardWrapper />} />
             <Route path="/projects/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
             <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />

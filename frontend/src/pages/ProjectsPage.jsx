@@ -99,75 +99,43 @@ export default function ProjectsPage({ onNavigate }) {
             <Card key={project.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1">
                     <CardTitle className="text-xl">{project.name}</CardTitle>
                     {project.description && (
                       <CardDescription>{project.description}</CardDescription>
                     )}
                   </div>
-                  {project.status !== 'draft' && getStatusBadge(project.status)}
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
-                  <div>
-                    <p className="text-gray-500">Создан</p>
-                    <p className="font-medium">{formatDate(project.created_at)}</p>
-                  </div>
-                  {project.started_at && (
-                    <div>
-                      <p className="text-gray-500">Запущен</p>
-                      <p className="font-medium">{formatDate(project.started_at)}</p>
-                    </div>
-                  )}
-                  {project.completed_at && (
-                    <div>
-                      <p className="text-gray-500">Завершен</p>
-                      <p className="font-medium">{formatDate(project.completed_at)}</p>
-                    </div>
-                  )}
+                <div className="mb-4 text-sm">
+                  <p className="text-gray-500">Создан: <span className="font-medium">{formatDate(project.created_at)}</span></p>
                 </div>
 
                 <div className="flex gap-2">
-                  {project.status === 'draft' && (
-                    <Button
-                      size="sm"
-                      onClick={() => onNavigate('project-execute', project.id)}
-                    >
-                      <Play className="mr-2 h-4 w-4" />
-                      Запустить
-                    </Button>
-                  )}
-                  {(project.status === 'completed' || project.status === 'failed') && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onNavigate('project-results', project.id)}
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      Просмотр результатов
-                    </Button>
-                  )}
-                  {project.status === 'running' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onNavigate('project-execute', project.id)}
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      Мониторинг выполнения
-                    </Button>
-                  )}
-                  {project.status === 'draft' && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteProject(project.id)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Удалить
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => onNavigate('project-execute', project.id)}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Запустить
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onNavigate('project-results', project.id)}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    Просмотр результатов
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDeleteProject(project.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Удалить
+                  </Button>
                 </div>
               </CardContent>
             </Card>

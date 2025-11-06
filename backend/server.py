@@ -15,6 +15,7 @@ import asyncio
 from cryptography.fernet import Fernet
 import base64
 import json
+import socket
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -139,7 +140,9 @@ class Script(BaseModel):
     system_id: str  # ОБЯЗАТЕЛЬНАЯ связь с системой
     name: str
     description: Optional[str] = None
-    content: str
+    content: str  # Команда (короткая, 1-2 строки)
+    processor_script: Optional[str] = None  # Скрипт-обработчик результатов
+    has_reference_files: bool = False  # Есть ли эталонные файлы
     order: int = 0  # Порядок отображения
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -148,6 +151,8 @@ class ScriptCreate(BaseModel):
     name: str
     description: Optional[str] = None
     content: str
+    processor_script: Optional[str] = None
+    has_reference_files: bool = False
     order: int = 0
 
 class ScriptUpdate(BaseModel):
@@ -155,6 +160,8 @@ class ScriptUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
+    processor_script: Optional[str] = None
+    has_reference_files: Optional[bool] = None
     order: Optional[int] = None
 
 # Project Models
@@ -187,6 +194,7 @@ class ProjectTask(BaseModel):
     host_id: str
     system_id: str
     script_ids: List[str]
+    reference_data: Optional[dict] = Field(default_factory=dict)  # script_id -> reference text
     status: str = "pending"  # pending, running, completed, failed
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -194,9 +202,11 @@ class ProjectTaskCreate(BaseModel):
     host_id: str
     system_id: str
     script_ids: List[str]
+    reference_data: Optional[dict] = Field(default_factory=dict)
 
 class ProjectTaskUpdate(BaseModel):
     script_ids: Optional[List[str]] = None
+    reference_data: Optional[dict] = None
     status: Optional[str] = None
 
 class ExecutionResult(BaseModel):
@@ -205,6 +215,7 @@ class ExecutionResult(BaseModel):
     success: bool
     output: str
     error: Optional[str] = None
+    check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Updated Execution Model
@@ -212,8 +223,9 @@ class Execution(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    project_id: Optional[str] = None  # NEW: Link to project
-    project_task_id: Optional[str] = None  # NEW: Link to task
+    project_id: Optional[str] = None  # Link to project
+    project_task_id: Optional[str] = None  # Link to task
+    execution_session_id: Optional[str] = None  # NEW: Group executions by session (each project run)
     host_id: str
     system_id: str
     script_id: str
@@ -221,6 +233,7 @@ class Execution(BaseModel):
     success: bool
     output: str
     error: Optional[str] = None
+    check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ExecuteProjectRequest(BaseModel):
@@ -250,8 +263,109 @@ async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
             error=f"Ошибка выполнения: {str(e)}"
         )
 
-def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
-    """Internal function to connect via SSH and execute command"""
+async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, reference_data: Optional[str] = None) -> ExecutionResult:
+    """Execute check command and process results with optional reference data"""
+    # Step 1: Execute the main command
+    main_result = await execute_ssh_command(host, command)
+    
+    if not processor_script:
+        # No processor - return as is
+        return main_result
+    
+    if not main_result.success:
+        # Main command failed - return error
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output=main_result.output,
+            error=main_result.error
+        )
+    
+    # Step 2: Run processor script with main command output as input
+    try:
+        loop = asyncio.get_event_loop()
+        
+        # Encode output, processor script, and reference data as base64 to safely pass any characters
+        import base64
+        encoded_output = base64.b64encode(main_result.output.encode('utf-8')).decode('ascii')
+        encoded_processor = base64.b64encode(processor_script.encode('utf-8')).decode('ascii')
+        encoded_reference = base64.b64encode((reference_data or '').encode('utf-8')).decode('ascii')
+        
+        # Create processor command with output and reference data available via environment variables:
+        # 1. Environment variable CHECK_OUTPUT - output from main command
+        # 2. Environment variable ETALON_INPUT - reference data for comparison
+        # 3. stdin - piped output from main command
+        # Use base64 for processor script to avoid heredoc conflicts
+        processor_cmd = f"""
+export CHECK_OUTPUT=$(echo '{encoded_output}' | base64 -d)
+export ETALON_INPUT=$(echo '{encoded_reference}' | base64 -d)
+echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | bash
+"""
+        processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
+        
+        # Parse processor output to determine check result
+        output = processor_result.output.strip()
+        check_status = None
+        
+        # Look for status keywords
+        for line in output.split('\n'):
+            line_lower = line.strip().lower()
+            if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
+                check_status = 'Пройдена'
+                break
+            elif 'не пройдена' in line_lower:
+                check_status = 'Не пройдена'
+                break
+            elif 'ошибка' in line_lower:
+                check_status = 'Ошибка'
+                break
+            elif 'оператор' in line_lower:
+                check_status = 'Оператор'
+                break
+        
+        # Build result message - only command output and final status
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
+        
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=(check_status == 'Пройдена'),
+            output=result_output,
+            error=processor_result.error if processor_result.error else None,
+            check_status=check_status
+        )
+        
+    except Exception as e:
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output=main_result.output,
+            error=f"Ошибка обработчика: {str(e)}"
+        )
+
+def _check_network_access(host: Host) -> tuple[bool, str]:
+    """Check if host is reachable via network"""
+    import socket
+    try:
+        # Try to connect to SSH port
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        result = sock.connect_ex((host.hostname, host.port))
+        sock.close()
+        
+        if result == 0:
+            return True, "Сетевой доступ есть"
+        else:
+            return False, f"Сетевой доступ отсутствует (порт {host.port} недоступен)"
+    except socket.gaierror:
+        return False, f"Не удается разрешить имя хоста {host.hostname}"
+    except Exception as e:
+        return False, f"Ошибка проверки сетевого доступа: {str(e)}"
+
+def _check_ssh_login(host: Host) -> tuple[bool, str]:
+    """Check if SSH login is successful"""
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
@@ -259,33 +373,186 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
         # Connect with appropriate authentication
         if host.auth_type == "password":
             password = decrypt_password(host.password) if host.password else None
+            if not password:
+                return False, "Пароль не указан или не удалось расшифровать"
             ssh.connect(
                 hostname=host.hostname,
                 port=host.port,
                 username=host.username,
                 password=password,
-                timeout=10
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
             )
         else:  # key-based auth
             from io import StringIO
+            if not host.ssh_key:
+                return False, "SSH ключ не указан"
             key_file = StringIO(host.ssh_key)
-            pkey = paramiko.RSAKey.from_private_key(key_file)
+            try:
+                pkey = paramiko.RSAKey.from_private_key(key_file)
+            except:
+                key_file = StringIO(host.ssh_key)
+                try:
+                    pkey = paramiko.DSSKey.from_private_key(key_file)
+                except:
+                    key_file = StringIO(host.ssh_key)
+                    try:
+                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                    except:
+                        key_file = StringIO(host.ssh_key)
+                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
             ssh.connect(
                 hostname=host.hostname,
                 port=host.port,
                 username=host.username,
                 pkey=pkey,
-                timeout=10
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
             )
+        
+        ssh.close()
+        return True, "Логин успешен"
+    
+    except paramiko.AuthenticationException:
+        return False, "Ошибка аутентификации: неверный логин/пароль/ключ"
+    except Exception as e:
+        return False, f"Ошибка логина: {str(e)}"
+
+def _check_sudo_access(host: Host) -> tuple[bool, str]:
+    """Check if sudo is available and working"""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        # Connect with appropriate authentication
+        if host.auth_type == "password":
+            password = decrypt_password(host.password) if host.password else None
+            if not password:
+                return False, "Пароль не указан"
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                password=password,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
+            )
+        else:
+            from io import StringIO
+            if not host.ssh_key:
+                return False, "SSH ключ не указан"
+            key_file = StringIO(host.ssh_key)
+            try:
+                pkey = paramiko.RSAKey.from_private_key(key_file)
+            except:
+                key_file = StringIO(host.ssh_key)
+                try:
+                    pkey = paramiko.DSSKey.from_private_key(key_file)
+                except:
+                    key_file = StringIO(host.ssh_key)
+                    try:
+                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                    except:
+                        key_file = StringIO(host.ssh_key)
+                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                pkey=pkey,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
+            )
+        
+        # Test sudo with a simple command
+        stdin, stdout, stderr = ssh.exec_command("sudo -n true", timeout=10)
+        exit_status = stdout.channel.recv_exit_status()
+        
+        ssh.close()
+        
+        if exit_status == 0:
+            return True, "sudo доступен"
+        else:
+            return False, "sudo недоступен (требуется настройка NOPASSWD или пароль)"
+    
+    except Exception as e:
+        return False, f"Ошибка проверки sudo: {str(e)}"
+
+def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
+    """Internal function to connect via SSH and execute command"""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        logger.info(f"Attempting SSH connection to {host.hostname}:{host.port} as {host.username}")
+        
+        # Connect with appropriate authentication
+        if host.auth_type == "password":
+            logger.info(f"Using password authentication for {host.name}")
+            password = decrypt_password(host.password) if host.password else None
+            if not password:
+                raise Exception("Пароль не указан или не удалось расшифровать")
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                password=password,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
+            )
+        else:  # key-based auth
+            logger.info(f"Using key-based authentication for {host.name}")
+            from io import StringIO
+            if not host.ssh_key:
+                raise Exception("SSH ключ не указан")
+            key_file = StringIO(host.ssh_key)
+            try:
+                pkey = paramiko.RSAKey.from_private_key(key_file)
+            except:
+                # Try DSA key
+                key_file = StringIO(host.ssh_key)
+                try:
+                    pkey = paramiko.DSSKey.from_private_key(key_file)
+                except:
+                    # Try ECDSA key
+                    key_file = StringIO(host.ssh_key)
+                    try:
+                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                    except:
+                        # Try Ed25519 key
+                        key_file = StringIO(host.ssh_key)
+                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                pkey=pkey,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False
+            )
+        
+        logger.info(f"Successfully connected to {host.name}")
         
         # Execute command with bash
         exec_command = f"bash -c '{command}'"
+        logger.info(f"Executing command on {host.name}: {exec_command[:100]}...")
         
         stdin, stdout, stderr = ssh.exec_command(exec_command, timeout=30)
         
         output = stdout.read().decode('utf-8', errors='replace')
         error = stderr.read().decode('utf-8', errors='replace')
         exit_status = stdout.channel.recv_exit_status()
+        
+        logger.info(f"Command completed on {host.name} with exit status {exit_status}")
         
         ssh.close()
         
@@ -297,15 +564,17 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
             error=error if error else None
         )
     
-    except paramiko.AuthenticationException:
+    except paramiko.AuthenticationException as e:
+        logger.error(f"Authentication failed for {host.name}: {str(e)}")
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
             success=False,
             output="",
-            error="Ошибка аутентификации"
+            error=f"Ошибка аутентификации: {str(e)}"
         )
     except paramiko.SSHException as e:
+        logger.error(f"SSH error for {host.name}: {str(e)}")
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
@@ -313,7 +582,26 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
             output="",
             error=f"SSH ошибка: {str(e)}"
         )
+    except socket.timeout:
+        logger.error(f"Connection timeout for {host.name}")
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output="",
+            error=f"Превышено время ожидания подключения к {host.hostname}:{host.port}"
+        )
+    except socket.gaierror as e:
+        logger.error(f"DNS resolution failed for {host.name}: {str(e)}")
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output="",
+            error=f"Не удалось разрешить имя хоста {host.hostname}: {str(e)}"
+        )
     except Exception as e:
+        logger.error(f"Connection error for {host.name}: {str(e)}")
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
@@ -322,7 +610,10 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
             error=f"Ошибка подключения: {str(e)}"
         )
     finally:
-        ssh.close()
+        try:
+            ssh.close()
+        except:
+            pass
 
 
 # API Routes - Hosts
@@ -354,6 +645,25 @@ async def get_host(host_id: str):
     if not host:
         raise HTTPException(status_code=404, detail="Хост не найден")
     return Host(**parse_from_mongo(host))
+
+@api_router.post("/hosts/{host_id}/test")
+async def test_host_connection(host_id: str):
+    """Test SSH connection to host"""
+    host_doc = await db.hosts.find_one({"id": host_id}, {"_id": 0})
+    if not host_doc:
+        raise HTTPException(status_code=404, detail="Хост не найден")
+    
+    host = Host(**parse_from_mongo(host_doc))
+    
+    # Try simple command
+    result = await execute_ssh_command(host, "echo 'Connection test successful'")
+    
+    return {
+        "success": result.success,
+        "output": result.output,
+        "error": result.error,
+        "message": "Подключение успешно" if result.success else "Ошибка подключения"
+    }
 
 @api_router.put("/hosts/{host_id}", response_model=Host)
 async def update_host(host_id: str, host_update: HostUpdate):
@@ -696,6 +1006,26 @@ async def get_project_tasks(project_id: str):
     tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
     return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
 
+@api_router.put("/projects/{project_id}/tasks/{task_id}", response_model=ProjectTask)
+async def update_project_task(project_id: str, task_id: str, task_update: ProjectTaskUpdate):
+    """Update task in project"""
+    # Check if task exists
+    task = await db.project_tasks.find_one({"id": task_id, "project_id": project_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    
+    # Update task
+    update_data = {k: v for k, v in task_update.dict().items() if v is not None}
+    if update_data:
+        await db.project_tasks.update_one(
+            {"id": task_id, "project_id": project_id},
+            {"$set": update_data}
+        )
+    
+    # Return updated task
+    updated_task = await db.project_tasks.find_one({"id": task_id}, {"_id": 0})
+    return ProjectTask(**parse_from_mongo(updated_task))
+
 @api_router.delete("/projects/{project_id}/tasks/{task_id}")
 async def delete_project_task(project_id: str, task_id: str):
     """Delete task from project"""
@@ -706,7 +1036,7 @@ async def delete_project_task(project_id: str, task_id: str):
 
 
 # Project Execution with Real-time Updates (SSE)
-@api_router.post("/projects/{project_id}/execute")
+@api_router.get("/projects/{project_id}/execute")
 async def execute_project(project_id: str):
     """Execute project with real-time updates via Server-Sent Events"""
     
@@ -718,16 +1048,11 @@ async def execute_project(project_id: str):
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Проект не найден'})}\n\n"
                 return
             
-            # Update project status
-            await db.projects.update_one(
-                {"id": project_id},
-                {"$set": {
-                    "status": "running",
-                    "started_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
+            # Create unique session ID for this execution
+            session_id = str(uuid.uuid4())
             
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Начало выполнения проекта', 'status': 'running'})}\n\n"
+            # Don't update project status - projects are reusable templates now
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Начало выполнения проекта', 'session_id': session_id})}\n\n"
             
             # Get all tasks for this project
             tasks_cursor = db.project_tasks.find({"project_id": project_id}, {"_id": 0})
@@ -735,10 +1060,6 @@ async def execute_project(project_id: str):
             
             if not tasks:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Нет заданий для выполнения'})}\n\n"
-                await db.projects.update_one(
-                    {"id": project_id},
-                    {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
-                )
                 return
             
             total_tasks = len(tasks)
@@ -774,7 +1095,7 @@ async def execute_project(project_id: str):
                 scripts = [Script(**parse_from_mongo(s)) for s in await scripts_cursor.to_list(1000)]
                 
                 if not scripts:
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'Скрипты не найдены для задания'})}\n\n"
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'Скрипты не найдены для задания'})}\n\n"
                     failed_tasks += 1
                     continue
                 
@@ -784,30 +1105,134 @@ async def execute_project(project_id: str):
                     {"$set": {"status": "running"}}
                 )
                 
-                yield f"data: {json.dumps({'type': 'task_start', 'host_name': host.name, 'system_name': system.name, 'scripts_count': len(scripts)})}\n\n"
+                yield f"data: {json.dumps({'type': 'task_start', 'host_name': host.name, 'host_address': host.hostname, 'system_name': system.name, 'scripts_count': len(scripts)})}\n\n"
                 
-                # Execute all scripts on this host using ONE SSH connection
-                task_success = True
-                task_results = []
+                # Perform preliminary checks
+                loop = asyncio.get_event_loop()
                 
-                try:
-                    # Execute scripts sequentially on the same host with one connection
+                # 1. Check network access
+                network_ok, network_msg = await loop.run_in_executor(None, _check_network_access, host)
+                yield f"data: {json.dumps({'type': 'check_network', 'host_name': host.name, 'success': network_ok, 'message': network_msg})}\n\n"
+                
+                if not network_ok:
+                    # Mark all scripts as failed with network error
                     for script in scripts:
-                        yield f"data: {json.dumps({'type': 'script_start', 'host_name': host.name, 'script_name': script.name})}\n\n"
-                        
-                        result = await execute_ssh_command(host, script.content)
-                        
-                        # Save execution result
                         execution = Execution(
                             project_id=project_id,
                             project_task_id=task_obj.id,
+                            execution_session_id=session_id,
+                            host_id=host.id,
+                            system_id=system.id,
+                            script_id=script.id,
+                            script_name=script.name,
+                            success=False,
+                            output="",
+                            error=network_msg,
+                            check_status="Ошибка"
+                        )
+                        exec_doc = prepare_for_mongo(execution.model_dump())
+                        await db.executions.insert_one(exec_doc)
+                    
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "failed"}}
+                    )
+                    failed_tasks += 1
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': network_msg})}\n\n"
+                    continue
+                
+                # 2. Check SSH login
+                login_ok, login_msg = await loop.run_in_executor(None, _check_ssh_login, host)
+                yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg})}\n\n"
+                
+                if not login_ok:
+                    # Mark all scripts as failed with login error
+                    for script in scripts:
+                        execution = Execution(
+                            project_id=project_id,
+                            project_task_id=task_obj.id,
+                            execution_session_id=session_id,
+                            host_id=host.id,
+                            system_id=system.id,
+                            script_id=script.id,
+                            script_name=script.name,
+                            success=False,
+                            output="",
+                            error=login_msg,
+                            check_status="Ошибка"
+                        )
+                        exec_doc = prepare_for_mongo(execution.model_dump())
+                        await db.executions.insert_one(exec_doc)
+                    
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "failed"}}
+                    )
+                    failed_tasks += 1
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg})}\n\n"
+                    continue
+                
+                # 3. Check sudo access
+                sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_sudo_access, host)
+                yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg})}\n\n"
+                
+                if not sudo_ok:
+                    # Mark all scripts as failed with sudo error
+                    for script in scripts:
+                        execution = Execution(
+                            project_id=project_id,
+                            project_task_id=task_obj.id,
+                            execution_session_id=session_id,
+                            host_id=host.id,
+                            system_id=system.id,
+                            script_id=script.id,
+                            script_name=script.name,
+                            success=False,
+                            output="",
+                            error=sudo_msg,
+                            check_status="Ошибка"
+                        )
+                        exec_doc = prepare_for_mongo(execution.model_dump())
+                        await db.executions.insert_one(exec_doc)
+                    
+                    await db.project_tasks.update_one(
+                        {"id": task_obj.id},
+                        {"$set": {"status": "failed"}}
+                    )
+                    failed_tasks += 1
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': sudo_msg})}\n\n"
+                    continue
+                
+                # All checks passed, proceed with script execution
+                task_success = True
+                task_results = []
+                scripts_completed = 0
+                
+                try:
+                    # Execute scripts sequentially on the same host with one connection
+                    for idx, script in enumerate(scripts, 1):
+                        # Get reference data for this script
+                        reference_data = task_obj.reference_data.get(script.id, '') if task_obj.reference_data else ''
+                        
+                        # Use processor if available
+                        result = await execute_check_with_processor(host, script.content, script.processor_script, reference_data)
+                        
+                        scripts_completed += 1
+                        yield f"data: {json.dumps({'type': 'script_progress', 'host_name': host.name, 'completed': scripts_completed, 'total': len(scripts)})}\n\n"
+                        
+                        # Save execution result with session_id
+                        execution = Execution(
+                            project_id=project_id,
+                            project_task_id=task_obj.id,
+                            execution_session_id=session_id,  # NEW: Link to session
                             host_id=host.id,
                             system_id=system.id,
                             script_id=script.id,
                             script_name=script.name,
                             success=result.success,
                             output=result.output,
-                            error=result.error
+                            error=result.error,
+                            check_status=result.check_status
                         )
                         
                         exec_doc = prepare_for_mongo(execution.model_dump())
@@ -817,22 +1242,16 @@ async def execute_project(project_id: str):
                         
                         if not result.success:
                             task_success = False
-                            yield f"data: {json.dumps({'type': 'script_error', 'host_name': host.name, 'script_name': script.name, 'error': result.error})}\n\n"
-                        else:
-                            yield f"data: {json.dumps({'type': 'script_success', 'host_name': host.name, 'script_name': script.name})}\n\n"
                     
-                    # Update task status
+                    # Update task status - host is successful if all preliminary checks passed
                     await db.project_tasks.update_one(
                         {"id": task_obj.id},
-                        {"$set": {"status": "completed" if task_success else "failed"}}
+                        {"$set": {"status": "completed"}}
                     )
                     
-                    if task_success:
-                        completed_tasks += 1
-                        yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': True})}\n\n"
-                    else:
-                        failed_tasks += 1
-                        yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': False})}\n\n"
+                    # Host completed successfully (passed preliminary checks)
+                    completed_tasks += 1
+                    yield f"data: {json.dumps({'type': 'task_complete', 'host_name': host.name, 'success': True})}\n\n"
                 
                 except Exception as e:
                     failed_tasks += 1
@@ -842,30 +1261,15 @@ async def execute_project(project_id: str):
                     )
                     yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': str(e)})}\n\n"
             
-            # Update project status
+            # Send completion event (don't update project status - project is reusable)
+            # completed_tasks = hosts that passed all preliminary checks
+            successful_hosts = completed_tasks
             final_status = "completed" if failed_tasks == 0 else "failed"
-            await db.projects.update_one(
-                {"id": project_id},
-                {"$set": {
-                    "status": final_status,
-                    "completed_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            
-            yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks})}\n\n"
+            yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks, 'successful_hosts': successful_hosts, 'session_id': session_id})}\n\n"
         
         except Exception as e:
             logger.error(f"Error during project execution: {str(e)}")
             yield f"data: {json.dumps({'type': 'error', 'message': f'Ошибка: {str(e)}'})}\n\n"
-            
-            # Update project status to failed
-            await db.projects.update_one(
-                {"id": project_id},
-                {"$set": {
-                    "status": "failed",
-                    "completed_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
     
     return StreamingResponse(
         event_generator(),
@@ -886,6 +1290,75 @@ async def get_project_executions(project_id: str):
         {"project_id": project_id},
         {"_id": 0}
     ).sort("executed_at", -1).to_list(1000)
+    
+    return [Execution(**parse_from_mongo(execution)) for execution in executions]
+
+# Get execution sessions for project (list of unique session runs)
+@api_router.get("/projects/{project_id}/sessions")
+async def get_project_sessions(project_id: str):
+    """Get list of execution sessions for a project"""
+    # Get distinct session IDs with their timestamps and check status counts
+    # If check_status is not one of the expected values, count it as error
+    pipeline = [
+        {"$match": {"project_id": project_id, "execution_session_id": {"$ne": None}}},
+        {"$group": {
+            "_id": "$execution_session_id",
+            "executed_at": {"$first": "$executed_at"},
+            "count": {"$sum": 1},
+            "passed_count": {
+                "$sum": {"$cond": [{"$eq": ["$check_status", "Пройдена"]}, 1, 0]}
+            },
+            "failed_count": {
+                "$sum": {"$cond": [{"$eq": ["$check_status", "Не пройдена"]}, 1, 0]}
+            },
+            "operator_count": {
+                "$sum": {"$cond": [{"$eq": ["$check_status", "Оператор"]}, 1, 0]}
+            },
+            "explicit_error_count": {
+                "$sum": {"$cond": [{"$eq": ["$check_status", "Ошибка"]}, 1, 0]}
+            },
+            # Count executions with null, empty, or unexpected check_status as errors
+            "other_count": {
+                "$sum": {
+                    "$cond": [
+                        {
+                            "$and": [
+                                {"$ne": ["$check_status", "Пройдена"]},
+                                {"$ne": ["$check_status", "Не пройдена"]},
+                                {"$ne": ["$check_status", "Оператор"]},
+                                {"$ne": ["$check_status", "Ошибка"]}
+                            ]
+                        },
+                        1,
+                        0
+                    ]
+                }
+            }
+        }},
+        {"$sort": {"executed_at": -1}}
+    ]
+    
+    sessions = await db.executions.aggregate(pipeline).to_list(1000)
+    
+    return [{
+        "session_id": s["_id"],
+        "executed_at": s["executed_at"],
+        "total_checks": s["count"],
+        "passed_count": s["passed_count"],
+        "failed_count": s["failed_count"],
+        # Combine explicit errors and unknown statuses
+        "error_count": s["explicit_error_count"] + s["other_count"],
+        "operator_count": s["operator_count"]
+    } for s in sessions]
+
+# Get executions for specific session
+@api_router.get("/projects/{project_id}/sessions/{session_id}/executions", response_model=List[Execution])
+async def get_session_executions(project_id: str, session_id: str):
+    """Get all executions for a specific session"""
+    executions = await db.executions.find(
+        {"project_id": project_id, "execution_session_id": session_id},
+        {"_id": 0}
+    ).sort("executed_at", 1).to_list(1000)
     
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
@@ -916,7 +1389,7 @@ async def execute_script(execute_req: ExecuteRequest):
         raise HTTPException(status_code=404, detail="Хосты не найдены")
     
     # Execute on all hosts concurrently
-    tasks = [execute_ssh_command(host, script.content) for host in hosts]
+    tasks = [execute_check_with_processor(host, script.content, script.processor_script) for host in hosts]
     results = await asyncio.gather(*tasks)
     
     # Save execution records (one per host)
@@ -929,7 +1402,8 @@ async def execute_script(execute_req: ExecuteRequest):
             script_name=script.name,
             success=result.success,
             output=result.output,
-            error=result.error
+            error=result.error,
+            check_status=result.check_status
         )
         
         doc = prepare_for_mongo(execution.model_dump())

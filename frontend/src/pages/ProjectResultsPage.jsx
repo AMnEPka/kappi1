@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -16,29 +24,67 @@ const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
   const [executions, setExecutions] = useState([]);
   const [groupedExecutions, setGroupedExecutions] = useState({});
   const [selectedExecution, setSelectedExecution] = useState(null);
+  const [hosts, setHosts] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    fetchProjectAndSessions();
   }, [projectId]);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    if (selectedSession) {
+      fetchSessionExecutions(selectedSession);
+    }
+  }, [selectedSession]);
+
+  const fetchProjectAndSessions = async () => {
     try {
       setLoading(true);
-      const [projectRes, executionsRes] = await Promise.all([
+      const [projectRes, sessionsRes, hostsRes] = await Promise.all([
         axios.get(`${API_URL}/api/projects/${projectId}`),
-        axios.get(`${API_URL}/api/projects/${projectId}/executions`),
+        axios.get(`${API_URL}/api/projects/${projectId}/sessions`),
+        axios.get(`${API_URL}/api/hosts`),
       ]);
 
       setProject(projectRes.data);
-      setExecutions(executionsRes.data);
+      setSessions(sessionsRes.data);
+      
+      // Create hosts map
+      const hostsMap = {};
+      hostsRes.data.forEach(host => {
+        hostsMap[host.id] = host;
+      });
+      setHosts(hostsMap);
+      
+      // Auto-select latest session
+      if (sessionsRes.data.length > 0) {
+        setSelectedSession(sessionsRes.data[0].session_id);
+      }
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error("Не удалось загрузить проект");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSessionExecutions = async (sessionId) => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/projects/${projectId}/sessions/${sessionId}/executions`
+      );
+      
+      setExecutions(response.data);
 
       // Group executions by host
       const grouped = {};
-      executionsRes.data.forEach(exec => {
+      response.data.forEach(exec => {
         if (!grouped[exec.host_id]) {
           grouped[exec.host_id] = [];
         }
@@ -47,10 +93,8 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       setGroupedExecutions(grouped);
 
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error("Не удалось загрузить результаты");
-    } finally {
-      setLoading(false);
+      console.error('Error fetching session executions:', error);
+      toast.error("Не удалось загрузить результаты сессии");
     }
   };
 
@@ -60,16 +104,40 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   };
 
   const getHostName = (hostId) => {
-    const firstExec = executions.find(e => e.host_id === hostId);
-    return firstExec ? `Host ${hostId.substring(0, 8)}` : hostId;
+    const host = hosts[hostId];
+    if (host) {
+      return `${host.name} (${host.hostname})`;
+    }
+    return `Host ${hostId.substring(0, 8)}`;
   };
 
   const getHostStats = (hostId) => {
     const hostExecutions = groupedExecutions[hostId] || [];
     const total = hostExecutions.length;
-    const successful = hostExecutions.filter(e => e.success).length;
-    const failed = total - successful;
-    return { total, successful, failed };
+    const passed = hostExecutions.filter(e => e.check_status === 'Пройдена').length;
+    const failed = hostExecutions.filter(e => e.check_status === 'Не пройдена').length;
+    const error = hostExecutions.filter(e => e.check_status === 'Ошибка' || (!e.check_status && !e.success)).length;
+    const operator = hostExecutions.filter(e => e.check_status === 'Оператор').length;
+    return { total, passed, failed, error, operator };
+  };
+
+  // Get badge by check status with colors
+  const getCheckStatusBadge = (execution) => {
+    const status = execution.check_status;
+    
+    // Check explicit statuses first before fallback
+    if (status === 'Пройдена') {
+      return <Badge className="bg-green-500 hover:bg-green-600">Пройдена</Badge>;
+    } else if (status === 'Не пройдена') {
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Не пройдена</Badge>;
+    } else if (status === 'Оператор') {
+      return <Badge className="bg-blue-500 hover:bg-blue-600">Оператор</Badge>;
+    } else if (status === 'Ошибка') {
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
+    } else {
+      // Fallback for undefined status
+      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
+    }
   };
 
   if (loading) {
@@ -109,45 +177,40 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
         </div>
       </div>
 
-      {/* Overall Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold">{Object.keys(groupedExecutions).length}</p>
-              <p className="text-gray-600 text-sm">Хостов</p>
-            </div>
+      {/* Session selector */}
+      {sessions.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Выбор запуска</CardTitle>
+            <CardDescription>Просмотр результатов конкретного запуска проекта</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedSession} onValueChange={setSelectedSession}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Выберите запуск" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.map((session, index) => (
+                  <SelectItem key={session.session_id} value={session.session_id}>
+                    {index === 0 ? '🆕 ' : ''}
+                    {formatDate(session.executed_at)} 
+                    {' - '}
+                    Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold">{executions.length}</p>
-              <p className="text-gray-600 text-sm">Всего выполнений</p>
-            </div>
+      )}
+
+      {sessions.length === 0 && (
+        <Card className="mb-6">
+          <CardContent className="p-6 text-center">
+            <p className="text-gray-500">Проект ещё не запускался</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">
-                {executions.filter(e => e.success).length}
-              </p>
-              <p className="text-gray-600 text-sm">Успешно</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-red-600">
-                {executions.filter(e => !e.success).length}
-              </p>
-              <p className="text-gray-600 text-sm">Ошибок</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
       {/* Results by Host */}
       <Card>
@@ -171,17 +234,25 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                         <div>
                           <CardTitle className="text-lg">{getHostName(hostId)}</CardTitle>
                           <CardDescription>
-                            Выполнено: {stats.successful}/{stats.total} скриптов
+                            Всего проверок: {stats.total}
                           </CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                          <span className="text-green-600 flex items-center gap-1">
+                        <div className="flex gap-3">
+                          <span className="text-green-600 flex items-center gap-1" title="Пройдена">
                             <CheckCircle className="h-4 w-4" />
-                            {stats.successful}
+                            {stats.passed}
                           </span>
-                          <span className="text-red-600 flex items-center gap-1">
+                          <span className="text-yellow-600 flex items-center gap-1" title="Не пройдена">
                             <XCircle className="h-4 w-4" />
                             {stats.failed}
+                          </span>
+                          <span className="text-red-600 flex items-center gap-1" title="Ошибка">
+                            <XCircle className="h-4 w-4" />
+                            {stats.error}
+                          </span>
+                          <span className="text-blue-600 flex items-center gap-1" title="Требует участия оператора">
+                            <CheckCircle className="h-4 w-4" />
+                            {stats.operator}
                           </span>
                         </div>
                       </div>
@@ -194,11 +265,6 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                             className="flex items-center justify-between p-3 border rounded hover:bg-gray-50"
                           >
                             <div className="flex items-center gap-3">
-                              {execution.success ? (
-                                <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                              )}
                               <div>
                                 <p className="font-medium">{execution.script_name}</p>
                                 <p className="text-xs text-gray-500">
@@ -206,14 +272,17 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                                 </p>
                               </div>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setSelectedExecution(execution)}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              Детали
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              {getCheckStatusBadge(execution)}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setSelectedExecution(execution)}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                Детали
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -231,11 +300,6 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {selectedExecution?.success ? (
-                <CheckCircle className="h-5 w-5 text-green-500" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-500" />
-              )}
               {selectedExecution?.script_name}
             </DialogTitle>
             <DialogDescription>
@@ -246,9 +310,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
           <div className="space-y-4">
             <div>
               <h3 className="font-bold mb-2">Статус:</h3>
-              <p className={selectedExecution?.success ? 'text-green-600' : 'text-red-600'}>
-                {selectedExecution?.success ? 'Успешно' : 'Ошибка'}
-              </p>
+              {selectedExecution && getCheckStatusBadge(selectedExecution)}
             </div>
 
             {selectedExecution?.output && (
