@@ -578,6 +578,8 @@ fi
                   <p>• Stdin: читайте через <code className="bg-gray-100 px-1 rounded">read</code> или обрабатывайте в цикле</p>
                   <p className="font-semibold mt-2">Возможные результаты:</p>
                   <p>Выведите одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>
+                  <p className="font-semibold">Доступ к эталонным данным:</p>
+                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
                 </div>
               </div>
 
