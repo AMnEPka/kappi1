@@ -16,6 +16,12 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
     completed: 0,
     failed: 0,
   });
+  const [tasks, setTasks] = useState([]);
+  const [hosts, setHosts] = useState([]);
+  const [systems, setSystems] = useState([]);
+  const [scripts, setScripts] = useState([]);
+  const [editMode, setEditMode] = useState(false);
+  const [editedTasks, setEditedTasks] = useState({});
   const eventSourceRef = useRef(null);
   const logsEndRef = useRef(null);
 
