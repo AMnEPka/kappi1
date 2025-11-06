@@ -1000,6 +1000,26 @@ async def get_project_tasks(project_id: str):
     tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
     return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
 
+@api_router.put("/projects/{project_id}/tasks/{task_id}", response_model=ProjectTask)
+async def update_project_task(project_id: str, task_id: str, task_update: ProjectTaskUpdate):
+    """Update task in project"""
+    # Check if task exists
+    task = await db.project_tasks.find_one({"id": task_id, "project_id": project_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    
+    # Update task
+    update_data = {k: v for k, v in task_update.dict().items() if v is not None}
+    if update_data:
+        await db.project_tasks.update_one(
+            {"id": task_id, "project_id": project_id},
+            {"$set": update_data}
+        )
+    
+    # Return updated task
+    updated_task = await db.project_tasks.find_one({"id": task_id}, {"_id": 0})
+    return ProjectTask(**parse_from_mongo(updated_task))
+
 @api_router.delete("/projects/{project_id}/tasks/{task_id}")
 async def delete_project_task(project_id: str, task_id: str):
     """Delete task from project"""
