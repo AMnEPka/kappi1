@@ -263,8 +263,8 @@ async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
             error=f"Ошибка выполнения: {str(e)}"
         )
 
-async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None) -> ExecutionResult:
-    """Execute check command and process results"""
+async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, reference_data: Optional[str] = None) -> ExecutionResult:
+    """Execute check command and process results with optional reference data"""
     # Step 1: Execute the main command
     main_result = await execute_ssh_command(host, command)
     
@@ -286,17 +286,20 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
     try:
         loop = asyncio.get_event_loop()
         
-        # Encode output and processor script as base64 to safely pass any characters
+        # Encode output, processor script, and reference data as base64 to safely pass any characters
         import base64
         encoded_output = base64.b64encode(main_result.output.encode('utf-8')).decode('ascii')
         encoded_processor = base64.b64encode(processor_script.encode('utf-8')).decode('ascii')
+        encoded_reference = base64.b64encode((reference_data or '').encode('utf-8')).decode('ascii')
         
-        # Create processor command with output available via:
-        # 1. Environment variable CHECK_OUTPUT (decoded from base64)
-        # 2. stdin (decoded and piped)
+        # Create processor command with output and reference data available via environment variables:
+        # 1. Environment variable CHECK_OUTPUT - output from main command
+        # 2. Environment variable ETALON_INPUT - reference data for comparison
+        # 3. stdin - piped output from main command
         # Use base64 for processor script to avoid heredoc conflicts
         processor_cmd = f"""
 export CHECK_OUTPUT=$(echo '{encoded_output}' | base64 -d)
+export ETALON_INPUT=$(echo '{encoded_reference}' | base64 -d)
 echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | bash
 """
         processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
