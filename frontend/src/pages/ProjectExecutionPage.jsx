@@ -82,7 +82,8 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       // Update each modified task
       const updates = Object.values(editedTasks).map(task => 
         axios.put(`${API_URL}/api/projects/${projectId}/tasks/${task.id}`, {
-          script_ids: task.script_ids
+          script_ids: task.script_ids,
+          reference_data: task.reference_data
         })
       );
       
