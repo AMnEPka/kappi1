@@ -1211,8 +1211,11 @@ async def execute_project(project_id: str):
                 try:
                     # Execute scripts sequentially on the same host with one connection
                     for idx, script in enumerate(scripts, 1):
+                        # Get reference data for this script
+                        reference_data = task_obj.reference_data.get(script.id, '') if task_obj.reference_data else ''
+                        
                         # Use processor if available
-                        result = await execute_check_with_processor(host, script.content, script.processor_script)
+                        result = await execute_check_with_processor(host, script.content, script.processor_script, reference_data)
                         
                         scripts_completed += 1
                         yield f"data: {json.dumps({'type': 'script_progress', 'host_name': host.name, 'completed': scripts_completed, 'total': len(scripts)})}\n\n"
