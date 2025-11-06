@@ -1189,10 +1189,10 @@ function App() {
       <BrowserRouter>
         <Layout>
           <Routes>
-            <Route path="/" element={<HostsPage />} />
+            <Route path="/" element={<ProjectsPageWrapper />} />
+            <Route path="/hosts" element={<HostsPage />} />
             <Route path="/scripts" element={<ScriptsPage />} />
             <Route path="/execute" element={<ExecutePage />} />
-            <Route path="/projects" element={<ProjectsPageWrapper />} />
             <Route path="/projects/new" element={<ProjectWizardWrapper />} />
             <Route path="/projects/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
             <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />
