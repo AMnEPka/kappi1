@@ -1072,8 +1072,8 @@ const Layout = ({ children }) => {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              <Terminal className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-bold">OSIB</span>
+              <img src="/logo.png" alt="OSIB" className="h-10 w-10 object-contain" />
+              <span className="text-xl font-bold text-gray-800">OSIB</span>
             </div>
             <div className="flex gap-2">
               <Link to="/">
