@@ -342,6 +342,96 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         </div>
       )}
 
+      {/* Task Configuration */}
+      {!executing && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Конфигурация проверок</CardTitle>
+                <CardDescription>
+                  {editMode ? 'Выберите проверки для выполнения' : 'Проверки, которые будут выполнены'}
+                </CardDescription>
+              </div>
+              <Button 
+                variant={editMode ? "default" : "outline"} 
+                onClick={() => {
+                  if (editMode) {
+                    saveTaskChanges();
+                  } else {
+                    setEditMode(true);
+                  }
+                }}
+              >
+                {editMode ? 'Сохранить изменения' : 'Редактировать'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {tasks.map(task => {
+                const host = hosts.find(h => h.id === task.host_id);
+                const system = systems.find(s => s.id === task.system_id);
+                const systemScripts = scripts.filter(s => s.system_id === task.system_id);
+                const editedTask = editedTasks[task.id] || task;
+                
+                return (
+                  <div key={task.id} className="border rounded-lg p-4">
+                    <div className="font-semibold text-lg mb-2">
+                      {host?.name || 'Неизвестный хост'} - {system?.name || 'Неизвестная система'}
+                    </div>
+                    <div className="text-sm text-gray-600 mb-3">
+                      {host?.hostname}
+                    </div>
+                    <div className="space-y-2">
+                      {systemScripts.map(script => {
+                        const isSelected = editedTask.script_ids.includes(script.id);
+                        return (
+                          <div key={script.id} className="flex items-center gap-2">
+                            <input 
+                              type="checkbox"
+                              id={`${task.id}-${script.id}`}
+                              checked={isSelected}
+                              disabled={!editMode}
+                              onChange={() => toggleScript(task.id, script.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+                            />
+                            <label 
+                              htmlFor={`${task.id}-${script.id}`}
+                              className={`flex-1 ${editMode ? 'cursor-pointer' : ''} ${!isSelected && editMode ? 'text-gray-400' : ''}`}
+                            >
+                              {script.name}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {editMode && (
+              <div className="mt-4 flex gap-2">
+                <Button variant="outline" onClick={() => {
+                  // Reset changes
+                  const tasksMap = {};
+                  tasks.forEach(task => {
+                    tasksMap[task.id] = {
+                      ...task,
+                      script_ids: [...task.script_ids]
+                    };
+                  });
+                  setEditedTasks(tasksMap);
+                  setEditMode(false);
+                }}>
+                  Отмена
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Logs */}
       <Card>
         <CardHeader>
