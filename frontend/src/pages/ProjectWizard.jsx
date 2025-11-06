@@ -24,7 +24,7 @@ export default function ProjectWizard({ onNavigate }) {
     name: '',
     description: '',
     hosts: [],
-    tasks: [], // { host_id, systems: [{ system_id, script_ids }] }
+    tasks: [], // { host_id, systems: [{ system_id, script_ids, reference_data: {script_id: text} }] }
   });
 
   const [hosts, setHosts] = useState([]);
@@ -166,9 +166,26 @@ export default function ProjectWizard({ onNavigate }) {
       return;
     }
     if (step === 3 && !canProceedToStep4()) {
-      toast.error("Для каждого хоста добавьте хотя бы одну систему и выберите скрипты");
+      toast.error("Для каждого хоста добавьте хотя бы одну систему и выберите проверки");
       return;
     }
+    
+    // Skip step 4 if no reference files needed
+    if (step === 3) {
+      const hasReferenceFiles = projectData.tasks.some(task =>
+        task.systems.some(system =>
+          system.script_ids.some(scriptId => {
+            const script = scripts.find(s => s.id === scriptId);
+            return script && script.has_reference_files;
+          })
+        )
+      );
+      if (!hasReferenceFiles) {
+        setStep(5); // Skip to confirmation
+        return;
+      }
+    }
+    
     setStep(step + 1);
   };
 
@@ -195,6 +212,7 @@ export default function ProjectWizard({ onNavigate }) {
             host_id: task.host_id,
             system_id: system.system_id,
             script_ids: system.script_ids,
+            reference_data: system.reference_data || {},
           });
         }
       }
@@ -260,7 +278,7 @@ export default function ProjectWizard({ onNavigate }) {
     <Card>
       <CardHeader>
         <CardTitle>Шаг 2: Выбор хостов</CardTitle>
-        <CardDescription>Выберите хосты для выполнения скриптов</CardDescription>
+        <CardDescription>Выберите хосты для выполнения проверок</CardDescription>
       </CardHeader>
       <CardContent>
         {hosts.length === 0 ? (
@@ -290,8 +308,8 @@ export default function ProjectWizard({ onNavigate }) {
   const renderStep3 = () => (
     <Card>
       <CardHeader>
-        <CardTitle>Шаг 3: Назначение скриптов</CardTitle>
-        <CardDescription>Для каждого хоста выберите системы и скрипты</CardDescription>
+        <CardTitle>Шаг 3: Назначение проверок</CardTitle>
+        <CardDescription>Для каждого хоста выберите системы и проверкуы</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -349,9 +367,9 @@ export default function ProjectWizard({ onNavigate }) {
 
                       {system.system_id && (
                         <div>
-                          <Label className="text-sm">Скрипты</Label>
+                          <Label className="text-sm">Проверки</Label>
                           {availableScripts.length === 0 ? (
-                            <p className="text-gray-500 text-sm mt-2">Нет доступных скриптов</p>
+                            <p className="text-gray-500 text-sm mt-2">Нет доступных проверок</p>
                           ) : (
                             <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
                               {availableScripts.map((script) => (
@@ -394,10 +412,87 @@ export default function ProjectWizard({ onNavigate }) {
     </Card>
   );
 
-  const renderStep4 = () => (
+  const renderStep4 = () => {
+    // Collect all scripts that have reference files
+    const scriptsWithReferences = [];
+    projectData.tasks.forEach(task => {
+      task.systems.forEach(system => {
+        system.script_ids.forEach(scriptId => {
+          const script = scripts.find(s => s.id === scriptId);
+          if (script && script.has_reference_files) {
+            scriptsWithReferences.push({
+              taskIndex: projectData.tasks.indexOf(task),
+              systemIndex: task.systems.indexOf(system),
+              script: script,
+              hostId: task.host_id,
+              systemId: system.system_id
+            });
+          }
+        });
+      });
+    });
+
+    if (scriptsWithReferences.length === 0) {
+      // Skip this step if no scripts have reference files
+      return null;
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Шаг 4: Эталонные данные</CardTitle>
+          <CardDescription>Введите эталонные данные для проверок</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {scriptsWithReferences.map((item, index) => {
+              const host = getHostById(item.hostId);
+              const system = getSystemById(item.systemId);
+              const currentValue = projectData.tasks[item.taskIndex]
+                .systems[item.systemIndex].reference_data?.[item.script.id] || '';
+
+              return (
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="mb-2">
+                    <p className="font-semibold">{item.script.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {host?.name} - {system?.name}
+                    </p>
+                  </div>
+                  <Textarea
+                    placeholder="Введите эталонные данные (5-15 строк)..."
+                    value={currentValue}
+                    onChange={(e) => {
+                      setProjectData(prev => {
+                        const newTasks = [...prev.tasks];
+                        const task = newTasks[item.taskIndex];
+                        const system = task.systems[item.systemIndex];
+                        
+                        if (!system.reference_data) {
+                          system.reference_data = {};
+                        }
+                        
+                        system.reference_data[item.script.id] = e.target.value;
+                        
+                        return { ...prev, tasks: newTasks };
+                      });
+                    }}
+                    rows={10}
+                    className="font-mono text-sm"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderStep5 = () => (
     <Card>
       <CardHeader>
-        <CardTitle>Шаг 4: Подтверждение</CardTitle>
+        <CardTitle>Шаг 5: Подтверждение</CardTitle>
         <CardDescription>Проверьте настройки проекта перед созданием</CardDescription>
       </CardHeader>
       <CardContent>
@@ -434,7 +529,7 @@ export default function ProjectWizard({ onNavigate }) {
                             Система: {systemInfo?.name}
                           </p>
                           <p className="text-sm text-gray-600">
-                            Скрипты ({taskScripts.length}):
+                            Проверки ({taskScripts.length}):
                           </p>
                           <ul className="list-disc list-inside text-sm text-gray-600 ml-2">
                             {taskScripts.map(script => (
@@ -459,19 +554,19 @@ export default function ProjectWizard({ onNavigate }) {
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Создание проекта</h1>
         <div className="flex items-center gap-2 mt-4">
-          {[1, 2, 3, 4].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className="flex items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  s <= step ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-600'
+                  s <= step ? 'bg-yellow-500 text-white' : 'bg-gray-300 text-gray-600'
                 }`}
               >
                 {s < step ? <Check className="h-4 w-4" /> : s}
               </div>
-              {s < 4 && (
+              {s < 5 && (
                 <div
                   className={`w-16 h-1 ${
-                    s < step ? 'bg-blue-500' : 'bg-gray-300'
+                    s < step ? 'bg-yellow-500' : 'bg-gray-300'
                   }`}
                 />
               )}
@@ -484,6 +579,7 @@ export default function ProjectWizard({ onNavigate }) {
       {step === 2 && renderStep2()}
       {step === 3 && renderStep3()}
       {step === 4 && renderStep4()}
+      {step === 5 && renderStep5()}
 
       <div className="flex justify-between mt-6">
         <Button
@@ -494,7 +590,7 @@ export default function ProjectWizard({ onNavigate }) {
           {step === 1 ? 'Отмена' : 'Назад'}
         </Button>
 
-        {step < 4 ? (
+        {step < 5 ? (
           <Button onClick={handleNext}>
             Далее
             <ChevronRight className="ml-2 h-4 w-4" />
