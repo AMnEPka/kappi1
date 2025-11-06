@@ -590,7 +590,7 @@ export default function ProjectWizard({ onNavigate }) {
           {step === 1 ? 'Отмена' : 'Назад'}
         </Button>
 
-        {step < 4 ? (
+        {step < 5 ? (
           <Button onClick={handleNext}>
             Далее
             <ChevronRight className="ml-2 h-4 w-4" />
