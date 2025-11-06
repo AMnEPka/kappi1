@@ -395,10 +395,87 @@ export default function ProjectWizard({ onNavigate }) {
     </Card>
   );
 
-  const renderStep4 = () => (
+  const renderStep4 = () => {
+    // Collect all scripts that have reference files
+    const scriptsWithReferences = [];
+    projectData.tasks.forEach(task => {
+      task.systems.forEach(system => {
+        system.script_ids.forEach(scriptId => {
+          const script = scripts.find(s => s.id === scriptId);
+          if (script && script.has_reference_files) {
+            scriptsWithReferences.push({
+              taskIndex: projectData.tasks.indexOf(task),
+              systemIndex: task.systems.indexOf(system),
+              script: script,
+              hostId: task.host_id,
+              systemId: system.system_id
+            });
+          }
+        });
+      });
+    });
+
+    if (scriptsWithReferences.length === 0) {
+      // Skip this step if no scripts have reference files
+      return null;
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Шаг 4: Эталонные данные</CardTitle>
+          <CardDescription>Введите эталонные данные для проверок</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {scriptsWithReferences.map((item, index) => {
+              const host = getHostById(item.hostId);
+              const system = getSystemById(item.systemId);
+              const currentValue = projectData.tasks[item.taskIndex]
+                .systems[item.systemIndex].reference_data?.[item.script.id] || '';
+
+              return (
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="mb-2">
+                    <p className="font-semibold">{item.script.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {host?.name} - {system?.name}
+                    </p>
+                  </div>
+                  <Textarea
+                    placeholder="Введите эталонные данные (5-15 строк)..."
+                    value={currentValue}
+                    onChange={(e) => {
+                      setProjectData(prev => {
+                        const newTasks = [...prev.tasks];
+                        const task = newTasks[item.taskIndex];
+                        const system = task.systems[item.systemIndex];
+                        
+                        if (!system.reference_data) {
+                          system.reference_data = {};
+                        }
+                        
+                        system.reference_data[item.script.id] = e.target.value;
+                        
+                        return { ...prev, tasks: newTasks };
+                      });
+                    }}
+                    rows={10}
+                    className="font-mono text-sm"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderStep5 = () => (
     <Card>
       <CardHeader>
-        <CardTitle>Шаг 4: Подтверждение</CardTitle>
+        <CardTitle>Шаг 5: Подтверждение</CardTitle>
         <CardDescription>Проверьте настройки проекта перед созданием</CardDescription>
       </CardHeader>
       <CardContent>
