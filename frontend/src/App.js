@@ -1066,6 +1066,19 @@ const HistoryPage = () => {
 
 // Main Layout
 const Layout = ({ children }) => {
+  const location = useLocation();
+  
+  const isActive = (path) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
+  
+  const navLinkClass = (path) => {
+    return isActive(path) 
+      ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700" 
+      : "hover:bg-gray-100";
+  };
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-200 shadow-sm">
@@ -1077,33 +1090,33 @@ const Layout = ({ children }) => {
             </div>
             <div className="flex gap-2">
               <Link to="/">
-                <Button variant="ghost" data-testid="nav-hosts">
+                <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/')}>
                   <Server className="mr-2 h-4 w-4" /> Хосты
                 </Button>
               </Link>
               <Link to="/scripts">
-                <Button variant="ghost" data-testid="nav-scripts">
+                <Button variant="ghost" data-testid="nav-scripts" className={navLinkClass('/scripts')}>
                   <FileCode className="mr-2 h-4 w-4" /> Проверки
                 </Button>
               </Link>
               <Link to="/execute">
-                <Button variant="ghost" data-testid="nav-execute">
+                <Button variant="ghost" data-testid="nav-execute" className={navLinkClass('/execute')}>
                   <Play className="mr-2 h-4 w-4" /> Выполнение
                 </Button>
               </Link>
               <Link to="/projects">
-                <Button variant="ghost" data-testid="nav-projects">
+                <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/projects')}>
                   <Briefcase className="mr-2 h-4 w-4" /> Проекты
                 </Button>
               </Link>
               <Link to="/history">
-                <Button variant="ghost" data-testid="nav-history">
+                <Button variant="ghost" data-testid="nav-history" className={navLinkClass('/history')}>
                   <History className="mr-2 h-4 w-4" /> История
                 </Button>
               </Link>
-              <div className="border-l mx-2 h-8"></div>
+              <div className="border-l mx-2 h-8 border-gray-200"></div>
               <Link to="/admin">
-                <Button variant="ghost" data-testid="nav-admin">
+                <Button variant="ghost" data-testid="nav-admin" className={navLinkClass('/admin')}>
                   <Settings className="mr-2 h-4 w-4" /> Админ
                 </Button>
               </Link>
