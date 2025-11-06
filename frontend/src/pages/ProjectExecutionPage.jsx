@@ -388,22 +388,53 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
                     <div className="space-y-2">
                       {systemScripts.map(script => {
                         const isSelected = editedTask.script_ids.includes(script.id);
+                        const hasReferenceFiles = script.has_reference_files;
+                        const referenceData = editedTask.reference_data?.[script.id] || '';
+                        
                         return (
-                          <div key={script.id} className="flex items-center gap-2">
-                            <input 
-                              type="checkbox"
-                              id={`${task.id}-${script.id}`}
-                              checked={isSelected}
-                              disabled={!editMode}
-                              onChange={() => toggleScript(task.id, script.id)}
-                              className="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
-                            />
-                            <label 
-                              htmlFor={`${task.id}-${script.id}`}
-                              className={`flex-1 ${editMode ? 'cursor-pointer' : ''} ${!isSelected && editMode ? 'text-gray-400' : ''}`}
-                            >
-                              {script.name}
-                            </label>
+                          <div key={script.id} className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="checkbox"
+                                id={`${task.id}-${script.id}`}
+                                checked={isSelected}
+                                disabled={!editMode}
+                                onChange={() => toggleScript(task.id, script.id)}
+                                className="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+                              />
+                              <label 
+                                htmlFor={`${task.id}-${script.id}`}
+                                className={`flex-1 ${editMode ? 'cursor-pointer' : ''} ${!isSelected && editMode ? 'text-gray-400' : ''}`}
+                              >
+                                {script.name}
+                                {hasReferenceFiles && <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">Эталонные данные</span>}
+                              </label>
+                            </div>
+                            {hasReferenceFiles && isSelected && editMode && (
+                              <Textarea
+                                placeholder="Введите эталонные данные..."
+                                value={referenceData}
+                                onChange={(e) => {
+                                  setEditedTasks(prev => ({
+                                    ...prev,
+                                    [task.id]: {
+                                      ...prev[task.id],
+                                      reference_data: {
+                                        ...prev[task.id].reference_data,
+                                        [script.id]: e.target.value
+                                      }
+                                    }
+                                  }));
+                                }}
+                                rows={8}
+                                className="ml-6 font-mono text-sm"
+                              />
+                            )}
+                            {hasReferenceFiles && isSelected && !editMode && referenceData && (
+                              <div className="ml-6 p-2 bg-gray-50 rounded text-sm font-mono whitespace-pre-wrap">
+                                {referenceData}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
