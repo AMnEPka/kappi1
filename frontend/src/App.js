@@ -260,10 +260,10 @@ const HostsPage = () => {
                     <CardDescription>{host.hostname}:{host.port}</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(host)}>
+                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(host)} className="hover:bg-yellow-50 hover:text-yellow-600">
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(host.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(host.id)} className="hover:bg-red-50 hover:text-red-600">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
