@@ -194,6 +194,7 @@ class ProjectTask(BaseModel):
     host_id: str
     system_id: str
     script_ids: List[str]
+    reference_data: Optional[dict] = Field(default_factory=dict)  # script_id -> reference text
     status: str = "pending"  # pending, running, completed, failed
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -201,9 +202,11 @@ class ProjectTaskCreate(BaseModel):
     host_id: str
     system_id: str
     script_ids: List[str]
+    reference_data: Optional[dict] = Field(default_factory=dict)
 
 class ProjectTaskUpdate(BaseModel):
     script_ids: Optional[List[str]] = None
+    reference_data: Optional[dict] = None
     status: Optional[str] = None
 
 class ExecutionResult(BaseModel):
