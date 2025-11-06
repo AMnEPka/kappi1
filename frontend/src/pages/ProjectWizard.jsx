@@ -195,6 +195,7 @@ export default function ProjectWizard({ onNavigate }) {
             host_id: task.host_id,
             system_id: system.system_id,
             script_ids: system.script_ids,
+            reference_data: system.reference_data || {},
           });
         }
       }
