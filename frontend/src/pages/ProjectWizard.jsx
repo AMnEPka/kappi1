@@ -24,7 +24,7 @@ export default function ProjectWizard({ onNavigate }) {
     name: '',
     description: '',
     hosts: [],
-    tasks: [], // { host_id, systems: [{ system_id, script_ids }] }
+    tasks: [], // { host_id, systems: [{ system_id, script_ids, reference_data: {script_id: text} }] }
   });
 
   const [hosts, setHosts] = useState([]);
