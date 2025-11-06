@@ -42,17 +42,83 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
   const fetchProject = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/projects/${projectId}`);
-      setProject(response.data);
+      const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes] = await Promise.all([
+        axios.get(`${API_URL}/api/projects/${projectId}`),
+        axios.get(`${API_URL}/api/projects/${projectId}/tasks`),
+        axios.get(`${API_URL}/api/hosts`),
+        axios.get(`${API_URL}/api/systems`),
+        axios.get(`${API_URL}/api/scripts`)
+      ]);
+      
+      setProject(projectRes.data);
+      setTasks(tasksRes.data);
+      setHosts(hostsRes.data);
+      setSystems(systemsRes.data);
+      setScripts(scriptsRes.data);
+      
+      // Initialize edited tasks
+      const tasksMap = {};
+      tasksRes.data.forEach(task => {
+        tasksMap[task.id] = {
+          ...task,
+          script_ids: [...task.script_ids]
+        };
+      });
+      setEditedTasks(tasksMap);
       
       // If project is running, connect to SSE
-      if (response.data.status === 'running') {
+      if (projectRes.data.status === 'running') {
         startExecution(false);
       }
     } catch (error) {
       console.error('Error fetching project:', error);
       toast.error("Не удалось загрузить проект");
     }
+  };
+
+  const saveTaskChanges = async () => {
+    try {
+      // Update each modified task
+      const updates = Object.values(editedTasks).map(task => 
+        axios.put(`${API_URL}/api/projects/${projectId}/tasks/${task.id}`, {
+          script_ids: task.script_ids
+        })
+      );
+      
+      await Promise.all(updates);
+      
+      // Refresh tasks
+      const tasksRes = await axios.get(`${API_URL}/api/projects/${projectId}/tasks`);
+      setTasks(tasksRes.data);
+      
+      setEditMode(false);
+      toast.success("Изменения сохранены");
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast.error("Не удалось сохранить изменения");
+    }
+  };
+
+  const toggleScript = (taskId, scriptId) => {
+    setEditedTasks(prev => {
+      const task = prev[taskId];
+      const scriptIds = [...task.script_ids];
+      const index = scriptIds.indexOf(scriptId);
+      
+      if (index > -1) {
+        scriptIds.splice(index, 1);
+      } else {
+        scriptIds.push(scriptId);
+      }
+      
+      return {
+        ...prev,
+        [taskId]: {
+          ...task,
+          script_ids: scriptIds
+        }
+      };
+    });
   };
 
   const startExecution = async (shouldTrigger = true) => {
