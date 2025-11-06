@@ -61,7 +61,8 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       tasksRes.data.forEach(task => {
         tasksMap[task.id] = {
           ...task,
-          script_ids: [...task.script_ids]
+          script_ids: [...task.script_ids],
+          reference_data: { ...(task.reference_data || {}) }
         };
       });
       setEditedTasks(tasksMap);
