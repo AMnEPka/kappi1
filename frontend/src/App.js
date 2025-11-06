@@ -1069,6 +1069,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   
   const isActive = (path) => {
+    if (path === '/hosts') return location.pathname === '/hosts';
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
@@ -1090,7 +1091,12 @@ const Layout = ({ children }) => {
             </Link>
             <div className="flex gap-2">
               <Link to="/">
-                <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/')}>
+                <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/')}>
+                  <Briefcase className="mr-2 h-4 w-4" /> Проекты
+                </Button>
+              </Link>
+              <Link to="/hosts">
+                <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/hosts')}>
                   <Server className="mr-2 h-4 w-4" /> Хосты
                 </Button>
               </Link>
@@ -1102,11 +1108,6 @@ const Layout = ({ children }) => {
               <Link to="/execute">
                 <Button variant="ghost" data-testid="nav-execute" className={navLinkClass('/execute')}>
                   <Play className="mr-2 h-4 w-4" /> Выполнение
-                </Button>
-              </Link>
-              <Link to="/projects">
-                <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/projects')}>
-                  <Briefcase className="mr-2 h-4 w-4" /> Проекты
                 </Button>
               </Link>
               <Link to="/history">
