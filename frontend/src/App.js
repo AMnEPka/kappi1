@@ -160,7 +160,7 @@ const HostsPage = () => {
                   <Label>Хост</Label>
                   <Input
                     data-testid="host-hostname-input"
-                    placeholder="192.168.1.1 или domain.com"
+                    placeholder="192.168.1.1 или host1.rn.ru"
                     value={formData.hostname}
                     onChange={(e) => setFormData({...formData, hostname: e.target.value})}
                     required
@@ -371,10 +371,10 @@ const ScriptsPage = () => {
     try {
       if (editingScript) {
         await axios.put(`${API}/scripts/${editingScript.id}`, formData);
-        toast.success("Проверка обновлен");
+        toast.success("Проверка обновлена");
       } else {
         await axios.post(`${API}/scripts`, formData);
-        toast.success("Проверка создан");
+        toast.success("Проверка создана");
       }
       setIsDialogOpen(false);
       resetForm();
@@ -388,7 +388,7 @@ const ScriptsPage = () => {
     if (window.confirm("Удалить проверку?")) {
       try {
         await axios.delete(`${API}/scripts/${id}`);
-        toast.success("Проверка удален");
+        toast.success("Проверка удалена");
         fetchScripts();
       } catch (error) {
         toast.error("Ошибка удаления проверки");
@@ -546,7 +546,7 @@ const ScriptsPage = () => {
                   className="font-mono text-sm"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Короткая команда (1-2 строки)</p>
+                <p className="text-xs text-gray-500 mt-1">Команда с выводом (cat, ls, и т.д.)</p>
               </div>
 
               <div>
@@ -554,32 +554,27 @@ const ScriptsPage = () => {
                 <Textarea
                   value={formData.processor_script}
                   onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
-                  placeholder="#!/bin/bash
+                  placeholder="#!/bin/bash\n
 # Результат команды доступен в переменной $CHECK_OUTPUT
-# Также доступен через stdin (можно читать через 'read' или 'cat')
-
-# Пример 1: Через переменную
+# Пример :
 if echo '$CHECK_OUTPUT' | grep -q 'нужная строка'; then
-    echo 'Пройдена'
+echo 'Пройдена'
 else
-    echo 'Не пройдена'
+echo 'Не пройдена'
 fi
-
-# Пример 2: Через stdin
-# while read line; do
-#     # обработка каждой строки
-# done"
+#Эталонные данные доступы в переменной $ETALON_INPUT"
                   rows={10}
                   className="font-mono text-sm"
                 />
                 <div className="text-xs text-gray-500 mt-1 space-y-1">
                   <p className="font-semibold">Доступ к результату команды:</p>
                   <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
-                  <p>• Stdin: читайте через <code className="bg-gray-100 px-1 rounded">read</code> или обрабатывайте в цикле</p>
-                  <p className="font-semibold mt-2">Возможные результаты:</p>
-                  <p>Выведите одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>
-                  <p className="font-semibold">Доступ к эталонным файлам:</p>
-                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>                    
+
+                  <p className="font-semibold">Доступ к эталонным данным:</p>
+                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
+                  <p className="font-semibold mt-2">Вывод результатов проверки:</p>
+                  <p>Скрипт должен вернуть одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>                  
+
                 </div>
               </div>
 
@@ -648,7 +643,7 @@ fi
           <div className="col-span-full text-center py-16">
             <FileCode className="h-16 w-16 mx-auto text-slate-300 mb-4" />
             <p className="text-slate-500 text-lg mb-2">Нет проверок</p>
-            <p className="text-slate-400 text-sm">Создайте первый проверку проверки</p>
+            <p className="text-slate-400 text-sm">Создайте первую проверку этого типа</p>
           </div>
         ) : (
           scripts.map((script) => (
@@ -787,7 +782,7 @@ const ExecutePage = () => {
         <CardContent>
           {scripts.length === 0 ? (
             <div className="text-center py-8 text-slate-500">
-              Нет доступных проверок. Создайте проверкуы на странице "Проверки".
+              Нет доступных проверок. Создайте проверку на странице "Проверки".
             </div>
           ) : (
             <>
@@ -1089,7 +1084,7 @@ const Layout = ({ children }) => {
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-3">
               <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
-              <span className="text-2xl font-bold text-gray-800">OSIB</span>
+              <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
             </Link>
             <div className="flex gap-2">
               <Link to="/">
@@ -1109,7 +1104,7 @@ const Layout = ({ children }) => {
               </Link>
               <Link to="/execute">
                 <Button variant="ghost" data-testid="nav-execute" className={navLinkClass('/execute')}>
-                  <Play className="mr-2 h-4 w-4" /> Выполнение
+                  <Play className="mr-2 h-4 w-4" /> Единичный запуск
                 </Button>
               </Link>
               <Link to="/history">
@@ -1120,7 +1115,7 @@ const Layout = ({ children }) => {
               <div className="border-l mx-2 h-8 border-gray-200"></div>
               <Link to="/admin">
                 <Button variant="ghost" data-testid="nav-admin" className={navLinkClass('/admin')}>
-                  <Settings className="mr-2 h-4 w-4" /> Админ
+                  <Settings className="mr-2 h-4 w-4" /> Админ-панель
                 </Button>
               </Link>
             </div>
