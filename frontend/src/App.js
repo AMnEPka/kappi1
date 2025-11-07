@@ -554,13 +554,13 @@ const ScriptsPage = () => {
                 <Textarea
                   value={formData.processor_script}
                   onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
-                  placeholder="#!/bin/bash
+                  placeholder="#!/bin/bash\n
 # Результат команды доступен в переменной $CHECK_OUTPUT
 # Пример :
 if echo '$CHECK_OUTPUT' | grep -q 'нужная строка'; then
-    echo 'Пройдена'
+echo 'Пройдена'
 else
-    echo 'Не пройдена'
+echo 'Не пройдена'
 fi
 #Эталонные данные доступы в переменной $ETALON_INPUT"
                   rows={10}
