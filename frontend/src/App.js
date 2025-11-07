@@ -569,10 +569,12 @@ fi
                 <div className="text-xs text-gray-500 mt-1 space-y-1">
                   <p className="font-semibold">Доступ к результату команды:</p>
                   <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
+
                   <p className="font-semibold">Доступ к эталонным данным:</p>
                   <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
                   <p className="font-semibold mt-2">Вывод результатов проверки:</p>
                   <p>Скрипт должен вернуть одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>                  
+
                 </div>
               </div>
 
