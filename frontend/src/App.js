@@ -562,7 +562,6 @@ echo 'Пройдена'
 else
 echo 'Не пройдена'
 fi
-
 #Эталонные данные доступны в переменной $ETALON_INPUT"
                   rows={10}
                   className="font-mono text-sm"
