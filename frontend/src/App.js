@@ -294,8 +294,8 @@ const HostsPage = () => {
                 <div className="space-y-2 text-sm">
                   <div>Пользователь: <strong>{host.username}</strong></div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
                     <Badge variant="outline">{host.connection_type === "ssh" ? "Linux" : "Windows"}</Badge>
+                    <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
                   </div>
                   <Button 
                     variant="outline" 
@@ -658,65 +658,75 @@ fi
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="overflow-x-auto">
         {scripts.length === 0 ? (
-          <div className="col-span-full text-center py-16">
+          <div className="text-center py-16">
             <FileCode className="h-16 w-16 mx-auto text-slate-300 mb-4" />
             <p className="text-slate-500 text-lg mb-2">Нет проверок</p>
             <p className="text-slate-400 text-sm">Создайте первую проверку этого типа</p>
           </div>
         ) : (
-          scripts.map((script) => (
-            <Card key={script.id} data-testid={`script-card-${script.id}`}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="text-left py-3 px-4 text-slate-600 font-medium">Название</th>
+                <th className="text-left py-3 px-4 text-slate-600 font-medium">Категория</th>
+                <th className="text-left py-3 px-4 text-slate-600 font-medium">Описание</th>
+                <th className="text-left py-3 px-4 text-slate-600 font-medium">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scripts.map((script) => (
+                <tr key={script.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`script-card-${script.id}`}>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-medium">
+                        <FileCode className="h-4 w-4 text-slate-500" />
+                        {script.name}
+                      </div>
+                      {script.has_reference_files && (
+                        <div className="text-xs text-slate-400" title="Есть эталонные файлы">
+                          📝
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-sm text-slate-600">
                     {script.category_name && (
-                      <div className="text-sm text-slate-500 mb-1">
+                      <div>
                         {script.category_icon} {script.category_name} → {script.system_name}
                       </div>
                     )}
-                    <CardTitle className="flex items-center gap-2">
-                      <FileCode className="h-5 w-5" />
-                      {script.name}
-                    </CardTitle>
-                    {script.description && (
-                      <CardDescription>{script.description}</CardDescription>
+                  </td>
+                  <td className="py-3 px-4 text-sm text-slate-500 max-w-[200px]">
+                    {script.description ? (
+                      <div className="relative group">
+                        <div className="truncate">
+                          {script.description}
+                        </div>
+                        <div className="absolute invisible group-hover:visible bg-slate-900 text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-2 whitespace-nowrap z-10">
+                          {script.description}
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
+                        </div>
+                      </div>
+                    ) : (
+                      "-"
                     )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(script)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(script.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="text-sm">
-                    <span className="text-gray-600">Команда:</span>
-                    <code className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded">
-                      {script.content.length > 50 ? script.content.substring(0, 50) + '...' : script.content}
-                    </code>
-                  </div>
-                  {script.processor_script && (
-                    <Badge variant="outline" className="text-xs">
-                      <Terminal className="h-3 w-3 mr-1" />
-                      Есть обработчик
-                    </Badge>
-                  )}
-                  {script.has_reference_files && (
-                    <Badge variant="outline" className="text-xs">
-                      📁 Эталонные файлы
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(script)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(script.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
