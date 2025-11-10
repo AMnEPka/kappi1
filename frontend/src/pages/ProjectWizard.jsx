@@ -305,6 +305,23 @@ export default function ProjectWizard({ onNavigate }) {
     </Card>
   );
 
+  const handleSelectAllScripts = (hostId, systemIndex, system, scripts) => {
+  const allSelected = scripts.every(script => 
+    system.script_ids.includes(script.id)
+  );
+
+  // Переключаем каждую проверку по отдельности через существующую функцию
+  scripts.forEach(script => {
+    const isCurrentlySelected = system.script_ids.includes(script.id);
+    
+    // Если все выбраны - снимаем выделение со всех
+    // Если не все выбраны - добавляем только те, которые не выбраны
+    if (allSelected || !isCurrentlySelected) {
+      handleTaskScriptToggle(hostId, systemIndex, script.id);
+    }
+  });
+};
+
   const renderStep3 = () => (
     <Card>
       <CardHeader>
@@ -372,6 +389,18 @@ export default function ProjectWizard({ onNavigate }) {
                             <p className="text-gray-500 text-sm mt-2">Нет доступных проверок</p>
                           ) : (
                             <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
+                              {/* Чекбокс "Выбрать все" */}
+                              <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
+                                <Checkbox
+                                  checked={availableScripts.every(script => 
+                                    system.script_ids.includes(script.id)
+                                  )}
+                                  onCheckedChange={() => handleSelectAllScripts(task.host_id, systemIndex, system, availableScripts)}
+                                />
+                                <Label className="font-medium text-sm cursor-pointer">Выбрать все</Label>
+                              </div>
+
+                              {/* Список проверок */}
                               {availableScripts.map((script) => (
                                 <div key={script.id} className="flex items-center space-x-2">
                                   <Checkbox
