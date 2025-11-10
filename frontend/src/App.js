@@ -19,6 +19,7 @@ import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectWizard from "@/pages/ProjectWizard";
 import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
 import ProjectResultsPage from "@/pages/ProjectResultsPage";
+import { Menu } from 'lucide-react'; 
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin.replace(':3000', ':8001').replace('127.0.0.1', 'localhost');
 const API = `${BACKEND_URL}/api`;
@@ -1108,54 +1109,63 @@ const Layout = ({ children }) => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center gap-3">
-              <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
-              <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
-            </Link>
-            <div className="flex gap-2">
-              <Link to="/">
-                <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/')}>
-                  <Briefcase className="mr-2 h-4 w-4" /> Проекты
-                </Button>
-              </Link>
-              <Link to="/hosts">
-                <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/hosts')}>
-                  <Server className="mr-2 h-4 w-4" /> Хосты
-                </Button>
-              </Link>
-              <Link to="/scripts">
-                <Button variant="ghost" data-testid="nav-scripts" className={navLinkClass('/scripts')}>
-                  <FileCode className="mr-2 h-4 w-4" /> Проверки
-                </Button>
-              </Link>
+<div className="min-h-screen bg-gray-50">
+  <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <div className="container mx-auto px-4">
+      <div className="flex items-center justify-between h-16">
+        <Link to="/" className="flex items-center gap-3">
+          <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
+          <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
+        </Link>
+        <div className="flex gap-2 items-center">
+          <Link to="/">
+            <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/')}>
+              <Briefcase className="mr-2 h-4 w-4" /> Проекты
+            </Button>
+          </Link>
+          <Link to="/hosts">
+            <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/hosts')}>
+              <Server className="mr-2 h-4 w-4" /> Хосты
+            </Button>
+          </Link>
+          <Link to="/scripts">
+            <Button variant="ghost" data-testid="nav-scripts" className={navLinkClass('/scripts')}>
+              <FileCode className="mr-2 h-4 w-4" /> Проверки
+            </Button>
+          </Link>
+          
+          {/* Выпадающее меню */}
+          <div className="relative group">
+            <Button variant="ghost" size="icon">
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
               <Link to="/execute">
-                <Button variant="ghost" data-testid="nav-execute" className={navLinkClass('/execute')}>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
                   <Play className="mr-2 h-4 w-4" /> Единичный запуск
-                </Button>
+                </div>
               </Link>
               <Link to="/history">
-                <Button variant="ghost" data-testid="nav-history" className={navLinkClass('/history')}>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
                   <History className="mr-2 h-4 w-4" /> История
-                </Button>
+                </div>
               </Link>
-              <div className="border-l mx-2 h-8 border-gray-200"></div>
+              <div className="border-t border-gray-100"></div>
               <Link to="/admin">
-                <Button variant="ghost" data-testid="nav-admin" className={navLinkClass('/admin')}>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" /> Админ-панель
-                </Button>
+                </div>
               </Link>
             </div>
           </div>
         </div>
-      </nav>
-      <main className="container mx-auto px-4 py-8">
-        {children}
-      </main>
+      </div>
     </div>
+  </nav>
+  <main className="container mx-auto px-4 py-8">
+    {children}
+  </main>
+</div>
   );
 };
 
