@@ -1274,8 +1274,11 @@ async def execute_project(project_id: str):
                     yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': network_msg})}\n\n"
                     continue
                 
-                # 2. Check SSH login
-                login_ok, login_msg = await loop.run_in_executor(None, _check_ssh_login, host)
+                # 2. Check login (SSH or WinRM)
+                if host.connection_type == "winrm":
+                    login_ok, login_msg = await loop.run_in_executor(None, _check_winrm_login, host)
+                else:
+                    login_ok, login_msg = await loop.run_in_executor(None, _check_ssh_login, host)
                 yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg})}\n\n"
                 
                 if not login_ok:
