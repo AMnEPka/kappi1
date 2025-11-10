@@ -720,7 +720,7 @@ async def test_host_connection(host_id: str):
     host = Host(**parse_from_mongo(host_doc))
     
     # Try simple command
-    result = await execute_ssh_command(host, "echo 'Connection test successful'")
+    result = await execute_command(host, "echo 'Connection test successful'")
     
     return {
         "success": result.success,
