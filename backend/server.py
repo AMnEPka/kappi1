@@ -276,7 +276,7 @@ async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
 async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, reference_data: Optional[str] = None) -> ExecutionResult:
     """Execute check command and process results with optional reference data"""
     # Step 1: Execute the main command
-    main_result = await execute_ssh_command(host, command)
+    main_result = await execute_command(host, command)
     
     if not processor_script:
         # No processor - return as is
