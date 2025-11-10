@@ -329,24 +329,38 @@ echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | b
         output = processor_result.output.strip()
         check_status = None
         
+        # Debug: log processor output
+        print(f"[DEBUG] Processor output (raw): {repr(output)}")
+        print(f"[DEBUG] Processor output (bytes): {output.encode('utf-8')}")
+        
         # Look for status keywords
         for line in output.split('\n'):
-            line_lower = line.strip().lower()
+            line_stripped = line.strip()
+            line_lower = line_stripped.lower()
+            
+            print(f"[DEBUG] Checking line: '{line_stripped}' (lower: '{line_lower}')")
+            
             if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
                 check_status = 'Пройдена'
+                print(f"[DEBUG] Found status: Пройдена")
                 break
             elif 'не пройдена' in line_lower:
                 check_status = 'Не пройдена'
+                print(f"[DEBUG] Found status: Не пройдена")
                 break
             elif 'ошибка' in line_lower:
                 check_status = 'Ошибка'
+                print(f"[DEBUG] Found status: Ошибка")
                 break
             elif 'оператор' in line_lower:
                 check_status = 'Оператор'
+                print(f"[DEBUG] Found status: Оператор")
                 break
         
+        print(f"[DEBUG] Final check_status: {check_status}")
+        
         # Build result message - only command output and final status
-        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Вывод обработчика ===\n{output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
         
         return ExecutionResult(
             host_id=host.id,
