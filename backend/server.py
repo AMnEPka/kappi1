@@ -380,6 +380,33 @@ def _check_network_access(host: Host) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Ошибка проверки сетевого доступа: {str(e)}"
 
+def _check_winrm_login(host: Host) -> tuple[bool, str]:
+    """Check if WinRM login is successful"""
+    try:
+        password = decrypt_password(host.password) if host.password else None
+        if not password:
+            return False, "Пароль не указан или не удалось расшифровать"
+        
+        winrm_port = host.port if host.port != 22 else 5985
+        endpoint = f'http://{host.hostname}:{winrm_port}/wsman'
+        
+        session = winrm.Session(
+            endpoint,
+            auth=(host.username, password),
+            transport='ntlm'
+        )
+        
+        # Try simple command
+        result = session.run_cmd('echo', ['test'])
+        
+        if result.status_code == 0:
+            return True, "Логин успешен"
+        else:
+            return False, "Ошибка аутентификации: неверный логин/пароль"
+    
+    except Exception as e:
+        return False, f"Ошибка логина: {str(e)}"
+
 def _check_ssh_login(host: Host) -> tuple[bool, str]:
     """Check if SSH login is successful"""
     ssh = paramiko.SSHClient()
