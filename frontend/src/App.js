@@ -190,6 +190,25 @@ const HostsPage = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label>Тип подключения</Label>
+                  <Select 
+                    value={formData.connection_type || 'ssh'} 
+                    onValueChange={(value) => {
+                      const newPort = value === 'winrm' ? 5985 : 22;
+                      setFormData({...formData, connection_type: value, port: newPort});
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ssh">SSH (Linux)</SelectItem>
+                      <SelectItem value="winrm">WinRM (Windows)</SelectItem>
+                      <SelectItem value="k8s" disabled>Kubernetes (скоро)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label>Тип аутентификации</Label>
                   <Select value={formData.auth_type} onValueChange={(value) => setFormData({...formData, auth_type: value})}>
                     <SelectTrigger>
@@ -197,7 +216,7 @@ const HostsPage = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="password">Пароль</SelectItem>
-                      <SelectItem value="key">SSH ключ</SelectItem>
+                      {formData.connection_type !== 'winrm' && <SelectItem value="key">SSH ключ</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
