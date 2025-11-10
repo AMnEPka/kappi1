@@ -304,8 +304,9 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         
         # Create processor command based on connection type
         if host.connection_type == "winrm":
-            # PowerShell command for Windows
+            # PowerShell command for Windows with UTF-8 output encoding
             processor_cmd = f"""
+[Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(1251)
 $env:CHECK_OUTPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_output}'))
 $env:ETALON_INPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_reference}'))
 $script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_processor}'))
