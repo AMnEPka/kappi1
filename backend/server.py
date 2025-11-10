@@ -488,6 +488,60 @@ def _check_sudo_access(host: Host) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Ошибка проверки sudo: {str(e)}"
 
+def _winrm_connect_and_execute(host: Host, command: str) -> ExecutionResult:
+    """Internal function to connect via WinRM and execute command on Windows"""
+    try:
+        # Decrypt password
+        password = decrypt_password(host.password) if host.password else None
+        if not password:
+            return ExecutionResult(
+                host_id=host.id,
+                host_name=host.name,
+                success=False,
+                output="",
+                error="Пароль не указан или не удалось расшифровать"
+            )
+        
+        # Connect to Windows host via WinRM
+        # Default WinRM port is 5985 for HTTP, 5986 for HTTPS
+        winrm_port = host.port if host.port != 22 else 5985
+        endpoint = f'http://{host.hostname}:{winrm_port}/wsman'
+        
+        session = winrm.Session(
+            endpoint,
+            auth=(host.username, password),
+            transport='ntlm'  # Use NTLM authentication
+        )
+        
+        # Execute command
+        result = session.run_ps(command)  # Run PowerShell command
+        
+        if result.status_code == 0:
+            return ExecutionResult(
+                host_id=host.id,
+                host_name=host.name,
+                success=True,
+                output=result.std_out.decode('utf-8') if result.std_out else "",
+                error=None
+            )
+        else:
+            return ExecutionResult(
+                host_id=host.id,
+                host_name=host.name,
+                success=False,
+                output=result.std_out.decode('utf-8') if result.std_out else "",
+                error=result.std_err.decode('utf-8') if result.std_err else f"Exit code: {result.status_code}"
+            )
+    
+    except Exception as e:
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output="",
+            error=f"Ошибка WinRM подключения: {str(e)}"
+        )
+
 def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
     """Internal function to connect via SSH and execute command"""
     ssh = paramiko.SSHClient()
