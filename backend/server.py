@@ -251,21 +251,27 @@ class ExecuteRequest(BaseModel):
 
 
 # SSH Execution Function
-async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
-    """Execute command on remote host via SSH"""
-    try:
-        # Run SSH connection in thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, command)
-        return result
-    except Exception as e:
+async def execute_command(host: Host, command: str) -> ExecutionResult:
+    """Execute command on host via appropriate connection method (SSH or WinRM)"""
+    loop = asyncio.get_event_loop()
+    
+    if host.connection_type == "winrm":
+        return await loop.run_in_executor(None, _winrm_connect_and_execute, host, command)
+    elif host.connection_type == "ssh":
+        return await loop.run_in_executor(None, _ssh_connect_and_execute, host, command)
+    else:
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
             success=False,
             output="",
-            error=f"Ошибка выполнения: {str(e)}"
+            error=f"Неподдерживаемый тип подключения: {host.connection_type}"
         )
+
+# Keep for backward compatibility
+async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
+    """Execute command on host via SSH"""
+    return await execute_command(host, command)
 
 async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, reference_data: Optional[str] = None) -> ExecutionResult:
     """Execute check command and process results with optional reference data"""
