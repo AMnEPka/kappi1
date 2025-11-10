@@ -121,7 +121,8 @@ const HostsPage = () => {
       username: host.username,
       auth_type: host.auth_type,
       password: "",
-      ssh_key: host.ssh_key || ""
+      ssh_key: host.ssh_key || "",
+      connection_type: host.connection_type || "ssh"
     });
     setIsDialogOpen(true);
   };
