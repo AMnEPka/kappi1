@@ -464,7 +464,43 @@ def _check_ssh_login(host: Host) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Ошибка логина: {str(e)}"
 
-def _check_sudo_access(host: Host) -> tuple[bool, str]:
+def _check_admin_access(host: Host) -> tuple[bool, str]:
+    """Check if admin/sudo access is available"""
+    if host.connection_type == "winrm":
+        # For Windows, check if user has admin rights
+        try:
+            password = decrypt_password(host.password) if host.password else None
+            if not password:
+                return False, "Пароль не указан"
+            
+            winrm_port = host.port if host.port != 22 else 5985
+            endpoint = f'http://{host.hostname}:{winrm_port}/wsman'
+            
+            session = winrm.Session(
+                endpoint,
+                auth=(host.username, password),
+                transport='ntlm'
+            )
+            
+            # Check if user is in Administrators group
+            result = session.run_ps('([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")')
+            
+            if result.status_code == 0:
+                output = result.std_out.decode('utf-8').strip()
+                if output.lower() == 'true':
+                    return True, "Права администратора доступны"
+                else:
+                    return False, "Пользователь не имеет прав администратора"
+            else:
+                return False, "Ошибка проверки прав администратора"
+        
+        except Exception as e:
+            return False, f"Ошибка проверки прав: {str(e)}"
+    else:
+        # For Linux, check sudo
+        return _check_sudo_access_linux(host)
+
+def _check_sudo_access_linux(host: Host) -> tuple[bool, str]:
     """Check if sudo is available and working"""
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
