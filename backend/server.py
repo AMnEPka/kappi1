@@ -1305,8 +1305,8 @@ async def execute_project(project_id: str):
                     yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg})}\n\n"
                     continue
                 
-                # 3. Check sudo access
-                sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_sudo_access, host)
+                # 3. Check sudo/admin access
+                sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_admin_access, host)
                 yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg})}\n\n"
                 
                 if not sudo_ok:
