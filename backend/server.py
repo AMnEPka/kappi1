@@ -616,22 +616,27 @@ def _winrm_connect_and_execute(host: Host, command: str) -> ExecutionResult:
         # Execute command
         result = session.run_ps(command)  # Run PowerShell command
         
-        # Decode output - try UTF-8 first, then UTF-16
-        try:
-            output_str = result.std_out.decode('utf-8') if result.std_out else ""
-        except UnicodeDecodeError:
-            try:
-                output_str = result.std_out.decode('utf-16') if result.std_out else ""
-            except:
-                output_str = result.std_out.decode('utf-8', errors='ignore') if result.std_out else ""
+        # Decode output - PowerShell returns output in cp1251 (Windows-1251) for Russian locale
+        # Try different encodings: cp1251, utf-8, utf-16
+        def decode_winrm_output(data):
+            if not data:
+                return ""
+            
+            encodings = ['cp1251', 'utf-8', 'utf-16-le', 'utf-16']
+            for encoding in encodings:
+                try:
+                    decoded = data.decode(encoding)
+                    # Check if decode was successful (no question marks)
+                    if '?' not in decoded or decoded.isprintable():
+                        return decoded
+                except (UnicodeDecodeError, LookupError):
+                    continue
+            
+            # Fallback: decode with errors ignored
+            return data.decode('utf-8', errors='ignore')
         
-        try:
-            error_str = result.std_err.decode('utf-8') if result.std_err else ""
-        except UnicodeDecodeError:
-            try:
-                error_str = result.std_err.decode('utf-16') if result.std_err else ""
-            except:
-                error_str = result.std_err.decode('utf-8', errors='ignore') if result.std_err else ""
+        output_str = decode_winrm_output(result.std_out)
+        error_str = decode_winrm_output(result.std_err)
         
         if result.status_code == 0:
             return ExecutionResult(
