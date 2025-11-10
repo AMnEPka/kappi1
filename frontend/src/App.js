@@ -295,6 +295,7 @@ const HostsPage = () => {
                   <div>Пользователь: <strong>{host.username}</strong></div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
+                    <Badge variant="outline">{host.connection_type === "ssh" ? "Linux" : "Windows"}</Badge>
                   </div>
                   <Button 
                     variant="outline" 
