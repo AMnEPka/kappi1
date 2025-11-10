@@ -602,12 +602,29 @@ def _winrm_connect_and_execute(host: Host, command: str) -> ExecutionResult:
         # Execute command
         result = session.run_ps(command)  # Run PowerShell command
         
+        # Decode output - try UTF-8 first, then UTF-16
+        try:
+            output_str = result.std_out.decode('utf-8') if result.std_out else ""
+        except UnicodeDecodeError:
+            try:
+                output_str = result.std_out.decode('utf-16') if result.std_out else ""
+            except:
+                output_str = result.std_out.decode('utf-8', errors='ignore') if result.std_out else ""
+        
+        try:
+            error_str = result.std_err.decode('utf-8') if result.std_err else ""
+        except UnicodeDecodeError:
+            try:
+                error_str = result.std_err.decode('utf-16') if result.std_err else ""
+            except:
+                error_str = result.std_err.decode('utf-8', errors='ignore') if result.std_err else ""
+        
         if result.status_code == 0:
             return ExecutionResult(
                 host_id=host.id,
                 host_name=host.name,
                 success=True,
-                output=result.std_out.decode('utf-8') if result.std_out else "",
+                output=output_str,
                 error=None
             )
         else:
@@ -615,8 +632,8 @@ def _winrm_connect_and_execute(host: Host, command: str) -> ExecutionResult:
                 host_id=host.id,
                 host_name=host.name,
                 success=False,
-                output=result.std_out.decode('utf-8') if result.std_out else "",
-                error=result.std_err.decode('utf-8') if result.std_err else f"Exit code: {result.status_code}"
+                output=output_str,
+                error=error_str if error_str else f"Exit code: {result.status_code}"
             )
     
     except Exception as e:
