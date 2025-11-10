@@ -359,16 +359,22 @@ def _check_network_access(host: Host) -> tuple[bool, str]:
     """Check if host is reachable via network"""
     import socket
     try:
-        # Try to connect to SSH port
+        # Determine port based on connection type
+        if host.connection_type == "winrm":
+            check_port = 5985 if host.port == 22 else host.port  # Default WinRM HTTP port
+        else:
+            check_port = host.port
+        
+        # Try to connect to the port
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
-        result = sock.connect_ex((host.hostname, host.port))
+        result = sock.connect_ex((host.hostname, check_port))
         sock.close()
         
         if result == 0:
             return True, "Сетевой доступ есть"
         else:
-            return False, f"Сетевой доступ отсутствует (порт {host.port} недоступен)"
+            return False, f"Сетевой доступ отсутствует (порт {check_port} недоступен)"
     except socket.gaierror:
         return False, f"Не удается разрешить имя хоста {host.hostname}"
     except Exception as e:
