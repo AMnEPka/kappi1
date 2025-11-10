@@ -113,6 +113,7 @@ class Host(BaseModel):
     auth_type: str  # "password" or "key"
     password: Optional[str] = None
     ssh_key: Optional[str] = None
+    connection_type: str = "ssh"  # "ssh" for Linux, "winrm" for Windows, "k8s" for Kubernetes
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class HostCreate(BaseModel):
@@ -123,6 +124,7 @@ class HostCreate(BaseModel):
     auth_type: str
     password: Optional[str] = None
     ssh_key: Optional[str] = None
+    connection_type: str = "ssh"
 
 class HostUpdate(BaseModel):
     name: Optional[str] = None
@@ -132,6 +134,7 @@ class HostUpdate(BaseModel):
     auth_type: Optional[str] = None
     password: Optional[str] = None
     ssh_key: Optional[str] = None
+    connection_type: Optional[str] = None
 
 class Script(BaseModel):
     model_config = ConfigDict(extra="ignore")
