@@ -302,17 +302,28 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         encoded_processor = base64.b64encode(processor_script.encode('utf-8')).decode('ascii')
         encoded_reference = base64.b64encode((reference_data or '').encode('utf-8')).decode('ascii')
         
-        # Create processor command with output and reference data available via environment variables:
-        # 1. Environment variable CHECK_OUTPUT - output from main command
-        # 2. Environment variable ETALON_INPUT - reference data for comparison
-        # 3. stdin - piped output from main command
-        # Use base64 for processor script to avoid heredoc conflicts
-        processor_cmd = f"""
+        # Create processor command based on connection type
+        if host.connection_type == "winrm":
+            # PowerShell command for Windows
+            processor_cmd = f"""
+$env:CHECK_OUTPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_output}'))
+$env:ETALON_INPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_reference}'))
+$script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_processor}'))
+Invoke-Expression $script
+"""
+        else:
+            # Bash command for Linux
+            processor_cmd = f"""
 export CHECK_OUTPUT=$(echo '{encoded_output}' | base64 -d)
 export ETALON_INPUT=$(echo '{encoded_reference}' | base64 -d)
 echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | bash
 """
-        processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
+        
+        # Execute processor script using appropriate connection method
+        if host.connection_type == "winrm":
+            processor_result = await loop.run_in_executor(None, _winrm_connect_and_execute, host, processor_cmd)
+        else:
+            processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
         
         # Parse processor output to determine check result
         output = processor_result.output.strip()
