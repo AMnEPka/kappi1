@@ -36,7 +36,8 @@ const HostsPage = () => {
     username: "",
     auth_type: "password",
     password: "",
-    ssh_key: ""
+    ssh_key: "",
+    connection_type: "ssh"
   });
 
   useEffect(() => {
