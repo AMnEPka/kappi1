@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 import paramiko
+import winrm
 import asyncio
 from cryptography.fernet import Fernet
 import base64
