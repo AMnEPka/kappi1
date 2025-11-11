@@ -429,6 +429,8 @@ const ScriptsPage = () => {
       content: "",
       processor_script: "",
       has_reference_files: false,
+      test_methodology: "",
+      success_criteria: "",
       order: 0
     });
     setFormCategoryId("");
