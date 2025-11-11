@@ -205,15 +205,32 @@ docker compose up -d --build
 
 ## Требования к хостам
 
-### Для Linux серверов:
-- Установлен OpenSSH Server
+### Для Linux серверов (SSH):
+- Установлен OpenSSH Server (порт 22)
 - Bash доступен
 - Пользователь имеет права на выполнение команд
+- Для проверок требующих повышенных привилегий: sudo без пароля или с паролем
 
-### Для Windows серверов:
-- Установлен OpenSSH Server
-- CMD или PowerShell доступны
+### Для Windows серверов (WinRM):
+- Включен и настроен WinRM (порт 5985 или 5986)
+- PowerShell доступен
 - Пользователь имеет права на выполнение команд
+- Для проверок требующих повышенных привилегий: права администратора
+
+#### Настройка WinRM на Windows:
+```powershell
+# Включить WinRM
+Enable-PSRemoting -Force
+
+# Настроить доверенные хосты (для HTTP)
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
+
+# Разрешить базовую аутентификацию
+Set-Item WSMan:\localhost\Service\Auth\Basic -Value $true
+
+# Перезапустить службу
+Restart-Service WinRM
+```
 
 ## Примеры скриптов
 
