@@ -495,22 +495,31 @@ def _check_ssh_login_and_sudo(host: Host) -> tuple[bool, str, bool, str]:
         login_msg = "Логин успешен"
         
         try:
-            # Check sudo with simple echo command
-            stdin, stdout, stderr = ssh.exec_command("sudo -n echo 'SUDO_OK' 2>&1", timeout=5, get_pty=False)
+            # Check sudo - simplified command without redirection
+            stdin, stdout, stderr = ssh.exec_command("sudo -n whoami", timeout=5, get_pty=False)
             channel = stdout.channel
             channel.settimeout(5)
             
+            # Read both stdout and stderr
             output = stdout.read().decode('utf-8', errors='replace').strip()
+            error_output = stderr.read().decode('utf-8', errors='replace').strip()
+            exit_code = channel.recv_exit_status()
             
-            if 'SUDO_OK' in output:
+            print(f"[DEBUG] Sudo check for {host.name}: exit_code={exit_code}, output='{output}', stderr='{error_output}'")
+            
+            # Check results
+            if exit_code == 0 and output:
                 sudo_success = True
                 sudo_msg = "sudo доступен"
-            elif 'password' in output.lower():
+            elif 'password' in error_output.lower() or 'password' in output.lower():
                 sudo_success = False
                 sudo_msg = "sudo недоступен (требуется пароль)"
+            elif 'sorry' in error_output.lower() or 'not in sudoers' in error_output.lower():
+                sudo_success = False
+                sudo_msg = "sudo недоступен (пользователь не в sudoers)"
             else:
                 sudo_success = False
-                sudo_msg = "sudo недоступен (требуется настройка NOPASSWD)"
+                sudo_msg = f"sudo недоступен (код: {exit_code})"
         except socket.timeout as e:
             print(f"[DEBUG] Sudo check timeout for {host.name}: {str(e)}")
             sudo_success = False
