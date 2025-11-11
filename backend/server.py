@@ -593,16 +593,28 @@ def _check_sudo_access_linux(host: Host) -> tuple[bool, str]:
                 gss_deleg_creds=False
             )
         
-        # Test sudo with a simple command
-        stdin, stdout, stderr = ssh.exec_command("sudo -n true", timeout=10)
-        exit_status = stdout.channel.recv_exit_status()
+        # Test sudo with a simple command using get_pty to avoid hanging
+        stdin, stdout, stderr = ssh.exec_command("sudo -n true 2>&1; echo $?", timeout=5, get_pty=False)
         
-        ssh.close()
+        # Read output with timeout
+        import select
+        channel = stdout.channel
+        channel.settimeout(5)
         
-        if exit_status == 0:
-            return True, "sudo доступен"
-        else:
-            return False, "sudo недоступен (требуется настройка NOPASSWD или пароль)"
+        try:
+            output = stdout.read().decode('utf-8', errors='replace').strip()
+            error_output = stderr.read().decode('utf-8', errors='replace').strip()
+            
+            # Check if sudo worked (exit code should be 0)
+            if '0' in output.split('\n')[-1]:
+                ssh.close()
+                return True, "sudo доступен"
+            else:
+                ssh.close()
+                return False, "sudo недоступен (требуется настройка NOPASSWD или пароль)"
+        except socket.timeout:
+            ssh.close()
+            return False, "Таймаут при проверке sudo"
     
     except Exception as e:
         return False, f"Ошибка проверки sudo: {str(e)}"
