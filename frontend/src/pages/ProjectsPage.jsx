@@ -66,49 +66,52 @@ export default function ProjectsPage({ onNavigate }) {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Проекты</h1>
-          <p className="text-gray-600 mt-1">
-            Проекты структурируют исполнение проверок на разных хостах
-          </p>
-        </div>
+  <div className="flex justify-between items-center mb-6">
+    <div>
+      <h1 className="text-3xl font-bold">Проекты</h1>
+      <p className="text-gray-600 mt-1">
+        Проекты структурируют исполнение проверок на разных хостах
+      </p>
+    </div>
+    <Button onClick={() => onNavigate('project-wizard')}>
+      <PlusCircle className="mr-2 h-4 w-4" />
+      Создать проект
+    </Button>
+  </div>
+
+  {loading ? (
+    <div className="flex justify-center items-center h-64">
+      <div className="text-gray-500">Загрузка...</div>
+    </div>
+  ) : projects.length === 0 ? (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center h-64">
+        <p className="text-gray-500 mb-4">Проектов пока нет</p>
         <Button onClick={() => onNavigate('project-wizard')}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Создать проект
+          Создать первый проект
         </Button>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">Загрузка...</div>
-        </div>
-      ) : projects.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center h-64">
-            <p className="text-gray-500 mb-4">Проектов пока нет</p>
-            <Button onClick={() => onNavigate('project-wizard')}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Создать первый проект
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4">
+      </CardContent>
+    </Card>
+  ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {projects.map((project) => (
-            <Card key={project.id}>
-              <CardHeader>
+            <Card key={project.id} className="flex flex-col h-full">
+              <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <CardTitle className="text-xl">{project.name}</CardTitle>
+                    <CardTitle className="text-lg line-clamp-1">{project.name}</CardTitle>
                     {project.description && (
-                      <CardDescription>{project.description}</CardDescription>
+                      <CardDescription className="line-clamp-2 mt-1">
+                        {project.description}
+                      </CardDescription>
                     )}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="mb-4 text-sm">
+              
+              <CardContent className="pb-4 flex-1">
+                <div className="mb-3 text-sm">
                   <p className="text-gray-500">Создан: <span className="font-medium">{formatDate(project.created_at)}</span></p>
                 </div>
 
@@ -116,25 +119,26 @@ export default function ProjectsPage({ onNavigate }) {
                   <Button
                     size="sm"
                     onClick={() => onNavigate('project-execute', project.id)}
+                    className="flex-1"
                   >
-                    <Play className="mr-2 h-4 w-4" />
+                    <Play className="mr-1 h-3 w-3" />
                     Запустить
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => onNavigate('project-results', project.id)}
+                    className="flex-1"
                   >
-                    <Eye className="mr-2 h-4 w-4" />
-                    Просмотр результатов
+                    <Eye className="mr-1 h-3 w-3" />
+                    Результаты
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
                     onClick={() => handleDeleteProject(project.id)}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Удалить
+                    <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               </CardContent>
