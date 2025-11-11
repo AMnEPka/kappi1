@@ -66,17 +66,24 @@ docker compose up -d --build
 **Backend:**
 - FastAPI - веб-фреймворк
 - Motor - асинхронный драйвер MongoDB
-- Paramiko - SSH клиент для Python
+- Paramiko - SSH клиент для Linux
+- pywinrm - WinRM клиент для Windows
+- openpyxl - генерация Excel отчетов
 - Cryptography - шифрование паролей
 
 **Frontend:**
 - React 19 - UI библиотека
 - Tailwind CSS - стилизация
-- Shadcn UI - компоненты
+- Shadcn UI - компоненты UI
 - Axios - HTTP клиент
+- Sonner - уведомления
 
 **Database:**
 - MongoDB - хранение данных
+
+**Deployment:**
+- Docker & Docker Compose
+- Supervisord - управление процессами
 
 ## Использование
 
