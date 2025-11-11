@@ -216,21 +216,33 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
             <CardDescription>Просмотр результатов конкретного запуска проекта</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select value={selectedSession} onValueChange={setSelectedSession}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Выберите запуск" />
-              </SelectTrigger>
-              <SelectContent>
-                {sessions.map((session, index) => (
-                  <SelectItem key={session.session_id} value={session.session_id}>
-                    {index === 0 ? '🆕 ' : ''}
-                    {formatDate(session.executed_at)} 
-                    {' - '}
-                    Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Select value={selectedSession} onValueChange={setSelectedSession}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите запуск" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sessions.map((session, index) => (
+                      <SelectItem key={session.session_id} value={session.session_id}>
+                        {index === 0 ? '🆕 ' : ''}
+                        {formatDate(session.executed_at)} 
+                        {' - '}
+                        Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={handleExportToExcel}
+                disabled={!selectedSession}
+                variant="yellow"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Экспорт в Excel
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
