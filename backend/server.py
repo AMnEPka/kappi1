@@ -431,8 +431,116 @@ def _check_winrm_login(host: Host) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Ошибка логина: {str(e)}"
 
+def _check_ssh_login_and_sudo(host: Host) -> tuple[bool, str, bool, str]:
+    """Check if SSH login is successful AND check sudo in one connection"""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        # Connect with appropriate authentication
+        if host.auth_type == "password":
+            password = decrypt_password(host.password) if host.password else None
+            if not password:
+                return False, "Пароль не указан или не удалось расшифровать", False, "Пароль не указан"
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                password=password,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
+            )
+        else:  # key-based auth
+            from io import StringIO
+            if not host.ssh_key:
+                return False, "SSH ключ не указан", False, "SSH ключ не указан"
+            key_file = StringIO(host.ssh_key)
+            try:
+                pkey = paramiko.RSAKey.from_private_key(key_file)
+            except:
+                key_file = StringIO(host.ssh_key)
+                try:
+                    pkey = paramiko.DSSKey.from_private_key(key_file)
+                except:
+                    key_file = StringIO(host.ssh_key)
+                    try:
+                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                    except:
+                        key_file = StringIO(host.ssh_key)
+                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                pkey=pkey,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
+            )
+        
+        # Login successful, now check sudo
+        login_success = True
+        login_msg = "Логин успешен"
+        
+        try:
+            # Check sudo with simple echo command
+            stdin, stdout, stderr = ssh.exec_command("sudo -n echo 'SUDO_OK' 2>&1", timeout=5, get_pty=False)
+            channel = stdout.channel
+            channel.settimeout(5)
+            
+            output = stdout.read().decode('utf-8', errors='replace').strip()
+            
+            if 'SUDO_OK' in output:
+                sudo_success = True
+                sudo_msg = "sudo доступен"
+            elif 'password' in output.lower():
+                sudo_success = False
+                sudo_msg = "sudo недоступен (требуется пароль)"
+            else:
+                sudo_success = False
+                sudo_msg = "sudo недоступен (требуется настройка NOPASSWD)"
+        except:
+            sudo_success = False
+            sudo_msg = "Ошибка проверки sudo"
+        
+        ssh.close()
+        import time
+        time.sleep(0.5)
+        
+        return login_success, login_msg, sudo_success, sudo_msg
+    
+    except paramiko.AuthenticationException:
+        try:
+            ssh.close()
+        except:
+            pass
+        return False, "Ошибка аутентификации: неверный логин/пароль/ключ", False, "Логин не выполнен"
+    except Exception as e:
+        try:
+            ssh.close()
+        except:
+            pass
+        return False, f"Ошибка логина: {str(e)}", False, "Логин не выполнен"
+
 def _check_ssh_login(host: Host) -> tuple[bool, str]:
-    """Check if SSH login is successful"""
+    """Check if SSH login is successful (wrapper for compatibility)"""
+    login_ok, login_msg, _, _ = _check_ssh_login_and_sudo(host)
+    return login_ok, login_msg
+
+def _check_ssh_login_original(host: Host) -> tuple[bool, str]:
+    """Original SSH login check - kept for reference"""
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
