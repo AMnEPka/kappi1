@@ -867,6 +867,13 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
                 gss_kex=False,
                 gss_deleg_creds=False
             )
+            # Enable keepalive to maintain connection
+            transport = ssh.get_transport()
+            if transport:
+                transport.set_keepalive(30)
+            # Small delay to let connection stabilize before opening channel
+            import time
+            time.sleep(1)
         else:  # key-based auth
             logger.info(f"Using key-based authentication for {host.name}")
             from io import StringIO
