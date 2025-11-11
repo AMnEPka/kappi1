@@ -19,7 +19,9 @@ import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectWizard from "@/pages/ProjectWizard";
 import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
 import ProjectResultsPage from "@/pages/ProjectResultsPage";
-import { Menu } from 'lucide-react'; 
+import { Menu, HelpCircle } from 'lucide-react'; 
+
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin.replace(':3000', ':8001').replace('127.0.0.1', 'localhost');
 const API = `${BACKEND_URL}/api`;
@@ -495,148 +497,162 @@ const ScriptsPage = () => {
               <Plus className="mr-2 h-4 w-4" /> Добавить проверку
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingScript ? "Редактировать проверку" : "Новая проверка"}</DialogTitle>
-              <DialogDescription>
-                Создайте проверку для конкретной системы
-              </DialogDescription>
+              <DialogDescription>Создайте проверку для конкретной системы</DialogDescription>
             </DialogHeader>
+            
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label>Категория</Label>
-                <Select 
-                  value={formCategoryId} 
-                  onValueChange={handleCategoryChangeInForm}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Выберите категорию..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.icon} {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Левый столбец */}
+                <div className="space-y-4">
+                  <div>
+                    <Label>Категория</Label>
+                    <Select value={formCategoryId} onValueChange={handleCategoryChangeInForm} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите категорию..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div>
-                <Label>Система</Label>
-                <Select 
-                  value={formData.system_id} 
-                  onValueChange={(value) => setFormData({...formData, system_id: value})}
-                  required
-                  disabled={!formCategoryId}
-                >
-                  <SelectTrigger data-testid="script-system-select">
-                    <SelectValue placeholder={formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formSystems.map((sys) => (
-                      <SelectItem key={sys.id} value={sys.id}>
-                        {sys.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label>Название проверки</Label>
-                <Input
-                  data-testid="script-name-input"
-                  placeholder="Проверка версии ядра"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label>Описание</Label>
-                <Input
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="Опционально"
-                />
-              </div>
+                  <div>
+                    <Label>Система</Label>
+                    <Select 
+                      value={formData.system_id} 
+                      onValueChange={(value) => setFormData({...formData, system_id: value})}
+                      required
+                      disabled={!formCategoryId}
+                    >
+                      <SelectTrigger data-testid="script-system-select">
+                        <SelectValue placeholder={formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formSystems.map((sys) => (
+                          <SelectItem key={sys.id} value={sys.id}>{sys.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Название проверки</Label>
+                    <Input
+                      data-testid="script-name-input"
+                      placeholder="Проверка версии ядра"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>Описание</Label>
+                    <Input
+                      value={formData.description}
+                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      placeholder="Опционально"
+                    />
+                  </div>
 
-              <div>
-                <Label>Команда</Label>
-                <Textarea
-                  data-testid="script-content-input"
-                  value={formData.content}
-                  onChange={(e) => setFormData({...formData, content: e.target.value})}
-                  placeholder="cat /etc/hostname"
-                  rows={2}
-                  className="font-mono text-sm"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">Команда с выводом (cat, ls, и т.д.)</p>
-              </div>
+                  <div>
+                    <Label>Команда</Label>
+                    <Textarea
+                      data-testid="script-content-input"
+                      value={formData.content}
+                      onChange={(e) => setFormData({...formData, content: e.target.value})}
+                      placeholder="cat /etc/hostname"
+                      rows={2}
+                      className="font-mono text-sm"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Команда с выводом (cat, ls, и т.д.)</p>
+                  </div>
 
-              <div>
-                <Label>Скрипт-обработчик</Label>
-                <Textarea
-                  value={formData.processor_script}
-                  onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
-                  placeholder="#!/bin/bash
-# Результат команды доступен в переменной $CHECK_OUTPUT
-# Пример :
-if echo '$CHECK_OUTPUT' | grep -q 'нужная строка'; then
-echo 'Пройдена'
-else
-echo 'Не пройдена'
-fi
-#Эталонные данные доступны в переменной $ETALON_INPUT"
-                  rows={10}
-                  className="font-mono text-sm"
-                />
-                <div className="text-xs text-gray-500 mt-1 space-y-1">
-                  <p className="font-semibold">Доступ к результату команды:</p>
-                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
-                  <p className="font-semibold">Доступ к эталонным данным:</p>
-                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
-                  <p className="font-semibold mt-2">Вывод результатов проверки:</p>
-                  <p>Скрипт должен вернуть одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="has_reference_files"
+                      checked={formData.has_reference_files}
+                      onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
+                    />
+                    <Label htmlFor="has_reference_files" className="cursor-pointer">
+                      Есть эталонные файлы
+                    </Label>
+                  </div>
+                </div>
+
+                {/* Правый столбец */}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Label>Скрипт-обработчик</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-gray-500 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="text-xs text-gray-500 mt-1 space-y-1">
+                              <p className="font-semibold">Для Windows скрипт-обработчик пишется на PowerShell Scripting Language</p>
+                              <p className="font-semibold">Для Linux скрипт-обработчик пишется на Bash</p>
+                              <p className="font-semibold">Доступ к результату команды: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
+                              <p className="font-semibold">Доступ к эталонным данным: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
+                              <p className="font-semibold mt-2">Вывод результатов проверки:</p>
+                              <p>Скрипт должен вернуть одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>                  
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <Textarea
+                      value={formData.processor_script}
+                      onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
+                      placeholder={[
+                        "#!/bin/bash",
+                        "# Результат команды доступен в переменной $CHECK_OUTPUT",
+                        "# Пример :",
+                        "if echo '$CHECK_OUTPUT' | grep -q 'нужная строка'; then",
+                        "  echo 'Пройдена'",
+                        "else",
+                        "  echo 'Не пройдена'",
+                        "fi",
+                        "#Эталонные данные доступны в переменной $ETALON_INPUT"
+                      ].join('\n')}
+                      rows={10}
+                      className="font-mono text-sm"
+                    />
+
+                  </div>
+
+                  <div>
+                    <Label>Описание методики испытания (опционально)</Label>
+                    <Textarea
+                      value={formData.test_methodology}
+                      onChange={(e) => setFormData({...formData, test_methodology: e.target.value})}
+                      placeholder="Описание методики испытания..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Критерий успешного прохождения испытания (опционально)</Label>
+                    <Textarea
+                      value={formData.success_criteria}
+                      onChange={(e) => setFormData({...formData, success_criteria: e.target.value})}
+                      placeholder="Критерий успешного прохождения..."
+                      rows={3}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <Label>Описание методики испытания (опционально)</Label>
-                <Textarea
-                  value={formData.test_methodology}
-                  onChange={(e) => setFormData({...formData, test_methodology: e.target.value})}
-                  placeholder="Описание методики испытания..."
-                  rows={5}
-                />
-              </div>
-
-              <div>
-                <Label>Критерий успешного прохождения испытания (опционально)</Label>
-                <Textarea
-                  value={formData.success_criteria}
-                  onChange={(e) => setFormData({...formData, success_criteria: e.target.value})}
-                  placeholder="Критерий успешного прохождения..."
-                  rows={5}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="has_reference_files"
-                  checked={formData.has_reference_files}
-                  onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
-                />
-                <Label htmlFor="has_reference_files" className="cursor-pointer">
-                  Есть эталонные файлы
-                </Label>
-              </div>
-
-              <div className="flex justify-end gap-2">
+              {/* Кнопки в одну строку */}
+              <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Отмена
                 </Button>
