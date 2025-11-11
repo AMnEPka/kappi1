@@ -7,13 +7,15 @@
 **Через Docker (рекомендуется):**
 ```bash
 git clone <your-repo-url>
-cd ssh-script-runner
+cd osib-automation-tool
 docker compose up -d --build
 ```
 
 Откройте http://localhost:3000
 
-📖 **Полная инструкция:** [DOCKER_DEPLOYMENT.md](./DOCKER_DEPLOYMENT.md)
+📖 **Полная инструкция:** [DOCKER_DEPLOYMENT.md](./DOCKER_DEPLOYMENT.md)  
+📖 **Оффлайн установка:** [OFFLINE_SETUP.md](./OFFLINE_SETUP.md)  
+📖 **Решение проблем:** [DOCKER_TROUBLESHOOTING.md](./DOCKER_TROUBLESHOOTING.md)
 
 ## Возможности
 
