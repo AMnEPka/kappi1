@@ -593,28 +593,31 @@ def _check_sudo_access_linux(host: Host) -> tuple[bool, str]:
                 gss_deleg_creds=False
             )
         
-        # Test sudo with a simple command using get_pty to avoid hanging
-        stdin, stdout, stderr = ssh.exec_command("sudo -n true 2>&1; echo $?", timeout=5, get_pty=False)
+        # Test sudo with a simple command - use whoami which is more reliable
+        stdin, stdout, stderr = ssh.exec_command("timeout 5 sudo -n whoami 2>&1 || echo 'SUDO_FAILED'", timeout=6, get_pty=False)
         
-        # Read output with timeout
-        import select
+        # Set channel timeout
         channel = stdout.channel
-        channel.settimeout(5)
+        channel.settimeout(6)
         
         try:
             output = stdout.read().decode('utf-8', errors='replace').strip()
-            error_output = stderr.read().decode('utf-8', errors='replace').strip()
             
-            # Check if sudo worked (exit code should be 0)
-            if '0' in output.split('\n')[-1]:
-                ssh.close()
+            ssh.close()
+            
+            # Check if sudo worked (should return 'root' or username)
+            if 'SUDO_FAILED' in output or 'password' in output.lower() or 'sorry' in output.lower():
+                return False, "sudo недоступен (требуется настройка NOPASSWD или пароль)"
+            elif 'root' in output or len(output) > 0:
                 return True, "sudo доступен"
             else:
-                ssh.close()
-                return False, "sudo недоступен (требуется настройка NOPASSWD или пароль)"
+                return False, "sudo недоступен"
         except socket.timeout:
             ssh.close()
-            return False, "Таймаут при проверке sudo"
+            return False, "Таймаут при проверке sudo (более 6 секунд)"
+        except Exception as e:
+            ssh.close()
+            return False, f"Ошибка проверки sudo: {str(e)}"
     
     except Exception as e:
         return False, f"Ошибка проверки sudo: {str(e)}"
