@@ -603,6 +603,26 @@ fi
                 </div>
               </div>
 
+              <div>
+                <Label>Описание методики испытания (опционально)</Label>
+                <Textarea
+                  value={formData.test_methodology}
+                  onChange={(e) => setFormData({...formData, test_methodology: e.target.value})}
+                  placeholder="Описание методики испытания..."
+                  rows={5}
+                />
+              </div>
+
+              <div>
+                <Label>Критерий успешного прохождения испытания (опционально)</Label>
+                <Textarea
+                  value={formData.success_criteria}
+                  onChange={(e) => setFormData({...formData, success_criteria: e.target.value})}
+                  placeholder="Критерий успешного прохождения..."
+                  rows={5}
+                />
+              </div>
+
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="has_reference_files"
