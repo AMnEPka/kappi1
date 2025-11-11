@@ -121,6 +121,37 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     return { total, passed, failed, error, operator };
   };
 
+  const handleExportToExcel = async () => {
+    if (!selectedSession) {
+      toast.error("Выберите сессию для экспорта");
+      return;
+    }
+
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/projects/${projectId}/sessions/${selectedSession}/export-excel`,
+        {
+          responseType: 'blob',
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Протокол_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Excel файл успешно экспортирован");
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      toast.error("Не удалось экспортировать в Excel");
+    }
+  };
+
   // Get badge by check status with colors
   const getCheckStatusBadge = (execution) => {
     const status = execution.check_status;
