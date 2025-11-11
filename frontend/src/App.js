@@ -439,6 +439,10 @@ const ScriptsPage = () => {
   };
 
   const openEditDialog = async (script) => {
+    console.log("Opening edit dialog with script:", script);
+    console.log("test_methodology:", script.test_methodology);
+    console.log("success_criteria:", script.success_criteria);
+    
     setEditingScript(script);
     setFormData({
       system_id: script.system_id,
