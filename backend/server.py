@@ -489,6 +489,13 @@ def _check_ssh_login_and_sudo(host: Host) -> tuple[bool, str, bool, str]:
                 gss_kex=False,
                 gss_deleg_creds=False
             )
+            # Enable keepalive to maintain connection
+            transport = ssh.get_transport()
+            if transport:
+                transport.set_keepalive(30)
+            # Small delay to let connection stabilize before opening channel
+            import time
+            time.sleep(1)
         
         # Login successful, now check sudo
         login_success = True
