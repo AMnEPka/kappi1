@@ -1610,6 +1610,163 @@ async def get_execution(execution_id: str):
     return Execution(**parse_from_mongo(execution))
 
 
+# Excel Export Endpoint
+@api_router.get("/projects/{project_id}/sessions/{session_id}/export-excel")
+async def export_session_to_excel(project_id: str, session_id: str):
+    """Export session execution results to Excel file"""
+    
+    # Get project info
+    project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    # Get executions for this session
+    executions = await db.executions.find(
+        {"project_id": project_id, "execution_session_id": session_id},
+        {"_id": 0}
+    ).sort("executed_at", 1).to_list(1000)
+    
+    if not executions:
+        raise HTTPException(status_code=404, detail="Результаты выполнения не найдены")
+    
+    # Create workbook and worksheet
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Результаты проверки"
+    
+    # Define styles
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    center_alignment = Alignment(horizontal='center', vertical='center')
+    
+    # Headers
+    headers = [
+        "№", "Хост", "Система", "Проверка", "Статус", 
+        "Результат", "Ошибка", "Время выполнения"
+    ]
+    
+    # Write headers
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+        cell.alignment = center_alignment
+    
+    # Get additional data for enrichment
+    hosts_cache = {}
+    systems_cache = {}
+    
+    # Write data rows
+    for idx, execution_data in enumerate(executions, 2):
+        execution = Execution(**parse_from_mongo(execution_data))
+        
+        # Get host info (with caching)
+        if execution.host_id not in hosts_cache:
+            host_doc = await db.hosts.find_one({"id": execution.host_id}, {"_id": 0})
+            hosts_cache[execution.host_id] = host_doc
+        host = hosts_cache[execution.host_id]
+        host_name = f"{host['name']} ({host['hostname']})" if host else "Неизвестный хост"
+        
+        # Get system info (with caching)
+        if execution.system_id not in systems_cache:
+            system_doc = await db.systems.find_one({"id": execution.system_id}, {"_id": 0})
+            systems_cache[execution.system_id] = system_doc
+        system = systems_cache[execution.system_id]
+        system_name = system['name'] if system else "Неизвестная система"
+        
+        # Status mapping
+        status_map = {
+            "Пройдена": "✅ Пройдена",
+            "Не пройдена": "❌ Не пройдена", 
+            "Ошибка": "⚠️ Ошибка",
+            "Оператор": "👤 Оператор"
+        }
+        status_display = status_map.get(execution.check_status, execution.check_status or "Не определён")
+        
+        # Result summary (first 100 chars of output)
+        result_summary = execution.output[:100] + "..." if execution.output and len(execution.output) > 100 else (execution.output or "")
+        
+        # Format timestamp
+        timestamp = execution.executed_at.strftime("%d.%m.%Y %H:%M:%S") if execution.executed_at else ""
+        
+        # Write row data
+        row_data = [
+            idx - 1,  # Row number
+            host_name,
+            system_name,
+            execution.script_name,
+            status_display,
+            result_summary,
+            execution.error or "",
+            timestamp
+        ]
+        
+        for col, value in enumerate(row_data, 1):
+            cell = ws.cell(row=idx, column=col, value=value)
+            cell.border = border
+            
+            # Color code status column
+            if col == 5:  # Status column
+                if execution.check_status == "Пройдена":
+                    cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+                elif execution.check_status == "Не пройдена":
+                    cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+                elif execution.check_status == "Ошибка":
+                    cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+                elif execution.check_status == "Оператор":
+                    cell.fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    
+    # Auto-adjust column widths
+    column_widths = [5, 25, 20, 30, 15, 50, 30, 20]
+    for col, width in enumerate(column_widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
+    
+    # Add summary information at the top
+    ws.insert_rows(1, 4)
+    
+    # Project info
+    ws.cell(row=1, column=1, value="Проект:").font = Font(bold=True)
+    ws.cell(row=1, column=2, value=project['name'])
+    
+    ws.cell(row=2, column=1, value="Дата экспорта:").font = Font(bold=True)
+    ws.cell(row=2, column=2, value=date.today().strftime("%d.%m.%Y"))
+    
+    ws.cell(row=3, column=1, value="ID сессии:").font = Font(bold=True)
+    ws.cell(row=3, column=2, value=session_id)
+    
+    # Statistics
+    total_checks = len(executions)
+    passed_count = sum(1 for e in executions if parse_from_mongo(e).get('check_status') == 'Пройдена')
+    failed_count = sum(1 for e in executions if parse_from_mongo(e).get('check_status') == 'Не пройдена')
+    error_count = sum(1 for e in executions if parse_from_mongo(e).get('check_status') == 'Ошибка')
+    operator_count = sum(1 for e in executions if parse_from_mongo(e).get('check_status') == 'Оператор')
+    
+    ws.cell(row=4, column=1, value="Статистика:").font = Font(bold=True)
+    ws.cell(row=4, column=2, value=f"Всего: {total_checks}, Пройдено: {passed_count}, Не пройдено: {failed_count}, Ошибок: {error_count}, Оператор: {operator_count}")
+    
+    # Save to temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+        wb.save(tmp_file.name)
+        tmp_file_path = tmp_file.name
+    
+    # Generate filename
+    project_name_safe = "".join(c for c in project['name'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
+    filename = f"Результаты_{project_name_safe}_{date.today().strftime('%Y%m%d')}.xlsx"
+    
+    return FileResponse(
+        path=tmp_file_path,
+        filename=filename,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
