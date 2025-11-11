@@ -491,11 +491,18 @@ def _check_ssh_login(host: Host) -> tuple[bool, str]:
             )
         
         ssh.close()
+        import time
+        time.sleep(0.5)  # Small delay to ensure connection is fully closed
         return True, "Логин успешен"
     
     except paramiko.AuthenticationException:
+        ssh.close()
         return False, "Ошибка аутентификации: неверный логин/пароль/ключ"
     except Exception as e:
+        try:
+            ssh.close()
+        except:
+            pass
         return False, f"Ошибка логина: {str(e)}"
 
 def _check_admin_access(host: Host) -> tuple[bool, str]:
