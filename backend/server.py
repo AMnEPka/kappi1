@@ -482,7 +482,12 @@ def _check_ssh_login(host: Host) -> tuple[bool, str]:
                 pkey=pkey,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         
         ssh.close()
@@ -580,7 +585,12 @@ def _check_sudo_access_linux(host: Host) -> tuple[bool, str]:
                 pkey=pkey,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         
         # Test sudo with a simple command
@@ -731,7 +741,12 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
                 pkey=pkey,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         
         logger.info(f"Successfully connected to {host.name}")
