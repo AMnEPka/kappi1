@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { ChevronLeft, CheckCircle, XCircle, Eye } from "lucide-react";
+import { ChevronLeft, CheckCircle, XCircle, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
 
