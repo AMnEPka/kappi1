@@ -70,7 +70,7 @@ export default function ProjectsPage({ onNavigate }) {
     <div>
       <h1 className="text-3xl font-bold">Проекты</h1>
       <p className="text-gray-600 mt-1">
-        Проекты структурируют исполнение проверок на разных хостах
+        Проекты агрегируют исполнение групп проверок на разных хостах
       </p>
     </div>
     <Button onClick={() => onNavigate('project-wizard')}>
