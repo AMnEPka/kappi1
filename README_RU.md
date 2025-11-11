@@ -173,17 +173,35 @@ docker compose up -d --build
 - `PUT /api/hosts/{id}` - обновить хост
 - `DELETE /api/hosts/{id}` - удалить хост
 
-### Скрипты
-- `GET /api/scripts` - получить все скрипты
-- `POST /api/scripts` - создать скрипт
-- `GET /api/scripts/{id}` - получить скрипт по ID
-- `PUT /api/scripts/{id}` - обновить скрипт
-- `DELETE /api/scripts/{id}` - удалить скрипт
+### Категории
+- `GET /api/categories` - получить все категории
+- `POST /api/categories` - создать категорию
+- `PUT /api/categories/{id}` - обновить категорию
+- `DELETE /api/categories/{id}` - удалить категорию
 
-### Выполнение
-- `POST /api/execute` - выполнить скрипт на хостах
-- `GET /api/executions` - получить историю выполнений
-- `GET /api/executions/{id}` - получить выполнение по ID
+### Системы
+- `GET /api/categories/{category_id}/systems` - получить системы категории
+- `POST /api/categories/{category_id}/systems` - создать систему
+- `PUT /api/systems/{id}` - обновить систему
+- `DELETE /api/systems/{id}` - удалить систему
+
+### Проверки
+- `GET /api/systems/{system_id}/scripts` - получить проверки системы
+- `POST /api/systems/{system_id}/scripts` - создать проверку
+- `PUT /api/scripts/{id}` - обновить проверку
+- `DELETE /api/scripts/{id}` - удалить проверку
+
+### Проекты
+- `GET /api/projects` - получить все проекты
+- `POST /api/projects` - создать проект
+- `GET /api/projects/{id}` - получить проект по ID
+- `PUT /api/projects/{id}` - обновить проект
+- `DELETE /api/projects/{id}` - удалить проект
+- `PUT /api/projects/{id}/tasks/bulk` - обновить задачи проекта
+- `POST /api/projects/{id}/execute` - выполнить проект (SSE)
+- `GET /api/projects/{id}/sessions` - получить сессии выполнения
+- `GET /api/projects/{id}/sessions/{session_id}/executions` - результаты сессии
+- `GET /api/projects/{id}/sessions/{session_id}/export-excel` - экспорт в Excel
 
 ## Требования к хостам
 
