@@ -696,10 +696,27 @@ const ScriptsPage = () => {
                       checked={formData.has_reference_files}
                       onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
                     />
-                    <Label htmlFor="has_reference_files" className="cursor-pointer">
-                      Есть эталонные файлы
-                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Label htmlFor="has_reference_files" className="cursor-pointer">
+                        Есть эталонные файлы
+                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-3 w-3 text-gray-500 cursor-help ml-1" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="text-xs text-gray-500 space-y-2">
+                              <p className="font-semibold">Включите, если для этой проверки нужны эталонные файлы</p>
+                              <p>Например: список доменных УЗ на хосте, список разрешенных групп</p>
+                              <p className="font-semibold">Эталонные файлы будут доступны в переменной: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
+                  
                 </div>
 
                 {/* Правый столбец */}
@@ -739,7 +756,7 @@ const ScriptsPage = () => {
                     <Textarea
                       value={formData.test_methodology}
                       onChange={(e) => setFormData({...formData, test_methodology: e.target.value})}
-                      placeholder="Описание методики испытания..."
+                      placeholder="Данные из ПМИ"
                       rows={3}
                     />
                   </div>
@@ -749,7 +766,7 @@ const ScriptsPage = () => {
                     <Textarea
                       value={formData.success_criteria}
                       onChange={(e) => setFormData({...formData, success_criteria: e.target.value})}
-                      placeholder="Критерий успешного прохождения..."
+                      placeholder="Данные из ПМИ"
                       rows={3}
                     />
                   </div>
