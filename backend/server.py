@@ -503,7 +503,8 @@ def _check_ssh_login_and_sudo(host: Host) -> tuple[bool, str, bool, str]:
         
         try:
             # Check sudo - simplified command without redirection
-            stdin, stdout, stderr = ssh.exec_command("sudo -n whoami", timeout=5, get_pty=False)
+            # Increase timeout to 10 seconds to avoid channel opening timeout
+            stdin, stdout, stderr = ssh.exec_command("sudo -n whoami", timeout=10, get_pty=False)
             channel = stdout.channel
             channel.settimeout(5)
             
