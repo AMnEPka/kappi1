@@ -600,30 +600,40 @@ def _check_sudo_access_linux(host: Host) -> tuple[bool, str]:
                 gss_deleg_creds=False
             )
         
-        # Test sudo with a simple command - use whoami which is more reliable
-        stdin, stdout, stderr = ssh.exec_command("timeout 5 sudo -n whoami 2>&1 || echo 'SUDO_FAILED'", timeout=6, get_pty=False)
-        
-        # Set channel timeout
-        channel = stdout.channel
-        channel.settimeout(6)
-        
+        # Test sudo with a simple echo command (more reliable than whoami or true)
+        # Use exec_command with shorter timeout and proper error handling
         try:
+            stdin, stdout, stderr = ssh.exec_command("sudo -n echo 'SUDO_OK' 2>&1", timeout=5, get_pty=False)
+            
+            # Set shorter channel timeout
+            channel = stdout.channel
+            channel.settimeout(5)
+            
+            # Read output
             output = stdout.read().decode('utf-8', errors='replace').strip()
+            error_output = stderr.read().decode('utf-8', errors='replace').strip()
             
             ssh.close()
+            import time
+            time.sleep(0.5)  # Small delay to ensure connection is fully closed
             
-            # Check if sudo worked (should return 'root' or username)
-            if 'SUDO_FAILED' in output or 'password' in output.lower() or 'sorry' in output.lower():
-                return False, "sudo недоступен (требуется настройка NOPASSWD или пароль)"
-            elif 'root' in output or len(output) > 0:
+            # Check if sudo worked (should contain 'SUDO_OK')
+            if 'SUDO_OK' in output:
                 return True, "sudo доступен"
+            elif 'password' in output.lower() or 'password' in error_output.lower():
+                return False, "sudo недоступен (требуется пароль)"
+            elif 'sorry' in output.lower() or 'sorry' in error_output.lower():
+                return False, "sudo недоступен (пользователь не в sudoers)"
             else:
-                return False, "sudo недоступен"
+                return False, "sudo недоступен (требуется настройка NOPASSWD)"
         except socket.timeout:
             ssh.close()
-            return False, "Таймаут при проверке sudo (более 6 секунд)"
+            return False, "Таймаут при проверке sudo"
         except Exception as e:
-            ssh.close()
+            try:
+                ssh.close()
+            except:
+                pass
             return False, f"Ошибка проверки sudo: {str(e)}"
     
     except Exception as e:
