@@ -147,6 +147,8 @@ class Script(BaseModel):
     content: str  # Команда (короткая, 1-2 строки)
     processor_script: Optional[str] = None  # Скрипт-обработчик результатов
     has_reference_files: bool = False  # Есть ли эталонные файлы
+    test_methodology: Optional[str] = None  # Описание методики испытания
+    success_criteria: Optional[str] = None  # Критерий успешного прохождения испытания
     order: int = 0  # Порядок отображения
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -157,6 +159,8 @@ class ScriptCreate(BaseModel):
     content: str
     processor_script: Optional[str] = None
     has_reference_files: bool = False
+    test_methodology: Optional[str] = None
+    success_criteria: Optional[str] = None
     order: int = 0
 
 class ScriptUpdate(BaseModel):
@@ -166,6 +170,8 @@ class ScriptUpdate(BaseModel):
     content: Optional[str] = None
     processor_script: Optional[str] = None
     has_reference_files: Optional[bool] = None
+    test_methodology: Optional[str] = None
+    success_criteria: Optional[str] = None
     order: Optional[int] = None
 
 # Project Models
