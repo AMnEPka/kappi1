@@ -511,9 +511,14 @@ def _check_ssh_login_and_sudo(host: Host) -> tuple[bool, str, bool, str]:
             else:
                 sudo_success = False
                 sudo_msg = "sudo недоступен (требуется настройка NOPASSWD)"
-        except:
+        except socket.timeout as e:
+            logger.error(f"Sudo check timeout for {host.name}: {str(e)}")
             sudo_success = False
-            sudo_msg = "Ошибка проверки sudo"
+            sudo_msg = "Таймаут проверки sudo"
+        except Exception as e:
+            logger.error(f"Sudo check error for {host.name}: {str(e)}")
+            sudo_success = False
+            sudo_msg = f"Ошибка проверки sudo: {str(e)}"
         
         ssh.close()
         import time
