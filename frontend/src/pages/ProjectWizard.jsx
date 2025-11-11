@@ -489,7 +489,7 @@ export default function ProjectWizard({ onNavigate }) {
                     </p>
                   </div>
                   <Textarea
-                    placeholder="Введите эталонные данные (5-15 строк)..."
+                    placeholder="Введите эталонные данные из ПМИ..."
                     value={currentValue}
                     onChange={(e) => {
                       setProjectData(prev => {

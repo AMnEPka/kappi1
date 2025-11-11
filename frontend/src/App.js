@@ -147,7 +147,7 @@ const HostsPage = () => {
             <DialogHeader>
               <DialogTitle>{editingHost ? "Редактировать хост" : "Новый хост"}</DialogTitle>
               <DialogDescription>
-                Добавьте информацию о сервере для SSH подключения
+                Внесите информацию о сервере
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -156,6 +156,7 @@ const HostsPage = () => {
                   <Label>Название</Label>
                   <Input
                     data-testid="host-name-input"
+                    placeholder="ЗАКС сервер хранения"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                     required
@@ -187,6 +188,7 @@ const HostsPage = () => {
                   <Label>Имя пользователя</Label>
                   <Input
                     value={formData.username}
+                    placeholder="user"
                     onChange={(e) => setFormData({...formData, username: e.target.value})}
                     required
                   />
@@ -533,6 +535,7 @@ const ScriptsPage = () => {
     if (category.name.toLowerCase().includes('linux')) {
       return `#!/bin/bash
   # Результат команды доступен в переменной $CHECK_OUTPUT
+  # Эталонные данные доступны в переменной $env:ETALON_INPUT  
   if echo "$CHECK_OUTPUT" | grep -q "нужная строка"; then
     echo "Пройдена"
   else
@@ -543,6 +546,7 @@ const ScriptsPage = () => {
     if (category.name.toLowerCase().includes('windows')) {
       return `# PowerShell скрипт
   # Результат команды доступен в переменной $env:CHECK_OUTPUT
+  # Эталонные данные доступны в переменной $env:ETALON_INPUT
   if ($env:CHECK_OUTPUT -match "нужная строка") {
     Write-Output "Пройдена"
   } else {
@@ -553,6 +557,7 @@ const ScriptsPage = () => {
     // Общий пример для других категорий
     return `#!/bin/bash
   # Результат команды доступен в переменной $CHECK_OUTPUT
+  # Эталонные данные доступны в переменной $env:ETALON_INPUT  
   # Пример обработки:
   if [ "$CHECK_OUTPUT" = "ожидаемое значение" ]; then
     echo "Пройдена"
