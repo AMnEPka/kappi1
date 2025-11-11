@@ -449,7 +449,12 @@ def _check_ssh_login(host: Host) -> tuple[bool, str]:
                 password=password,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         else:  # key-based auth
             from io import StringIO
@@ -542,7 +547,12 @@ def _check_sudo_access_linux(host: Host) -> tuple[bool, str]:
                 password=password,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         else:
             from io import StringIO
@@ -684,7 +694,12 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
                 password=password,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         else:  # key-based auth
             logger.info(f"Using key-based authentication for {host.name}")
