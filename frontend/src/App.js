@@ -481,6 +481,106 @@ const ScriptsPage = () => {
     }
   };
 
+  // placeholder selection
+  const getPlaceholder = () => {
+    const category = categories.find(cat => cat.id === formCategoryId);
+    
+    if (!category) {
+      return "Выберите категорию для отображения примера...";
+    }
+
+    if (category.name.toLowerCase().includes('linux')) {
+      return `#!/bin/bash
+  # Результат команды доступен в переменной $CHECK_OUTPUT
+  if echo "$CHECK_OUTPUT" | grep -q "нужная строка"; then
+    echo "Пройдена"
+  else
+    echo "Не пройдена"
+  fi`;
+    }
+
+    if (category.name.toLowerCase().includes('windows')) {
+      return `# PowerShell скрипт
+  # Результат команды доступен в переменной $env:CHECK_OUTPUT
+  if ($env:CHECK_OUTPUT -match "нужная строка") {
+    Write-Output "Пройдена"
+  } else {
+    Write-Output "Не пройдена"
+  }`;
+    }
+
+    // Общий пример для других категорий
+    return `#!/bin/bash
+  # Результат команды доступен в переменной $CHECK_OUTPUT
+  # Пример обработки:
+  if [ "$CHECK_OUTPUT" = "ожидаемое значение" ]; then
+    echo "Пройдена"
+  else
+    echo "Не пройдена"
+  fi`;
+  };
+  // Функция для получения тултипа в зависимости от категории
+  const getTooltipContent = () => {
+    const category = categories.find(cat => cat.id === formCategoryId);
+    
+    if (!category) {
+      return (
+        <div>
+          <p>Выберите категорию для отображения подсказки</p>
+        </div>
+      );
+    }
+
+    if (category.name.toLowerCase().includes('linux')) {
+      return (
+        <div>
+          <p className="font-semibold">Linux скрипт-обработчик</p>
+          <p>Используйте bash/shell скрипты</p>
+          <p><strong>Доступные переменные:</strong></p>
+          <ul className="list-disc list-inside text-xs mt-1">
+            <li><code>$CHECK_OUTPUT</code> - вывод команды</li>
+            <li><code>$ETALON_INPUT</code> - эталонные данные</li>
+          </ul>
+          <p className="text-xs mt-2">Примеры: grep, awk, sed, if-else</p>
+          <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
+          <p className="text-xs mt-2"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
+        </div>
+      );
+    }
+
+    if (category.name.toLowerCase().includes('windows')) {
+      return (
+        <div>
+          <p className="font-semibold">Windows скрипт-обработчик</p>
+          <p>Используйте PowerShell или Batch скрипты</p>
+          <p><strong>Доступные переменные:</strong></p>
+          <ul className="list-disc list-inside text-xs mt-1">
+            <li><code>$env:CHECK_OUTPUT</code> - вывод команды</li>
+            <li><code>$env:ETALON_INPUT</code> - эталонные данные</li>
+          </ul>
+          <p className="text-xs mt-2">Примеры: Where-Object, Select-String, if-else</p>
+          <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
+          <p className="text-xs mt-2"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
+        </div>
+      );
+    }
+
+    // Для остальных категорий
+    return (
+      <div>
+        <p className="font-semibold">Скрипт-обработчик</p>
+        <p>Настройте обработку результатов для выбранной системы</p>
+        <p><strong>Доступные переменные:</strong></p>
+        <ul className="list-disc list-inside text-xs mt-1">
+          <li><code>$CHECK_OUTPUT</code> - вывод команды</li>
+          <li><code>$ETALON_INPUT</code> - эталонные данные</li>
+          <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
+          <p className="text-xs mt-2"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
+        </ul>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -561,7 +661,24 @@ const ScriptsPage = () => {
                   </div>
 
                   <div>
-                    <Label>Команда</Label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Label>Команда</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-gray-500 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="text-xs text-gray-500 mt-1 space-y-1">
+                              <p className="font-semibold">Для Windows команда пишется на PowerShell Scripting Language</p>
+                              <p className="font-semibold">Для Linux команда пишется на Bash</p>
+                              <p className="font-semibold">Команда должна получать вывод в терминал - файл ('cat /etc/passwd') или другой результат ('dir c:\windows')</p>
+                              <p className="font-semibold">Доступ к результату команды из скрипта-обработчика: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <Textarea
                       data-testid="script-content-input"
                       value={formData.content}
@@ -570,8 +687,7 @@ const ScriptsPage = () => {
                       rows={2}
                       className="font-mono text-sm"
                       required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Команда с выводом (cat, ls, и т.д.)</p>
+                    />                    
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -589,22 +705,22 @@ const ScriptsPage = () => {
                 {/* Правый столбец */}
                 <div className="space-y-4">
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2">
                       <Label>Скрипт-обработчик</Label>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <HelpCircle className="h-4 w-4 text-gray-500 cursor-help" />
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-4 w-4 rounded-full"
+                            >
+                              <HelpCircle className="h-3 w-3 text-gray-500" />
+                            </Button>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs">
-                            <div className="text-xs text-gray-500 mt-1 space-y-1">
-                              <p className="font-semibold">Для Windows скрипт-обработчик пишется на PowerShell Scripting Language</p>
-                              <p className="font-semibold">Для Linux скрипт-обработчик пишется на Bash</p>
-                              <p className="font-semibold">Доступ к результату команды: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
-                              <p className="font-semibold">Доступ к эталонным данным: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
-                              <p className="font-semibold mt-2">Вывод результатов проверки:</p>
-                              <p>Скрипт должен вернуть одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>                  
-                            </div>
+                            {getTooltipContent()}
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -612,21 +728,10 @@ const ScriptsPage = () => {
                     <Textarea
                       value={formData.processor_script}
                       onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
-                      placeholder={[
-                        "#!/bin/bash",
-                        "# Результат команды доступен в переменной $CHECK_OUTPUT",
-                        "# Пример :",
-                        "if echo '$CHECK_OUTPUT' | grep -q 'нужная строка'; then",
-                        "  echo 'Пройдена'",
-                        "else",
-                        "  echo 'Не пройдена'",
-                        "fi",
-                        "#Эталонные данные доступны в переменной $ETALON_INPUT"
-                      ].join('\n')}
+                      placeholder={getPlaceholder()}
                       rows={10}
                       className="font-mono text-sm"
                     />
-
                   </div>
 
                   <div>
