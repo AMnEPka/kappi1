@@ -445,6 +445,8 @@ const ScriptsPage = () => {
       content: script.content,
       processor_script: script.processor_script || "",
       has_reference_files: script.has_reference_files || false,
+      test_methodology: script.test_methodology || "",
+      success_criteria: script.success_criteria || "",
       order: script.order || 0
     });
     
