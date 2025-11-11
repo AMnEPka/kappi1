@@ -232,27 +232,80 @@ Set-Item WSMan:\localhost\Service\Auth\Basic -Value $true
 Restart-Service WinRM
 ```
 
-## Примеры скриптов
+## Примеры проверок
 
-### Информация о системе (Linux)
+### Пример 1: Проверка версии ядра Linux
+
+**Команды:**
 ```bash
-echo "System Information:"
-echo "Date:" $(date)
-echo "User:" $(whoami)
-echo "Uptime:" $(uptime)
+uname -r
 ```
 
-### Проверка диска (Linux)
+**Скрипт-обработчик (Bash):**
 ```bash
-df -h
-du -sh /var/log/*
+#!/bin/bash
+KERNEL_VERSION=$(echo "$CHECK_OUTPUT" | grep -oP '\d+\.\d+')
+REQUIRED_VERSION="5.10"
+
+if (( $(echo "$KERNEL_VERSION >= $REQUIRED_VERSION" | bc -l) )); then
+    echo "Пройдена"
+else
+    echo "Не пройдена"
+fi
 ```
 
-### Информация о системе (Windows)
-```batch
-systeminfo
-echo %DATE% %TIME%
-whoami
+### Пример 2: Проверка открытых портов Windows
+
+**Команды (PowerShell):**
+```powershell
+Get-NetTCPConnection -State Listen | Select-Object LocalPort
+```
+
+**Скрипт-обработчик (PowerShell):**
+```powershell
+$output = $env:CHECK_OUTPUT
+$requiredPorts = @(80, 443)
+$success = $true
+
+foreach ($port in $requiredPorts) {
+    if ($output -notmatch $port) {
+        $success = $false
+        break
+    }
+}
+
+if ($success) {
+    Write-Output "Пройдена"
+} else {
+    Write-Output "Не пройдена"
+}
+```
+
+### Пример 3: Сравнение с эталонным файлом
+
+**Команды:**
+```bash
+cat /etc/hosts
+```
+
+**Эталонные файлы:**
+```
+127.0.0.1   localhost
+::1         localhost
+```
+
+**Скрипт-обработчик (Bash):**
+```bash
+#!/bin/bash
+DIFF=$(diff <(echo "$CHECK_OUTPUT") <(echo "$ETALON_INPUT"))
+
+if [ -z "$DIFF" ]; then
+    echo "Пройдена"
+else
+    echo "Не пройдена"
+    echo "Различия:"
+    echo "$DIFF"
+fi
 ```
 
 ## Примечания
