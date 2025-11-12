@@ -2308,8 +2308,13 @@ async def get_execution(execution_id: str, current_user: User = Depends(get_curr
 
 # Excel Export Endpoint
 @api_router.get("/projects/{project_id}/sessions/{session_id}/export-excel")
-async def export_session_to_excel(project_id: str, session_id: str):
-    """Export session execution results to Excel file in specified format"""
+async def export_session_to_excel(project_id: str, session_id: str, current_user: User = Depends(get_current_user)):
+    """Export session execution results to Excel file (requires results_export_all or project access)"""
+    
+    # Check if user can export all results or has access to project
+    if not await has_permission(current_user, 'results_export_all'):
+        if not await can_access_project(current_user, project_id):
+            raise HTTPException(status_code=403, detail="Access denied to this project")
     
     # Get project info
     project = await db.projects.find_one({"id": project_id}, {"_id": 0})
