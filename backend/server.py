@@ -1850,8 +1850,16 @@ async def delete_project_task(project_id: str, task_id: str, current_user: User 
 
 # Project Execution with Real-time Updates (SSE)
 @api_router.get("/projects/{project_id}/execute")
-async def execute_project(project_id: str):
-    """Execute project with real-time updates via Server-Sent Events"""
+async def execute_project(project_id: str, current_user: User = Depends(get_current_user)):
+    """Execute project with real-time updates via Server-Sent Events (requires projects_execute permission and access to project)"""
+    
+    # Check permission
+    if not await has_permission(current_user, 'projects_execute'):
+        raise HTTPException(status_code=403, detail="Permission denied: projects_execute")
+    
+    # Check project access
+    if not await can_access_project(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
     
     async def event_generator():
         try:
