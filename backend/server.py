@@ -2303,6 +2303,287 @@ async def export_session_to_excel(project_id: str, session_id: str):
     )
 
 
+# API Routes - User Management
+@api_router.get("/users", response_model=List[UserResponse])
+async def get_users(current_user: User = Depends(get_current_user)):
+    """Get all users (requires users_manage permission)"""
+    await require_permission(current_user, 'users_manage')
+    
+    users = await db.users.find().to_list(length=None)
+    return [UserResponse(**user) for user in users]
+
+@api_router.post("/users", response_model=UserResponse)
+async def create_user(user_input: UserCreate, current_user: User = Depends(get_current_user)):
+    """Create new user (requires users_manage permission)"""
+    await require_permission(current_user, 'users_manage')
+    
+    # Check if username already exists
+    existing = await db.users.find_one({"username": user_input.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Create user
+    user = User(
+        username=user_input.username,
+        full_name=user_input.full_name,
+        password_hash=hash_password(user_input.password),
+        is_admin=user_input.is_admin,
+        created_by=current_user.id
+    )
+    
+    doc = prepare_for_mongo(user.model_dump())
+    await db.users.insert_one(doc)
+    
+    return UserResponse(**user.model_dump())
+
+@api_router.put("/users/{user_id}", response_model=UserResponse)
+async def update_user(user_id: str, user_update: UserUpdate, current_user: User = Depends(get_current_user)):
+    """Update user (requires users_manage permission)"""
+    await require_permission(current_user, 'users_manage')
+    
+    # Find user
+    user_doc = await db.users.find_one({"id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update fields
+    update_data = {k: v for k, v in user_update.model_dump().items() if v is not None}
+    if update_data:
+        await db.users.update_one({"id": user_id}, {"$set": update_data})
+    
+    # Return updated user
+    updated_doc = await db.users.find_one({"id": user_id})
+    return UserResponse(**updated_doc)
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_user: User = Depends(get_current_user)):
+    """Delete user and reassign their data to admin (requires users_manage permission)"""
+    await require_permission(current_user, 'users_manage')
+    
+    # Cannot delete yourself
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    # Find admin user
+    admin_user = await db.users.find_one({"is_admin": True})
+    if not admin_user:
+        raise HTTPException(status_code=500, detail="No admin user found")
+    admin_id = admin_user['id']
+    
+    # Reassign all data to admin
+    await db.categories.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    await db.systems.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    await db.scripts.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    await db.hosts.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    await db.projects.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    await db.executions.update_many({"executed_by": user_id}, {"$set": {"executed_by": admin_id}})
+    
+    # Delete user roles
+    await db.user_roles.delete_many({"user_id": user_id})
+    
+    # Delete project access
+    await db.project_access.delete_many({"user_id": user_id})
+    
+    # Delete user
+    result = await db.users.delete_one({"id": user_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "User deleted and data reassigned to admin"}
+
+@api_router.put("/users/{user_id}/password")
+async def reset_user_password(user_id: str, password_data: PasswordResetRequest, current_user: User = Depends(get_current_user)):
+    """Reset user password (requires users_manage permission)"""
+    await require_permission(current_user, 'users_manage')
+    
+    # Hash new password
+    new_hash = hash_password(password_data.new_password)
+    
+    # Update password
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "Password updated successfully"}
+
+@api_router.get("/users/{user_id}/roles")
+async def get_user_roles(user_id: str, current_user: User = Depends(get_current_user)):
+    """Get user's roles (requires users_manage permission)"""
+    await require_permission(current_user, 'users_manage')
+    
+    user_roles = await db.user_roles.find({"user_id": user_id}).to_list(length=None)
+    role_ids = [ur['role_id'] for ur in user_roles]
+    
+    roles = []
+    for role_id in role_ids:
+        role_doc = await db.roles.find_one({"id": role_id})
+        if role_doc:
+            roles.append(Role(**role_doc))
+    
+    return roles
+
+@api_router.put("/users/{user_id}/roles")
+async def assign_user_roles(user_id: str, role_ids: List[str], current_user: User = Depends(get_current_user)):
+    """Assign roles to user (requires users_manage permission)"""
+    await require_permission(current_user, 'users_manage')
+    
+    # Delete existing roles
+    await db.user_roles.delete_many({"user_id": user_id})
+    
+    # Add new roles
+    for role_id in role_ids:
+        await db.user_roles.insert_one({
+            "user_id": user_id,
+            "role_id": role_id
+        })
+    
+    return {"message": "Roles assigned successfully"}
+
+
+# API Routes - Role Management
+@api_router.get("/roles", response_model=List[Role])
+async def get_roles(current_user: User = Depends(get_current_user)):
+    """Get all roles"""
+    roles = await db.roles.find().to_list(length=None)
+    return [Role(**role) for role in roles]
+
+@api_router.post("/roles", response_model=Role)
+async def create_role(role_input: RoleCreate, current_user: User = Depends(get_current_user)):
+    """Create new role (requires roles_manage permission)"""
+    await require_permission(current_user, 'roles_manage')
+    
+    # Create role
+    role = Role(
+        name=role_input.name,
+        permissions=role_input.permissions,
+        description=role_input.description,
+        created_by=current_user.id
+    )
+    
+    doc = prepare_for_mongo(role.model_dump())
+    await db.roles.insert_one(doc)
+    
+    return role
+
+@api_router.put("/roles/{role_id}", response_model=Role)
+async def update_role(role_id: str, role_update: RoleUpdate, current_user: User = Depends(get_current_user)):
+    """Update role (requires roles_manage permission)"""
+    await require_permission(current_user, 'roles_manage')
+    
+    # Update fields
+    update_data = {k: v for k, v in role_update.model_dump().items() if v is not None}
+    if update_data:
+        result = await db.roles.update_one({"id": role_id}, {"$set": update_data})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Role not found")
+    
+    # Return updated role
+    updated_doc = await db.roles.find_one({"id": role_id})
+    return Role(**updated_doc)
+
+@api_router.delete("/roles/{role_id}")
+async def delete_role(role_id: str, current_user: User = Depends(get_current_user)):
+    """Delete role (requires roles_manage permission)"""
+    await require_permission(current_user, 'roles_manage')
+    
+    # Delete user-role assignments
+    await db.user_roles.delete_many({"role_id": role_id})
+    
+    # Delete role
+    result = await db.roles.delete_one({"id": role_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    return {"message": "Role deleted successfully"}
+
+@api_router.get("/permissions")
+async def get_permissions(current_user: User = Depends(get_current_user)):
+    """Get all available permissions"""
+    return PERMISSIONS
+
+
+# API Routes - Project Access Management
+@api_router.get("/projects/{project_id}/users")
+async def get_project_users(project_id: str, current_user: User = Depends(get_current_user)):
+    """Get users with access to project"""
+    # Check if user can access project
+    if not await can_access_project(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
+    # Get project access records
+    access_records = await db.project_access.find({"project_id": project_id}).to_list(length=None)
+    user_ids = [record['user_id'] for record in access_records]
+    
+    # Get users
+    users = []
+    for user_id in user_ids:
+        user_doc = await db.users.find_one({"id": user_id})
+        if user_doc:
+            users.append(UserResponse(**user_doc))
+    
+    return users
+
+@api_router.post("/projects/{project_id}/users/{user_id}")
+async def grant_project_access(project_id: str, user_id: str, current_user: User = Depends(get_current_user)):
+    """Grant user access to project"""
+    # Check if current user is project creator or admin
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if project.get('created_by') != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only project creator or admin can grant access")
+    
+    # Check if access already exists
+    existing = await db.project_access.find_one({
+        "project_id": project_id,
+        "user_id": user_id
+    })
+    
+    if existing:
+        return {"message": "User already has access"}
+    
+    # Grant access
+    access = ProjectAccess(
+        project_id=project_id,
+        user_id=user_id,
+        granted_by=current_user.id
+    )
+    
+    doc = prepare_for_mongo(access.model_dump())
+    await db.project_access.insert_one(doc)
+    
+    return {"message": "Access granted successfully"}
+
+@api_router.delete("/projects/{project_id}/users/{user_id}")
+async def revoke_project_access(project_id: str, user_id: str, current_user: User = Depends(get_current_user)):
+    """Revoke user access to project"""
+    # Check if current user is project creator or admin
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    if project.get('created_by') != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only project creator or admin can revoke access")
+    
+    # Revoke access
+    result = await db.project_access.delete_one({
+        "project_id": project_id,
+        "user_id": user_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Access record not found")
+    
+    return {"message": "Access revoked successfully"}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
