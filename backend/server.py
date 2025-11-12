@@ -1484,29 +1484,30 @@ async def delete_category(category_id: str, current_user: User = Depends(get_cur
 
 
 # API Routes - Systems
-@api_router.post("/systems", response_model=System)
-async def create_system(system_input: SystemCreate):
-    """Create new system (admin only in future)"""
+@api_router.post("/categories/{category_id}/systems", response_model=System)
+async def create_system(category_id: str, system_input: SystemCreate, current_user: User = Depends(get_current_user)):
+    """Create new system (requires categories_manage permission)"""
+    await require_permission(current_user, 'categories_manage')
+    
     # Verify category exists
-    category = await db.categories.find_one({"id": system_input.category_id})
+    category = await db.categories.find_one({"id": category_id})
     if not category:
         raise HTTPException(status_code=404, detail="Категория не найдена")
     
-    system_obj = System(**system_input.model_dump())
+    system_obj = System(**system_input.model_dump(), created_by=current_user.id)
     doc = prepare_for_mongo(system_obj.model_dump())
     
     await db.systems.insert_one(doc)
     return system_obj
 
-@api_router.get("/systems", response_model=List[System])
-async def get_systems(category_id: Optional[str] = None):
-    """Get all systems, optionally filtered by category"""
-    query = {"category_id": category_id} if category_id else {}
-    systems = await db.systems.find(query, {"_id": 0}).to_list(1000)
+@api_router.get("/categories/{category_id}/systems", response_model=List[System])
+async def get_systems(category_id: str, current_user: User = Depends(get_current_user)):
+    """Get systems for category"""
+    systems = await db.systems.find({"category_id": category_id}, {"_id": 0}).to_list(1000)
     return [System(**parse_from_mongo(sys)) for sys in systems]
 
 @api_router.get("/systems/{system_id}", response_model=System)
-async def get_system(system_id: str):
+async def get_system(system_id: str, current_user: User = Depends(get_current_user)):
     """Get system by ID"""
     system = await db.systems.find_one({"id": system_id}, {"_id": 0})
     if not system:
@@ -1514,8 +1515,10 @@ async def get_system(system_id: str):
     return System(**parse_from_mongo(system))
 
 @api_router.put("/systems/{system_id}", response_model=System)
-async def update_system(system_id: str, system_update: SystemUpdate):
-    """Update system"""
+async def update_system(system_id: str, system_update: SystemUpdate, current_user: User = Depends(get_current_user)):
+    """Update system (requires categories_manage permission)"""
+    await require_permission(current_user, 'categories_manage')
+    
     update_data = system_update.model_dump(exclude_unset=True)
     
     if not update_data:
@@ -1539,17 +1542,17 @@ async def update_system(system_id: str, system_update: SystemUpdate):
     return System(**parse_from_mongo(updated_system))
 
 @api_router.delete("/systems/{system_id}")
-async def delete_system(system_id: str):
-    """Delete system"""
-    # Check if system has scripts
-    scripts = await db.scripts.find_one({"system_id": system_id})
-    if scripts:
-        raise HTTPException(status_code=400, detail="Невозможно удалить систему со скриптами")
+async def delete_system(system_id: str, current_user: User = Depends(get_current_user)):
+    """Delete system and all scripts (requires categories_manage permission)"""
+    await require_permission(current_user, 'categories_manage')
+    
+    # Delete all scripts in system
+    await db.scripts.delete_many({"system_id": system_id})
     
     result = await db.systems.delete_one({"id": system_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Система не найдена")
-    return {"message": "Система удалена"}
+    return {"message": "Система и связанные проверки удалены"}
 
 
 # API Routes - Scripts
