@@ -4,12 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { PlusCircle, Play, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 export default function ProjectsPage({ onNavigate }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { hasPermission, isAdmin } = useAuth();
 
   useEffect(() => {
     fetchProjects();
