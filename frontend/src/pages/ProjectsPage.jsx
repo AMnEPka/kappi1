@@ -66,6 +66,9 @@ export default function ProjectsPage({ onNavigate }) {
     return new Date(dateString).toLocaleString('ru-RU');
   };
 
+  const canCreateProjects = hasPermission('projects_create');
+  const canExecuteProjects = hasPermission('projects_execute');
+
   return (
     <div className="p-6">
   <div className="flex justify-between items-center mb-6">
@@ -75,10 +78,12 @@ export default function ProjectsPage({ onNavigate }) {
         Проекты агрегируют исполнение групп проверок на разных хостах
       </p>
     </div>
-    <Button onClick={() => onNavigate('project-wizard')}>
-      <PlusCircle className="mr-2 h-4 w-4" />
-      Создать проект
-    </Button>
+    {canCreateProjects && (
+      <Button onClick={() => onNavigate('project-wizard')} variant="yellow">
+        <PlusCircle className="mr-2 h-4 w-4" />
+        Создать проект
+      </Button>
+    )}
   </div>
 
   {loading ? (
@@ -89,10 +94,15 @@ export default function ProjectsPage({ onNavigate }) {
     <Card>
       <CardContent className="flex flex-col items-center justify-center h-64">
         <p className="text-gray-500 mb-4">Проектов пока нет</p>
-        <Button onClick={() => onNavigate('project-wizard')}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Создать первый проект
-        </Button>
+        {canCreateProjects && (
+          <Button onClick={() => onNavigate('project-wizard')} variant="yellow">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Создать первый проект
+          </Button>
+        )}
+        {!canCreateProjects && (
+          <p className="text-gray-400 text-sm">У вас нет прав на создание проектов</p>
+        )}
       </CardContent>
     </Card>
   ) : (
