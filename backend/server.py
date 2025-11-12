@@ -1321,8 +1321,11 @@ async def create_host(host_input: HostCreate, current_user: User = Depends(get_c
 @api_router.get("/hosts", response_model=List[Host])
 async def get_hosts(current_user: User = Depends(get_current_user)):
     """Get all hosts (filtered by permissions)"""
-    # If user can edit all hosts, show all
-    if await has_permission(current_user, 'hosts_edit_all'):
+    # If user can edit all hosts OR can work with projects, show all hosts
+    if (await has_permission(current_user, 'hosts_edit_all') or 
+        await has_permission(current_user, 'projects_create') or 
+        await has_permission(current_user, 'projects_execute') or
+        await has_permission(current_user, 'results_view_all')):
         hosts = await db.hosts.find({}, {"_id": 0}).to_list(1000)
     else:
         # Show only own hosts
