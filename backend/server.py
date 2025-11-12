@@ -1149,6 +1149,152 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
             pass
 
 
+# Authentication Middleware and Helper Functions
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+    """Get current user from JWT token"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    user_doc = await db.users.find_one({"id": user_id})
+    if user_doc is None:
+        raise credentials_exception
+    
+    user = User(**user_doc)
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    
+    return user
+
+async def get_user_permissions(user: User) -> List[str]:
+    """Get all permissions for a user from their roles"""
+    if user.is_admin:
+        # Admin has all permissions
+        return list(PERMISSIONS.keys())
+    
+    # Get user roles
+    user_roles = await db.user_roles.find({"user_id": user.id}).to_list(length=None)
+    role_ids = [ur['role_id'] for ur in user_roles]
+    
+    # Get permissions from roles
+    permissions = set()
+    for role_id in role_ids:
+        role_doc = await db.roles.find_one({"id": role_id})
+        if role_doc:
+            permissions.update(role_doc.get('permissions', []))
+    
+    return list(permissions)
+
+async def has_permission(user: User, permission: str) -> bool:
+    """Check if user has specific permission"""
+    if user.is_admin:
+        return True
+    
+    permissions = await get_user_permissions(user)
+    return permission in permissions
+
+async def require_permission(user: User, permission: str):
+    """Raise exception if user doesn't have permission"""
+    if not await has_permission(user, permission):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: {permission}"
+        )
+
+async def can_access_project(user: User, project_id: str) -> bool:
+    """Check if user can access a project"""
+    if user.is_admin:
+        return True
+    
+    # Check if user is project creator
+    project = await db.projects.find_one({"id": project_id})
+    if project and project.get('created_by') == user.id:
+        return True
+    
+    # Check if user has explicit access
+    access = await db.project_access.find_one({
+        "project_id": project_id,
+        "user_id": user.id
+    })
+    return access is not None
+
+
+# API Routes - Authentication
+@api_router.post("/auth/login", response_model=LoginResponse)
+async def login(login_data: LoginRequest):
+    """Login and get JWT token"""
+    # Find user
+    user_doc = await db.users.find_one({"username": login_data.username})
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password"
+        )
+    
+    user = User(**user_doc)
+    
+    # Verify password
+    if not verify_password(login_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    
+    # Create access token
+    access_token = create_access_token(data={"sub": user.id})
+    
+    # Return token and user data
+    user_response = UserResponse(
+        id=user.id,
+        username=user.username,
+        full_name=user.full_name,
+        is_active=user.is_active,
+        is_admin=user.is_admin,
+        created_at=user.created_at,
+        created_by=user.created_by
+    )
+    
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=user_response
+    )
+
+@api_router.get("/auth/me")
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current user information and permissions"""
+    permissions = await get_user_permissions(current_user)
+    
+    user_response = UserResponse(
+        id=current_user.id,
+        username=current_user.username,
+        full_name=current_user.full_name,
+        is_active=current_user.is_active,
+        is_admin=current_user.is_admin,
+        created_at=current_user.created_at,
+        created_by=current_user.created_by
+    )
+    
+    return {
+        "user": user_response,
+        "permissions": permissions
+    }
+
+
 # API Routes - Hosts
 @api_router.post("/hosts", response_model=Host)
 async def create_host(host_input: HostCreate):
