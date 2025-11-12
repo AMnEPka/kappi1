@@ -46,13 +46,17 @@ const AdminPage = () => {
           )}
         </TabsList>
 
-        <TabsContent value="categories" className="mt-6">
-          <CategoriesPage />
-        </TabsContent>
+        {canManageCategories && (
+          <TabsContent value="categories" className="mt-6">
+            <CategoriesPage />
+          </TabsContent>
+        )}
 
-        <TabsContent value="systems" className="mt-6">
-          <SystemsPage />
-        </TabsContent>
+        {canManageCategories && (
+          <TabsContent value="systems" className="mt-6">
+            <SystemsPage />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
