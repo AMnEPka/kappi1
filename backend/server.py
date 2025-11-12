@@ -1782,9 +1782,12 @@ async def delete_project(project_id: str, current_user: User = Depends(get_curre
 
 # API Routes - Project Tasks
 @api_router.post("/projects/{project_id}/tasks", response_model=ProjectTask)
-async def create_project_task(project_id: str, task_input: ProjectTaskCreate):
-    """Create task in project"""
-    # Verify project exists
+async def create_project_task(project_id: str, task_input: ProjectTaskCreate, current_user: User = Depends(get_current_user)):
+    """Create task in project (requires access to project)"""
+    # Check project access
+    if not await can_access_project(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
     project = await db.projects.find_one({"id": project_id})
     if not project:
         raise HTTPException(status_code=404, detail="Проект не найден")
@@ -1796,20 +1799,33 @@ async def create_project_task(project_id: str, task_input: ProjectTaskCreate):
     return task_obj
 
 @api_router.get("/projects/{project_id}/tasks", response_model=List[ProjectTask])
-async def get_project_tasks(project_id: str):
-    """Get all tasks for a project"""
+async def get_project_tasks(project_id: str, current_user: User = Depends(get_current_user)):
+    """Get all tasks for a project (requires access to project)"""
+    if not await can_access_project(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
+    tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
+
+@api_router.get("/projects/{project_id}/tasks/bulk", response_model=List[ProjectTask])
+async def get_project_tasks_bulk(project_id: str, current_user: User = Depends(get_current_user)):
+    """Get all tasks for a project with all details (requires access to project)"""
+    if not await can_access_project(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
     tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
     return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
 
 @api_router.put("/projects/{project_id}/tasks/{task_id}", response_model=ProjectTask)
-async def update_project_task(project_id: str, task_id: str, task_update: ProjectTaskUpdate):
-    """Update task in project"""
-    # Check if task exists
+async def update_project_task(project_id: str, task_id: str, task_update: ProjectTaskUpdate, current_user: User = Depends(get_current_user)):
+    """Update task in project (requires access to project)"""
+    if not await can_access_project(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
     task = await db.project_tasks.find_one({"id": task_id, "project_id": project_id}, {"_id": 0})
     if not task:
         raise HTTPException(status_code=404, detail="Задание не найдено")
     
-    # Update task
     update_data = {k: v for k, v in task_update.dict().items() if v is not None}
     if update_data:
         await db.project_tasks.update_one(
@@ -1817,13 +1833,15 @@ async def update_project_task(project_id: str, task_id: str, task_update: Projec
             {"$set": update_data}
         )
     
-    # Return updated task
     updated_task = await db.project_tasks.find_one({"id": task_id}, {"_id": 0})
     return ProjectTask(**parse_from_mongo(updated_task))
 
 @api_router.delete("/projects/{project_id}/tasks/{task_id}")
-async def delete_project_task(project_id: str, task_id: str):
-    """Delete task from project"""
+async def delete_project_task(project_id: str, task_id: str, current_user: User = Depends(get_current_user)):
+    """Delete task from project (requires access to project)"""
+    if not await can_access_project(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
     result = await db.project_tasks.delete_one({"id": task_id, "project_id": project_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Задание не найдено")
