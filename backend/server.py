@@ -2282,17 +2282,26 @@ async def execute_script(execute_req: ExecuteRequest, current_user: User = Depen
     return {"execution_ids": execution_ids, "results": [r.model_dump() for r in results]}
 
 @api_router.get("/executions", response_model=List[Execution])
-async def get_executions():
-    """Get all executions"""
-    executions = await db.executions.find({}, {"_id": 0}).sort("executed_at", -1).to_list(1000)
+async def get_executions(current_user: User = Depends(get_current_user)):
+    """Get all executions (requires results_view_all or shows own executions)"""
+    if await has_permission(current_user, 'results_view_all'):
+        executions = await db.executions.find({}, {"_id": 0}).sort("executed_at", -1).to_list(1000)
+    else:
+        executions = await db.executions.find({"executed_by": current_user.id}, {"_id": 0}).sort("executed_at", -1).to_list(1000)
+    
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
 @api_router.get("/executions/{execution_id}", response_model=Execution)
-async def get_execution(execution_id: str):
+async def get_execution(execution_id: str, current_user: User = Depends(get_current_user)):
     """Get execution by ID"""
     execution = await db.executions.find_one({"id": execution_id}, {"_id": 0})
     if not execution:
         raise HTTPException(status_code=404, detail="Выполнение не найдено")
+    
+    # Check access
+    if not await has_permission(current_user, 'results_view_all'):
+        if execution.get('executed_by') != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
     
     return Execution(**parse_from_mongo(execution))
 
