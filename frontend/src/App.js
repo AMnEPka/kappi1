@@ -1392,6 +1392,25 @@ const Layout = ({ children }) => {
               </Link>
             </div>
           </div>
+
+          {/* User info and logout */}
+          <div className="ml-4 flex items-center gap-2 border-l pl-4">
+            <div className="flex items-center gap-2 text-sm">
+              <User className="h-4 w-4 text-gray-500" />
+              <span className="text-gray-700 font-medium">{user?.full_name}</span>
+              {user?.is_admin && (
+                <Badge variant="yellow" className="text-xs">Админ</Badge>
+              )}
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleLogout}
+              title="Выйти"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
