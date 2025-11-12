@@ -19,6 +19,9 @@ import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectWizard from "@/pages/ProjectWizard";
 import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
 import ProjectResultsPage from "@/pages/ProjectResultsPage";
+import { Menu, HelpCircle, EthernetPort, Loader2 } from 'lucide-react'; 
+
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin.replace(':3000', ':8001').replace('127.0.0.1', 'localhost');
 const API = `${BACKEND_URL}/api`;
@@ -36,7 +39,8 @@ const HostsPage = () => {
     username: "",
     auth_type: "password",
     password: "",
-    ssh_key: ""
+    ssh_key: "",
+    connection_type: "ssh"
   });
 
   useEffect(() => {
@@ -120,7 +124,8 @@ const HostsPage = () => {
       username: host.username,
       auth_type: host.auth_type,
       password: "",
-      ssh_key: host.ssh_key || ""
+      ssh_key: host.ssh_key || "",
+      connection_type: host.connection_type || "ssh"
     });
     setIsDialogOpen(true);
   };
@@ -142,7 +147,7 @@ const HostsPage = () => {
             <DialogHeader>
               <DialogTitle>{editingHost ? "Редактировать хост" : "Новый хост"}</DialogTitle>
               <DialogDescription>
-                Добавьте информацию о сервере для SSH подключения
+                Внесите информацию о сервере
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -151,6 +156,7 @@ const HostsPage = () => {
                   <Label>Название</Label>
                   <Input
                     data-testid="host-name-input"
+                    placeholder="ЗАКС сервер хранения"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                     required
@@ -182,6 +188,7 @@ const HostsPage = () => {
                   <Label>Имя пользователя</Label>
                   <Input
                     value={formData.username}
+                    placeholder="user"
                     onChange={(e) => setFormData({...formData, username: e.target.value})}
                     required
                   />
@@ -190,6 +197,25 @@ const HostsPage = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label>Тип подключения</Label>
+                  <Select 
+                    value={formData.connection_type || 'ssh'} 
+                    onValueChange={(value) => {
+                      const newPort = value === 'winrm' ? 5985 : 22;
+                      setFormData({...formData, connection_type: value, port: newPort});
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ssh">SSH (Linux)</SelectItem>
+                      <SelectItem value="winrm">WinRM (Windows)</SelectItem>
+                      <SelectItem value="k8s" disabled>Kubernetes (скоро)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label>Тип аутентификации</Label>
                   <Select value={formData.auth_type} onValueChange={(value) => setFormData({...formData, auth_type: value})}>
                     <SelectTrigger>
@@ -197,7 +223,7 @@ const HostsPage = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="password">Пароль</SelectItem>
-                      <SelectItem value="key">SSH ключ</SelectItem>
+                      {formData.connection_type !== 'winrm' && <SelectItem value="key">SSH ключ</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
@@ -260,12 +286,62 @@ const HostsPage = () => {
                     <CardDescription>{host.hostname}:{host.port}</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(host)} className="hover:bg-yellow-50 hover:text-yellow-600">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(host.id)} className="hover:bg-red-50 hover:text-red-600">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleTestConnection(host.id)}
+                            disabled={testingHostId === host.id}
+                            className="hover:bg-blue-50 hover:text-blue-600"
+                          >
+                            {testingHostId === host.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <EthernetPort className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Тест подключения</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => openEditDialog(host)} 
+                            className="hover:bg-yellow-50 hover:text-yellow-600"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Редактировать хост</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDelete(host.id)} 
+                            className="hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Удалить хост</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               </CardHeader>
@@ -273,17 +349,9 @@ const HostsPage = () => {
                 <div className="space-y-2 text-sm">
                   <div>Пользователь: <strong>{host.username}</strong></div>
                   <div className="flex items-center gap-2">
+                    <Badge variant="outline">{host.connection_type === "ssh" ? "Linux" : "Windows"}</Badge>
                     <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full mt-2"
-                    onClick={() => handleTestConnection(host.id)}
-                    disabled={testingHostId === host.id}
-                  >
-                    {testingHostId === host.id ? "Тестирование..." : "Тест подключения"}
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -312,6 +380,8 @@ const ScriptsPage = () => {
     content: "",
     processor_script: "",
     has_reference_files: false,
+    test_methodology: "",
+    success_criteria: "",
     order: 0
   });
 
@@ -404,6 +474,8 @@ const ScriptsPage = () => {
       content: "",
       processor_script: "",
       has_reference_files: false,
+      test_methodology: "",
+      success_criteria: "",
       order: 0
     });
     setFormCategoryId("");
@@ -420,6 +492,8 @@ const ScriptsPage = () => {
       content: script.content,
       processor_script: script.processor_script || "",
       has_reference_files: script.has_reference_files || false,
+      test_methodology: script.test_methodology || "",
+      success_criteria: script.success_criteria || "",
       order: script.order || 0
     });
     
@@ -450,6 +524,110 @@ const ScriptsPage = () => {
     }
   };
 
+  // placeholder selection
+  const getPlaceholder = () => {
+    const category = categories.find(cat => cat.id === formCategoryId);
+    
+    if (!category) {
+      return "Выберите категорию для отображения примера...";
+    }
+
+    if (category.name.toLowerCase().includes('linux')) {
+      return `#!/bin/bash
+  # Результат команды доступен в переменной $CHECK_OUTPUT
+  # Эталонные данные доступны в переменной $env:ETALON_INPUT  
+  if echo "$CHECK_OUTPUT" | grep -q "нужная строка"; then
+    echo "Пройдена"
+  else
+    echo "Не пройдена"
+  fi`;
+    }
+
+    if (category.name.toLowerCase().includes('windows')) {
+      return `#!/bin/bash
+  # Скрипт-обработчик даже для Windows пишем на BASH
+  # Результат команды доступен в переменной $CHECK_OUTPUT
+  # Эталонные данные доступны в переменной $env:ETALON_INPUT  
+  if echo "$CHECK_OUTPUT" | grep -q "нужная строка"; then
+    echo "Пройдена"
+  else
+    echo "Не пройдена"
+  fi`;
+    }
+
+    // Общий пример для других категорий
+    return `#!/bin/bash
+  # Результат команды доступен в переменной $CHECK_OUTPUT
+  # Эталонные данные доступны в переменной $env:ETALON_INPUT  
+  # Пример обработки:
+  if [ "$CHECK_OUTPUT" = "ожидаемое значение" ]; then
+    echo "Пройдена"
+  else
+    echo "Не пройдена"
+  fi`;
+  };
+  // Функция для получения тултипа в зависимости от категории
+  const getTooltipContent = () => {
+    const category = categories.find(cat => cat.id === formCategoryId);
+    
+    if (!category) {
+      return (
+        <div>
+          <p>Выберите категорию для отображения подсказки</p>
+        </div>
+      );
+    }
+
+    if (category.name.toLowerCase().includes('linux')) {
+      return (
+        <div>
+          <p className="font-semibold">Linux скрипт-обработчик</p>
+          <p>Используйте bash/shell скрипты</p>
+          <p><strong>Доступные переменные:</strong></p>
+          <ul className="list-disc list-inside text-xs mt-1">
+            <li><code>$CHECK_OUTPUT</code> - вывод команды</li>
+            <li><code>$ETALON_INPUT</code> - эталонные данные</li>
+          </ul>
+          <p className="text-xs mt-2">Примеры: grep, awk, sed, if-else</p>
+          <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
+          <p className="text-xs mt-2"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
+        </div>
+      );
+    }
+
+    if (category.name.toLowerCase().includes('windows')) {
+      return (
+        <div>
+          <p className="font-semibold">Windows скрипт-обработчик</p>
+          <p>Используйте bash/shell скрипты</p>
+          <p><strong>Доступные переменные:</strong></p>
+          <ul className="list-disc list-inside text-xs mt-1">
+            <li><code>$CHECK_OUTPUT</code> - вывод команды</li>
+            <li><code>$ETALON_INPUT</code> - эталонные данные</li>
+          </ul>
+          <p className="text-xs mt-2">Примеры: Where-Object, Select-String, if-else</p>
+          <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
+          <p className="text-xs mt-2"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
+        </div>
+      );
+    }
+
+    // Для остальных категорий
+    return (
+      <div>
+        <p className="font-semibold">Скрипт-обработчик</p>
+        <p>Настройте обработку результатов для выбранной системы</p>
+        <p><strong>Доступные переменные:</strong></p>
+        <ul className="list-disc list-inside text-xs mt-1">
+          <li><code>$CHECK_OUTPUT</code> - вывод команды</li>
+          <li><code>$ETALON_INPUT</code> - эталонные данные</li>
+          <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
+          <p className="text-xs mt-2"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
+        </ul>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -466,130 +644,183 @@ const ScriptsPage = () => {
               <Plus className="mr-2 h-4 w-4" /> Добавить проверку
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingScript ? "Редактировать проверку" : "Новая проверка"}</DialogTitle>
-              <DialogDescription>
-                Создайте проверку для конкретной системы
-              </DialogDescription>
+              <DialogDescription>Создайте проверку для конкретной системы</DialogDescription>
             </DialogHeader>
+            
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label>Категория</Label>
-                <Select 
-                  value={formCategoryId} 
-                  onValueChange={handleCategoryChangeInForm}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Выберите категорию..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.icon} {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Левый столбец */}
+                <div className="space-y-4">
+                  <div>
+                    <Label>Категория</Label>
+                    <Select value={formCategoryId} onValueChange={handleCategoryChangeInForm} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите категорию..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div>
-                <Label>Система</Label>
-                <Select 
-                  value={formData.system_id} 
-                  onValueChange={(value) => setFormData({...formData, system_id: value})}
-                  required
-                  disabled={!formCategoryId}
-                >
-                  <SelectTrigger data-testid="script-system-select">
-                    <SelectValue placeholder={formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formSystems.map((sys) => (
-                      <SelectItem key={sys.id} value={sys.id}>
-                        {sys.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label>Название проверки</Label>
-                <Input
-                  data-testid="script-name-input"
-                  placeholder="Проверка версии ядра"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label>Описание</Label>
-                <Input
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="Опционально"
-                />
-              </div>
+                  <div>
+                    <Label>Система</Label>
+                    <Select 
+                      value={formData.system_id} 
+                      onValueChange={(value) => setFormData({...formData, system_id: value})}
+                      required
+                      disabled={!formCategoryId}
+                    >
+                      <SelectTrigger data-testid="script-system-select">
+                        <SelectValue placeholder={formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formSystems.map((sys) => (
+                          <SelectItem key={sys.id} value={sys.id}>{sys.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Название проверки</Label>
+                    <Input
+                      data-testid="script-name-input"
+                      placeholder="Проверка версии ядра"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>Описание</Label>
+                    <Input
+                      value={formData.description}
+                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      placeholder="Опционально"
+                    />
+                  </div>
 
-              <div>
-                <Label>Команда</Label>
-                <Textarea
-                  data-testid="script-content-input"
-                  value={formData.content}
-                  onChange={(e) => setFormData({...formData, content: e.target.value})}
-                  placeholder="cat /etc/hostname"
-                  rows={2}
-                  className="font-mono text-sm"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">Команда с выводом (cat, ls, и т.д.)</p>
-              </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Label>Команда</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-gray-500 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="text-xs text-gray-500 mt-1 space-y-1">
+                              <p className="font-semibold">Для Windows команда пишется на PowerShell Scripting Language</p>
+                              <p className="font-semibold">Для Linux команда пишется на Bash</p>
+                              <p className="font-semibold">Команда должна получать вывод в терминал - файл ('cat /etc/passwd') или другой результат ('dir c:\windows')</p>
+                              <p className="font-semibold">Доступ к результату команды из скрипта-обработчика: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <Textarea
+                      data-testid="script-content-input"
+                      value={formData.content}
+                      onChange={(e) => setFormData({...formData, content: e.target.value})}
+                      placeholder="cat /etc/hostname"
+                      rows={2}
+                      className="font-mono text-sm"
+                      required
+                    />                    
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="has_reference_files"
+                      checked={formData.has_reference_files}
+                      onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
+                    />
+                    <div className="flex items-center gap-1">
+                      <Label htmlFor="has_reference_files" className="cursor-pointer">
+                        Есть эталонные файлы
+                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-3 w-3 text-gray-500 cursor-help ml-1" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="text-xs text-gray-500 space-y-2">
+                              <p className="font-semibold">Включите, если для этой проверки нужны эталонные файлы</p>
+                              <p>Например: список доменных УЗ на хосте, список разрешенных групп</p>
+                              <p className="font-semibold">Эталонные файлы будут доступны в переменной: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
 
-              <div>
-                <Label>Скрипт-обработчик</Label>
-                <Textarea
-                  value={formData.processor_script}
-                  onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
-                  placeholder="#!/bin/bash\n
-# Результат команды доступен в переменной $CHECK_OUTPUT
-# Пример :
-if echo '$CHECK_OUTPUT' | grep -q 'нужная строка'; then
-echo 'Пройдена'
-else
-echo 'Не пройдена'
-fi
-#Эталонные данные доступы в переменной $ETALON_INPUT"
-                  rows={10}
-                  className="font-mono text-sm"
-                />
-                <div className="text-xs text-gray-500 mt-1 space-y-1">
-                  <p className="font-semibold">Доступ к результату команды:</p>
-                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
+                </div>
 
-                  <p className="font-semibold">Доступ к эталонным данным:</p>
-                  <p>• Переменная: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
-                  <p className="font-semibold mt-2">Вывод результатов проверки:</p>
-                  <p>Скрипт должен вернуть одно из: <strong>Пройдена</strong>, <strong>Не пройдена</strong>, <strong>Ошибка</strong>, <strong>Оператор</strong></p>                  
+                {/* Правый столбец */}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Label>Скрипт-обработчик</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-4 w-4 rounded-full"
+                            >
+                              <HelpCircle className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            {getTooltipContent()}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <Textarea
+                      value={formData.processor_script}
+                      onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
+                      placeholder={getPlaceholder()}
+                      rows={10}
+                      className="font-mono text-sm"
+                    />
+                  </div>
 
+                  <div>
+                    <Label>Описание методики испытания (опционально)</Label>
+                    <Textarea
+                      value={formData.test_methodology}
+                      onChange={(e) => setFormData({...formData, test_methodology: e.target.value})}
+                      placeholder="Данные из ПМИ"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Критерий успешного прохождения испытания (опционально)</Label>
+                    <Textarea
+                      value={formData.success_criteria}
+                      onChange={(e) => setFormData({...formData, success_criteria: e.target.value})}
+                      placeholder="Данные из ПМИ"
+                      rows={3}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="has_reference_files"
-                  checked={formData.has_reference_files}
-                  onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
-                />
-                <Label htmlFor="has_reference_files" className="cursor-pointer">
-                  Есть эталонные файлы
-                </Label>
-              </div>
-
-              <div className="flex justify-end gap-2">
+              {/* Кнопки в одну строку */}
+              <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Отмена
                 </Button>
@@ -638,65 +869,88 @@ fi
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="overflow-x-auto">
         {scripts.length === 0 ? (
-          <div className="col-span-full text-center py-16">
+          <div className="text-center py-16">
             <FileCode className="h-16 w-16 mx-auto text-slate-300 mb-4" />
             <p className="text-slate-500 text-lg mb-2">Нет проверок</p>
             <p className="text-slate-400 text-sm">Создайте первую проверку этого типа</p>
           </div>
         ) : (
-          scripts.map((script) => (
-            <Card key={script.id} data-testid={`script-card-${script.id}`}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    {script.category_name && (
-                      <div className="text-sm text-slate-500 mb-1">
-                        {script.category_icon} {script.category_name} → {script.system_name}
+      <div className="overflow-hidden">
+        <table className="w-full border-collapse table-fixed">
+          <colgroup>
+            <col className="w-[25%]" /> {/* Название */}
+            <col className="w-[20%]" /> {/* Категория */}
+            <col className="w-[40%]" /> {/* Описание */}
+            <col className="w-[15%]" /> {/* Действия */}
+          </colgroup>
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Название</th>
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Категория</th>
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Описание</th>
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scripts.map((script) => (
+              <tr key={script.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`script-card-${script.id}`}>
+                <td className="py-1 px-4 overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-medium truncate">
+                      <FileCode className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                      <span className="truncate">{script.name}</span>
+                    </div>
+                    {script.has_reference_files && (
+                      <div className="text-xs text-slate-400 flex-shrink-0 ml-2" title="Есть эталонные файлы">
+                        📝
                       </div>
                     )}
-                    <CardTitle className="flex items-center gap-2">
-                      <FileCode className="h-5 w-5" />
-                      {script.name}
-                    </CardTitle>
-                    {script.description && (
-                      <CardDescription>{script.description}</CardDescription>
-                    )}
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(script)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(script.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="text-sm">
-                    <span className="text-gray-600">Команда:</span>
-                    <code className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded">
-                      {script.content.length > 50 ? script.content.substring(0, 50) + '...' : script.content}
-                    </code>
-                  </div>
-                  {script.processor_script && (
-                    <Badge variant="outline" className="text-xs">
-                      <Terminal className="h-3 w-3 mr-1" />
-                      Есть обработчик
-                    </Badge>
+                </td>
+                <td className="py-1 px-4 text-sm text-slate-600 overflow-hidden">
+                  {script.category_name && (
+                    <div className="truncate">
+                      {script.category_icon} {script.category_name} → {script.system_name}
+                    </div>
                   )}
-                  {script.has_reference_files && (
-                    <Badge variant="outline" className="text-xs">
-                      📁 Эталонные файлы
-                    </Badge>
+                </td>
+                <td className="py-1 px-4 text-sm text-slate-500">
+                  {script.description ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="truncate cursor-help text-left">
+                            {script.description}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <div className="text-sm">
+                            {script.description}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    "-"
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </td>
+                <td className="py-1 px-4">
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}>
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(script.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
         )}
       </div>
     </div>
@@ -1078,54 +1332,63 @@ const Layout = ({ children }) => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center gap-3">
-              <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
-              <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
-            </Link>
-            <div className="flex gap-2">
-              <Link to="/">
-                <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/')}>
-                  <Briefcase className="mr-2 h-4 w-4" /> Проекты
-                </Button>
-              </Link>
-              <Link to="/hosts">
-                <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/hosts')}>
-                  <Server className="mr-2 h-4 w-4" /> Хосты
-                </Button>
-              </Link>
-              <Link to="/scripts">
-                <Button variant="ghost" data-testid="nav-scripts" className={navLinkClass('/scripts')}>
-                  <FileCode className="mr-2 h-4 w-4" /> Проверки
-                </Button>
-              </Link>
+<div className="min-h-screen bg-gray-50">
+  <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <div className="container mx-auto px-4">
+      <div className="flex items-center justify-between h-16">
+        <Link to="/" className="flex items-center gap-3">
+          <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
+          <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
+        </Link>
+        <div className="flex gap-2 items-center">
+          <Link to="/">
+            <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/')}>
+              <Briefcase className="mr-2 h-4 w-4" /> Проекты
+            </Button>
+          </Link>
+          <Link to="/hosts">
+            <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/hosts')}>
+              <Server className="mr-2 h-4 w-4" /> Хосты
+            </Button>
+          </Link>
+          <Link to="/scripts">
+            <Button variant="ghost" data-testid="nav-scripts" className={navLinkClass('/scripts')}>
+              <FileCode className="mr-2 h-4 w-4" /> Проверки
+            </Button>
+          </Link>
+          
+          {/* Выпадающее меню */}
+          <div className="relative group">
+            <Button variant="ghost" size="icon">
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
               <Link to="/execute">
-                <Button variant="ghost" data-testid="nav-execute" className={navLinkClass('/execute')}>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
                   <Play className="mr-2 h-4 w-4" /> Единичный запуск
-                </Button>
+                </div>
               </Link>
               <Link to="/history">
-                <Button variant="ghost" data-testid="nav-history" className={navLinkClass('/history')}>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
                   <History className="mr-2 h-4 w-4" /> История
-                </Button>
+                </div>
               </Link>
-              <div className="border-l mx-2 h-8 border-gray-200"></div>
+              <div className="border-t border-gray-100"></div>
               <Link to="/admin">
-                <Button variant="ghost" data-testid="nav-admin" className={navLinkClass('/admin')}>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" /> Админ-панель
-                </Button>
+                </div>
               </Link>
             </div>
           </div>
         </div>
-      </nav>
-      <main className="container mx-auto px-4 py-8">
-        {children}
-      </main>
+      </div>
     </div>
+  </nav>
+  <main className="container mx-auto px-4 py-8">
+    {children}
+  </main>
+</div>
   );
 };
 

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -11,11 +11,16 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 import paramiko
+import winrm
 import asyncio
 from cryptography.fernet import Fernet
 import base64
 import json
 import socket
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+from datetime import date
+import tempfile
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -113,6 +118,7 @@ class Host(BaseModel):
     auth_type: str  # "password" or "key"
     password: Optional[str] = None
     ssh_key: Optional[str] = None
+    connection_type: str = "ssh"  # "ssh" for Linux, "winrm" for Windows, "k8s" for Kubernetes
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class HostCreate(BaseModel):
@@ -123,6 +129,7 @@ class HostCreate(BaseModel):
     auth_type: str
     password: Optional[str] = None
     ssh_key: Optional[str] = None
+    connection_type: str = "ssh"
 
 class HostUpdate(BaseModel):
     name: Optional[str] = None
@@ -132,6 +139,7 @@ class HostUpdate(BaseModel):
     auth_type: Optional[str] = None
     password: Optional[str] = None
     ssh_key: Optional[str] = None
+    connection_type: Optional[str] = None
 
 class Script(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -143,6 +151,8 @@ class Script(BaseModel):
     content: str  # Команда (короткая, 1-2 строки)
     processor_script: Optional[str] = None  # Скрипт-обработчик результатов
     has_reference_files: bool = False  # Есть ли эталонные файлы
+    test_methodology: Optional[str] = None  # Описание методики испытания
+    success_criteria: Optional[str] = None  # Критерий успешного прохождения испытания
     order: int = 0  # Порядок отображения
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -153,6 +163,8 @@ class ScriptCreate(BaseModel):
     content: str
     processor_script: Optional[str] = None
     has_reference_files: bool = False
+    test_methodology: Optional[str] = None
+    success_criteria: Optional[str] = None
     order: int = 0
 
 class ScriptUpdate(BaseModel):
@@ -162,6 +174,8 @@ class ScriptUpdate(BaseModel):
     content: Optional[str] = None
     processor_script: Optional[str] = None
     has_reference_files: Optional[bool] = None
+    test_methodology: Optional[str] = None
+    success_criteria: Optional[str] = None
     order: Optional[int] = None
 
 # Project Models
@@ -247,26 +261,32 @@ class ExecuteRequest(BaseModel):
 
 
 # SSH Execution Function
-async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
-    """Execute command on remote host via SSH"""
-    try:
-        # Run SSH connection in thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, command)
-        return result
-    except Exception as e:
+async def execute_command(host: Host, command: str) -> ExecutionResult:
+    """Execute command on host via appropriate connection method (SSH or WinRM)"""
+    loop = asyncio.get_event_loop()
+    
+    if host.connection_type == "winrm":
+        return await loop.run_in_executor(None, _winrm_connect_and_execute, host, command)
+    elif host.connection_type == "ssh":
+        return await loop.run_in_executor(None, _ssh_connect_and_execute, host, command)
+    else:
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
             success=False,
             output="",
-            error=f"Ошибка выполнения: {str(e)}"
+            error=f"Неподдерживаемый тип подключения: {host.connection_type}"
         )
+
+# Keep for backward compatibility
+async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
+    """Execute command on host via SSH"""
+    return await execute_command(host, command)
 
 async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, reference_data: Optional[str] = None) -> ExecutionResult:
     """Execute check command and process results with optional reference data"""
     # Step 1: Execute the main command
-    main_result = await execute_ssh_command(host, command)
+    main_result = await execute_command(host, command)
     
     if not processor_script:
         # No processor - return as is
@@ -282,27 +302,40 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             error=main_result.error
         )
     
-    # Step 2: Run processor script with main command output as input
+    # Step 2: Run processor script LOCALLY with main command output as input
     try:
         loop = asyncio.get_event_loop()
         
-        # Encode output, processor script, and reference data as base64 to safely pass any characters
-        import base64
-        encoded_output = base64.b64encode(main_result.output.encode('utf-8')).decode('ascii')
-        encoded_processor = base64.b64encode(processor_script.encode('utf-8')).decode('ascii')
-        encoded_reference = base64.b64encode((reference_data or '').encode('utf-8')).decode('ascii')
+        # Execute processor script LOCALLY on our server
+        # This avoids command line length limits and doesn't require write permissions on remote hosts
+        import subprocess
+        import os
         
-        # Create processor command with output and reference data available via environment variables:
-        # 1. Environment variable CHECK_OUTPUT - output from main command
-        # 2. Environment variable ETALON_INPUT - reference data for comparison
-        # 3. stdin - piped output from main command
-        # Use base64 for processor script to avoid heredoc conflicts
-        processor_cmd = f"""
-export CHECK_OUTPUT=$(echo '{encoded_output}' | base64 -d)
-export ETALON_INPUT=$(echo '{encoded_reference}' | base64 -d)
-echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | bash
-"""
-        processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
+        # Set environment variables for the local process
+        env = os.environ.copy()
+        env['CHECK_OUTPUT'] = main_result.output
+        env['ETALON_INPUT'] = reference_data or ''
+        
+        print(f"[DEBUG] Executing processor script locally, output size: {len(main_result.output)} bytes")
+        
+        # Execute processor script locally using bash
+        # User should write processor scripts in bash regardless of target OS
+        result = subprocess.run(
+            ['bash', '-c', processor_script],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        print(f"[DEBUG] Local processor execution completed, return code: {result.returncode}")
+        
+        # Create processor result from local execution
+        processor_result = type('obj', (object,), {
+            'output': result.stdout,
+            'error': result.stderr if result.returncode != 0 else None,
+            'success': result.returncode == 0
+        })()
         
         # Parse processor output to determine check result
         output = processor_result.output.strip()
@@ -310,7 +343,9 @@ echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | b
         
         # Look for status keywords
         for line in output.split('\n'):
-            line_lower = line.strip().lower()
+            line_stripped = line.strip()
+            line_lower = line_stripped.lower()
+            
             if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
                 check_status = 'Пройдена'
                 break
@@ -325,7 +360,7 @@ echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | b
                 break
         
         # Build result message - only command output and final status
-        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Вывод обработчика ===\n{output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
         
         return ExecutionResult(
             host_id=host.id,
@@ -349,23 +384,188 @@ def _check_network_access(host: Host) -> tuple[bool, str]:
     """Check if host is reachable via network"""
     import socket
     try:
-        # Try to connect to SSH port
+        # Determine port based on connection type
+        if host.connection_type == "winrm":
+            check_port = 5985 if host.port == 22 else host.port  # Default WinRM HTTP port
+        else:
+            check_port = host.port
+        
+        # Try to connect to the port
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
-        result = sock.connect_ex((host.hostname, host.port))
+        result = sock.connect_ex((host.hostname, check_port))
         sock.close()
         
         if result == 0:
             return True, "Сетевой доступ есть"
         else:
-            return False, f"Сетевой доступ отсутствует (порт {host.port} недоступен)"
+            return False, f"Сетевой доступ отсутствует (порт {check_port} недоступен)"
     except socket.gaierror:
         return False, f"Не удается разрешить имя хоста {host.hostname}"
     except Exception as e:
         return False, f"Ошибка проверки сетевого доступа: {str(e)}"
 
+def _check_winrm_login(host: Host) -> tuple[bool, str]:
+    """Check if WinRM login is successful"""
+    try:
+        password = decrypt_password(host.password) if host.password else None
+        if not password:
+            return False, "Пароль не указан или не удалось расшифровать"
+        
+        winrm_port = host.port if host.port != 22 else 5985
+        endpoint = f'http://{host.hostname}:{winrm_port}/wsman'
+        
+        session = winrm.Session(
+            endpoint,
+            auth=(host.username, password),
+            transport='ntlm'
+        )
+        
+        # Try simple command
+        result = session.run_cmd('echo', ['test'])
+        
+        if result.status_code == 0:
+            return True, "Логин успешен"
+        else:
+            return False, "Ошибка аутентификации: неверный логин/пароль"
+    
+    except Exception as e:
+        return False, f"Ошибка логина: {str(e)}"
+
+def _check_ssh_login_and_sudo(host: Host) -> tuple[bool, str, bool, str]:
+    """Check if SSH login is successful AND check sudo in one connection"""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        # Connect with appropriate authentication
+        if host.auth_type == "password":
+            password = decrypt_password(host.password) if host.password else None
+            if not password:
+                return False, "Пароль не указан или не удалось расшифровать", False, "Пароль не указан"
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                password=password,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
+            )
+        else:  # key-based auth
+            from io import StringIO
+            if not host.ssh_key:
+                return False, "SSH ключ не указан", False, "SSH ключ не указан"
+            key_file = StringIO(host.ssh_key)
+            try:
+                pkey = paramiko.RSAKey.from_private_key(key_file)
+            except:
+                key_file = StringIO(host.ssh_key)
+                try:
+                    pkey = paramiko.DSSKey.from_private_key(key_file)
+                except:
+                    key_file = StringIO(host.ssh_key)
+                    try:
+                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                    except:
+                        key_file = StringIO(host.ssh_key)
+                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
+            ssh.connect(
+                hostname=host.hostname,
+                port=host.port,
+                username=host.username,
+                pkey=pkey,
+                timeout=10,
+                allow_agent=False,
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
+            )
+            # Enable keepalive to maintain connection
+            transport = ssh.get_transport()
+            if transport:
+                transport.set_keepalive(30)
+            # Small delay to let connection stabilize before opening channel
+            import time
+            time.sleep(1)
+        
+        # Login successful, now check sudo
+        login_success = True
+        login_msg = "Логин успешен"
+        
+        try:
+            # Check sudo - simplified command without redirection
+            # Increase timeout to 10 seconds to avoid channel opening timeout
+            stdin, stdout, stderr = ssh.exec_command("sudo -n whoami", timeout=10, get_pty=False)
+            channel = stdout.channel
+            channel.settimeout(10)
+            
+            # Read both stdout and stderr
+            output = stdout.read().decode('utf-8', errors='replace').strip()
+            error_output = stderr.read().decode('utf-8', errors='replace').strip()
+            exit_code = channel.recv_exit_status()
+            
+            print(f"[DEBUG] Sudo check for {host.name}: exit_code={exit_code}, output='{output}', stderr='{error_output}'")
+            
+            # Check results
+            if exit_code == 0 and output:
+                sudo_success = True
+                sudo_msg = "sudo доступен"
+            elif 'password' in error_output.lower() or 'password' in output.lower():
+                sudo_success = False
+                sudo_msg = "sudo недоступен (требуется пароль)"
+            elif 'sorry' in error_output.lower() or 'not in sudoers' in error_output.lower():
+                sudo_success = False
+                sudo_msg = "sudo недоступен (пользователь не в sudoers)"
+            else:
+                sudo_success = False
+                sudo_msg = f"sudo недоступен (код: {exit_code})"
+        except socket.timeout as e:
+            print(f"[DEBUG] Sudo check timeout for {host.name}: {str(e)}")
+            sudo_success = False
+            sudo_msg = "Таймаут проверки sudo"
+        except Exception as e:
+            print(f"[DEBUG] Sudo check error for {host.name}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            sudo_success = False
+            sudo_msg = f"Ошибка проверки sudo: {str(e)}"
+        
+        ssh.close()
+        import time
+        time.sleep(0.5)
+        
+        return login_success, login_msg, sudo_success, sudo_msg
+    
+    except paramiko.AuthenticationException:
+        try:
+            ssh.close()
+        except:
+            pass
+        return False, "Ошибка аутентификации: неверный логин/пароль/ключ", False, "Логин не выполнен"
+    except Exception as e:
+        try:
+            ssh.close()
+        except:
+            pass
+        return False, f"Ошибка логина: {str(e)}", False, "Логин не выполнен"
+
 def _check_ssh_login(host: Host) -> tuple[bool, str]:
-    """Check if SSH login is successful"""
+    """Check if SSH login is successful (wrapper for compatibility)"""
+    login_ok, login_msg, _, _ = _check_ssh_login_and_sudo(host)
+    return login_ok, login_msg
+
+def _check_ssh_login_original(host: Host) -> tuple[bool, str]:
+    """Original SSH login check - kept for reference"""
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
@@ -382,7 +582,12 @@ def _check_ssh_login(host: Host) -> tuple[bool, str]:
                 password=password,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         else:  # key-based auth
             from io import StringIO
@@ -410,18 +615,66 @@ def _check_ssh_login(host: Host) -> tuple[bool, str]:
                 pkey=pkey,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         
         ssh.close()
+        import time
+        time.sleep(0.5)  # Small delay to ensure connection is fully closed
         return True, "Логин успешен"
     
     except paramiko.AuthenticationException:
+        ssh.close()
         return False, "Ошибка аутентификации: неверный логин/пароль/ключ"
     except Exception as e:
+        try:
+            ssh.close()
+        except:
+            pass
         return False, f"Ошибка логина: {str(e)}"
 
-def _check_sudo_access(host: Host) -> tuple[bool, str]:
+def _check_admin_access(host: Host) -> tuple[bool, str]:
+    """Check if admin/sudo access is available"""
+    if host.connection_type == "winrm":
+        # For Windows, check if user has admin rights
+        try:
+            password = decrypt_password(host.password) if host.password else None
+            if not password:
+                return False, "Пароль не указан"
+            
+            winrm_port = host.port if host.port != 22 else 5985
+            endpoint = f'http://{host.hostname}:{winrm_port}/wsman'
+            
+            session = winrm.Session(
+                endpoint,
+                auth=(host.username, password),
+                transport='ntlm'
+            )
+            
+            # Check if user is in Administrators group
+            result = session.run_ps('([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")')
+            
+            if result.status_code == 0:
+                output = result.std_out.decode('utf-8').strip()
+                if output.lower() == 'true':
+                    return True, "Права администратора доступны"
+                else:
+                    return False, "Пользователь не имеет прав администратора"
+            else:
+                return False, "Ошибка проверки прав администратора"
+        
+        except Exception as e:
+            return False, f"Ошибка проверки прав: {str(e)}"
+    else:
+        # For Linux, check sudo
+        return _check_sudo_access_linux(host)
+
+def _check_sudo_access_linux(host: Host) -> tuple[bool, str]:
     """Check if sudo is available and working"""
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -439,7 +692,12 @@ def _check_sudo_access(host: Host) -> tuple[bool, str]:
                 password=password,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         else:
             from io import StringIO
@@ -467,22 +725,135 @@ def _check_sudo_access(host: Host) -> tuple[bool, str]:
                 pkey=pkey,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
         
-        # Test sudo with a simple command
-        stdin, stdout, stderr = ssh.exec_command("sudo -n true", timeout=10)
-        exit_status = stdout.channel.recv_exit_status()
-        
-        ssh.close()
-        
-        if exit_status == 0:
-            return True, "sudo доступен"
-        else:
-            return False, "sudo недоступен (требуется настройка NOPASSWD или пароль)"
+        # Test sudo with a simple echo command (more reliable than whoami or true)
+        # Use exec_command with shorter timeout and proper error handling
+        try:
+            stdin, stdout, stderr = ssh.exec_command("sudo -n echo 'SUDO_OK' 2>&1", timeout=5, get_pty=False)
+            
+            # Set shorter channel timeout
+            channel = stdout.channel
+            channel.settimeout(5)
+            
+            # Read output
+            output = stdout.read().decode('utf-8', errors='replace').strip()
+            error_output = stderr.read().decode('utf-8', errors='replace').strip()
+            
+            ssh.close()
+            import time
+            time.sleep(0.5)  # Small delay to ensure connection is fully closed
+            
+            # Check if sudo worked (should contain 'SUDO_OK')
+            if 'SUDO_OK' in output:
+                return True, "sudo доступен"
+            elif 'password' in output.lower() or 'password' in error_output.lower():
+                return False, "sudo недоступен (требуется пароль)"
+            elif 'sorry' in output.lower() or 'sorry' in error_output.lower():
+                return False, "sudo недоступен (пользователь не в sudoers)"
+            else:
+                return False, "sudo недоступен (требуется настройка NOPASSWD)"
+        except socket.timeout:
+            ssh.close()
+            return False, "Таймаут при проверке sudo"
+        except Exception as e:
+            try:
+                ssh.close()
+            except:
+                pass
+            return False, f"Ошибка проверки sudo: {str(e)}"
     
     except Exception as e:
         return False, f"Ошибка проверки sudo: {str(e)}"
+
+def _winrm_connect_and_execute(host: Host, command: str) -> ExecutionResult:
+    """Internal function to connect via WinRM and execute command on Windows"""
+    try:
+        # Decrypt password
+        password = decrypt_password(host.password) if host.password else None
+        if not password:
+            return ExecutionResult(
+                host_id=host.id,
+                host_name=host.name,
+                success=False,
+                output="",
+                error="Пароль не указан или не удалось расшифровать"
+            )
+        
+        # Connect to Windows host via WinRM
+        # Default WinRM port is 5985 for HTTP, 5986 for HTTPS
+        winrm_port = host.port if host.port != 22 else 5985
+        endpoint = f'http://{host.hostname}:{winrm_port}/wsman'
+        
+        session = winrm.Session(
+            endpoint,
+            auth=(host.username, password),
+            transport='ntlm'  # Use NTLM authentication
+        )
+        
+        # Wrap command to ensure UTF-8 output encoding
+        wrapped_command = f"""
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+{command}
+"""
+        
+        # Execute command
+        result = session.run_ps(wrapped_command)  # Run PowerShell command
+        
+        # Decode output - PowerShell returns output in cp1251 (Windows-1251) for Russian locale
+        # Try different encodings: cp1251, utf-8, utf-16
+        def decode_winrm_output(data):
+            if not data:
+                return ""
+            
+            encodings = ['cp1251', 'utf-8', 'utf-16-le', 'utf-16']
+            for encoding in encodings:
+                try:
+                    decoded = data.decode(encoding)
+                    # Check if decode was successful (no question marks)
+                    if '?' not in decoded or decoded.isprintable():
+                        return decoded
+                except (UnicodeDecodeError, LookupError):
+                    continue
+            
+            # Fallback: decode with errors ignored
+            return data.decode('utf-8', errors='ignore')
+        
+        output_str = decode_winrm_output(result.std_out)
+        error_str = decode_winrm_output(result.std_err)
+        
+        if result.status_code == 0:
+            return ExecutionResult(
+                host_id=host.id,
+                host_name=host.name,
+                success=True,
+                output=output_str,
+                error=None
+            )
+        else:
+            return ExecutionResult(
+                host_id=host.id,
+                host_name=host.name,
+                success=False,
+                output=output_str,
+                error=error_str if error_str else f"Exit code: {result.status_code}"
+            )
+    
+    except Exception as e:
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output="",
+            error=f"Ошибка WinRM подключения: {str(e)}"
+        )
 
 def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
     """Internal function to connect via SSH and execute command"""
@@ -505,8 +876,20 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
                 password=password,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
+            # Enable keepalive to maintain connection
+            transport = ssh.get_transport()
+            if transport:
+                transport.set_keepalive(30)
+            # Small delay to let connection stabilize before opening channel
+            import time
+            time.sleep(1)
         else:  # key-based auth
             logger.info(f"Using key-based authentication for {host.name}")
             from io import StringIO
@@ -537,8 +920,20 @@ def _ssh_connect_and_execute(host: Host, command: str) -> ExecutionResult:
                 pkey=pkey,
                 timeout=10,
                 allow_agent=False,
-                look_for_keys=False
+                look_for_keys=False,
+                banner_timeout=5,
+                auth_timeout=10,
+                gss_auth=False,
+                gss_kex=False,
+                gss_deleg_creds=False
             )
+            # Enable keepalive to maintain connection
+            transport = ssh.get_transport()
+            if transport:
+                transport.set_keepalive(30)
+            # Small delay to let connection stabilize before opening channel
+            import time
+            time.sleep(1)
         
         logger.info(f"Successfully connected to {host.name}")
         
@@ -656,7 +1051,7 @@ async def test_host_connection(host_id: str):
     host = Host(**parse_from_mongo(host_doc))
     
     # Try simple command
-    result = await execute_ssh_command(host, "echo 'Connection test successful'")
+    result = await execute_command(host, "echo 'Connection test successful'")
     
     return {
         "success": result.success,
@@ -1141,40 +1536,76 @@ async def execute_project(project_id: str):
                     yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': network_msg})}\n\n"
                     continue
                 
-                # 2. Check SSH login
-                login_ok, login_msg = await loop.run_in_executor(None, _check_ssh_login, host)
-                yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg})}\n\n"
-                
-                if not login_ok:
-                    # Mark all scripts as failed with login error
-                    for script in scripts:
-                        execution = Execution(
-                            project_id=project_id,
-                            project_task_id=task_obj.id,
-                            execution_session_id=session_id,
-                            host_id=host.id,
-                            system_id=system.id,
-                            script_id=script.id,
-                            script_name=script.name,
-                            success=False,
-                            output="",
-                            error=login_msg,
-                            check_status="Ошибка"
-                        )
-                        exec_doc = prepare_for_mongo(execution.model_dump())
-                        await db.executions.insert_one(exec_doc)
+                # 2. Check login and sudo (combined for SSH to avoid multiple connections)
+                if host.connection_type == "winrm":
+                    # For WinRM, check login first
+                    login_ok, login_msg = await loop.run_in_executor(None, _check_winrm_login, host)
+                    yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg})}\n\n"
                     
-                    await db.project_tasks.update_one(
-                        {"id": task_obj.id},
-                        {"$set": {"status": "failed"}}
-                    )
-                    failed_tasks += 1
-                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg})}\n\n"
-                    continue
-                
-                # 3. Check sudo access
-                sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_sudo_access, host)
-                yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg})}\n\n"
+                    if not login_ok:
+                        # Mark all scripts as failed with login error
+                        for script in scripts:
+                            execution = Execution(
+                                project_id=project_id,
+                                project_task_id=task_obj.id,
+                                execution_session_id=session_id,
+                                host_id=host.id,
+                                system_id=system.id,
+                                script_id=script.id,
+                                script_name=script.name,
+                                success=False,
+                                output="",
+                                error=login_msg,
+                                check_status="Ошибка"
+                            )
+                            exec_doc = prepare_for_mongo(execution.model_dump())
+                            await db.executions.insert_one(exec_doc)
+                        
+                        await db.project_tasks.update_one(
+                            {"id": task_obj.id},
+                            {"$set": {"status": "failed"}}
+                        )
+                        failed_tasks += 1
+                        yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg})}\n\n"
+                        continue
+                    
+                    # Then check admin access
+                    sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_admin_access, host)
+                    yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg})}\n\n"
+                else:
+                    # For SSH, check both login and sudo in one connection
+                    login_ok, login_msg, sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_ssh_login_and_sudo, host)
+                    yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg})}\n\n"
+                    
+                    if not login_ok:
+                        # Mark all scripts as failed with login error
+                        for script in scripts:
+                            execution = Execution(
+                                project_id=project_id,
+                                project_task_id=task_obj.id,
+                                execution_session_id=session_id,
+                                host_id=host.id,
+                                system_id=system.id,
+                                script_id=script.id,
+                                script_name=script.name,
+                                success=False,
+                                output="",
+                                error=login_msg,
+                                check_status="Ошибка"
+                            )
+                            exec_doc = prepare_for_mongo(execution.model_dump())
+                            await db.executions.insert_one(exec_doc)
+                        
+                        await db.project_tasks.update_one(
+                            {"id": task_obj.id},
+                            {"$set": {"status": "failed"}}
+                        )
+                        failed_tasks += 1
+                        yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg})}\n\n"
+                        continue
+                    
+                    # Send sudo check result
+                    yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg})}\n\n"
                 
                 if not sudo_ok:
                     # Mark all scripts as failed with sudo error
@@ -1426,6 +1857,166 @@ async def get_execution(execution_id: str):
         raise HTTPException(status_code=404, detail="Выполнение не найдено")
     
     return Execution(**parse_from_mongo(execution))
+
+
+# Excel Export Endpoint
+@api_router.get("/projects/{project_id}/sessions/{session_id}/export-excel")
+async def export_session_to_excel(project_id: str, session_id: str):
+    """Export session execution results to Excel file in specified format"""
+    
+    # Get project info
+    project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    # Get executions for this session
+    executions = await db.executions.find(
+        {"project_id": project_id, "execution_session_id": session_id},
+        {"_id": 0}
+    ).sort("executed_at", 1).to_list(1000)
+    
+    if not executions:
+        raise HTTPException(status_code=404, detail="Результаты выполнения не найдены")
+    
+    # Get scripts cache for methodology and criteria
+    scripts_cache = {}
+    hosts_cache = {}
+    
+    # Create workbook and worksheet
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Протокол испытаний"
+    
+    # Define styles
+    thick_border = Border(
+        left=Side(style='thick'),
+        right=Side(style='thick'),
+        top=Side(style='thick'),
+        bottom=Side(style='thick')
+    )
+    yellow_fill = PatternFill(start_color="FFD966", end_color="FFD966", fill_type="solid")
+    header_font = Font(bold=True, size=11)
+    
+    # A1: Протокол
+    ws['A1'] = "Протокол проведения испытаний №"
+    ws['A1'].font = Font(bold=True, size=14)
+    
+    # A2: Информационная система
+    ws['A2'] = "Информационная система ..."
+    ws['A2'].font = Font(bold=True, size=12)
+    
+    # A4: Место проведения
+    ws['A4'] = "Место проведения испытаний: удалённо"
+    
+    # A5: Дата
+    ws['A5'] = f"Дата проведения испытаний: {date.today().strftime('%d.%m.%Y')}"
+    
+    # Row 8: Table headers
+    headers = [
+        "№ п/п",
+        "Реализация требования ИБ",
+        "№ п/п",
+        "Описание методики испытания",
+        "Критерий успешного прохождения испытания",
+        "Результат испытания",
+        "Комментарии",
+        "Уровень критичности"
+    ]
+    
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=8, column=col, value=header)
+        cell.font = header_font
+        cell.fill = yellow_fill
+        cell.border = thick_border
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    
+    # Data rows starting from row 9
+    row_num = 9
+    for idx, execution_data in enumerate(executions, 1):
+        execution = Execution(**parse_from_mongo(execution_data))
+        
+        # Get script info (with caching)
+        if execution.script_id not in scripts_cache:
+            script_doc = await db.scripts.find_one({"id": execution.script_id}, {"_id": 0})
+            scripts_cache[execution.script_id] = script_doc
+        script = scripts_cache.get(execution.script_id, {})
+        
+        # Get host info (with caching)
+        if execution.host_id not in hosts_cache:
+            host_doc = await db.hosts.find_one({"id": execution.host_id}, {"_id": 0})
+            hosts_cache[execution.host_id] = host_doc
+        host = hosts_cache.get(execution.host_id, {})
+        
+        # Prepare data
+        test_methodology = script.get('test_methodology', '') or ''
+        success_criteria = script.get('success_criteria', '') or ''
+        
+        # Result mapping
+        result_map = {
+            "Пройдена": "Пройдена",
+            "Не пройдена": "Не пройдена",
+            "Ошибка": "Ошибка",
+            "Оператор": "Требует участия оператора"
+        }
+        result = result_map.get(execution.check_status, execution.check_status or "Не определён")
+        
+        # Level of criticality column - host and username info
+        host_info = ""
+        if host:
+            hostname_or_ip = host.get('hostname', 'неизвестно')
+            username = host.get('username', 'неизвестно')
+            host_info = f"Испытания проводились на хосте {hostname_or_ip} под учетной записью {username}"
+        
+        # Write row data
+        row_data = [
+            idx,  # № п/п
+            "",   # Реализация требования ИБ (пусто)
+            idx,  # № п/п (дубликат)
+            test_methodology,  # Описание методики
+            success_criteria,  # Критерий успешного прохождения
+            result,  # Результат
+            "",  # Комментарии (пусто)
+            host_info  # Уровень критичности
+        ]
+        
+        for col, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_num, column=col, value=value)
+            cell.border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            cell.alignment = Alignment(vertical='top', wrap_text=True)
+        
+        row_num += 1
+    
+    # Set column widths
+    ws.column_dimensions['A'].width = 8   # № п/п
+    ws.column_dimensions['B'].width = 25  # Реализация требования ИБ
+    ws.column_dimensions['C'].width = 8   # № п/п
+    ws.column_dimensions['D'].width = 35  # Описание методики
+    ws.column_dimensions['E'].width = 35  # Критерий успешного прохождения
+    ws.column_dimensions['F'].width = 20  # Результат
+    ws.column_dimensions['G'].width = 25  # Комментарии
+    ws.column_dimensions['H'].width = 40  # Уровень критичности
+    
+    # Set row heights
+    ws.row_dimensions[8].height = 40  # Header row
+    
+    # Save to temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+        wb.save(tmp_file.name)
+        tmp_file_path = tmp_file.name
+    
+    # Generate filename
+    filename = f"Протокол_испытаний_{date.today().strftime('%d%m%Y')}.xlsx"
+    
+    return FileResponse(
+        path=tmp_file_path,
+        filename=filename,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 
 # Include the router in the main app
