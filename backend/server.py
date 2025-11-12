@@ -1297,32 +1297,46 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 
 # API Routes - Hosts
 @api_router.post("/hosts", response_model=Host)
-async def create_host(host_input: HostCreate):
-    """Create new host"""
+async def create_host(host_input: HostCreate, current_user: User = Depends(get_current_user)):
+    """Create new host (requires hosts_create permission)"""
+    await require_permission(current_user, 'hosts_create')
+    
     host_dict = host_input.model_dump()
     
     # Encrypt password if provided
     if host_dict.get('password'):
         host_dict['password'] = encrypt_password(host_dict['password'])
     
-    host_obj = Host(**host_dict)
+    host_obj = Host(**host_dict, created_by=current_user.id)
     doc = prepare_for_mongo(host_obj.model_dump())
     
     await db.hosts.insert_one(doc)
     return host_obj
 
 @api_router.get("/hosts", response_model=List[Host])
-async def get_hosts():
-    """Get all hosts"""
-    hosts = await db.hosts.find({}, {"_id": 0}).to_list(1000)
+async def get_hosts(current_user: User = Depends(get_current_user)):
+    """Get all hosts (filtered by permissions)"""
+    # If user can edit all hosts, show all
+    if await has_permission(current_user, 'hosts_edit_all'):
+        hosts = await db.hosts.find({}, {"_id": 0}).to_list(1000)
+    else:
+        # Show only own hosts
+        hosts = await db.hosts.find({"created_by": current_user.id}, {"_id": 0}).to_list(1000)
+    
     return [Host(**parse_from_mongo(host)) for host in hosts]
 
 @api_router.get("/hosts/{host_id}", response_model=Host)
-async def get_host(host_id: str):
+async def get_host(host_id: str, current_user: User = Depends(get_current_user)):
     """Get host by ID"""
     host = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     if not host:
         raise HTTPException(status_code=404, detail="Хост не найден")
+    
+    # Check access
+    if not await has_permission(current_user, 'hosts_edit_all'):
+        if host.get('created_by') != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    
     return Host(**parse_from_mongo(host))
 
 @api_router.post("/hosts/{host_id}/test")
