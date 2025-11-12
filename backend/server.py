@@ -43,6 +43,38 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# JWT Configuration
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production-please-use-strong-random-key')
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_HOURS = 24
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# HTTP Bearer for JWT
+security = HTTPBearer()
+
+# Permissions list
+PERMISSIONS = {
+    'categories_manage': 'Управление категориями и системами',
+    'checks_create': 'Создание проверок',
+    'checks_edit_own': 'Редактирование своих проверок',
+    'checks_edit_all': 'Редактирование всех проверок',
+    'checks_delete_own': 'Удаление своих проверок',
+    'checks_delete_all': 'Удаление всех проверок',
+    'hosts_create': 'Создание хостов',
+    'hosts_edit_own': 'Редактирование своих хостов',
+    'hosts_edit_all': 'Редактирование всех хостов',
+    'hosts_delete_own': 'Удаление своих хостов',
+    'hosts_delete_all': 'Удаление всех хостов',
+    'users_manage': 'Управление пользователями',
+    'roles_manage': 'Управление ролями',
+    'results_view_all': 'Просмотр всех результатов',
+    'results_export_all': 'Экспорт всех результатов',
+    'projects_create': 'Создание проектов',
+    'projects_execute': 'Выполнение проектов',
+}
+
 
 # Helper functions
 def encrypt_password(password: str) -> str:
