@@ -1411,22 +1411,24 @@ async def delete_host(host_id: str, current_user: User = Depends(get_current_use
 
 # API Routes - Categories
 @api_router.post("/categories", response_model=Category)
-async def create_category(category_input: CategoryCreate):
-    """Create new category (admin only in future)"""
-    category_obj = Category(**category_input.model_dump())
+async def create_category(category_input: CategoryCreate, current_user: User = Depends(get_current_user)):
+    """Create new category (requires categories_manage permission)"""
+    await require_permission(current_user, 'categories_manage')
+    
+    category_obj = Category(**category_input.model_dump(), created_by=current_user.id)
     doc = prepare_for_mongo(category_obj.model_dump())
     
     await db.categories.insert_one(doc)
     return category_obj
 
 @api_router.get("/categories", response_model=List[Category])
-async def get_categories():
+async def get_categories(current_user: User = Depends(get_current_user)):
     """Get all categories"""
     categories = await db.categories.find({}, {"_id": 0}).to_list(1000)
     return [Category(**parse_from_mongo(cat)) for cat in categories]
 
 @api_router.get("/categories/{category_id}", response_model=Category)
-async def get_category(category_id: str):
+async def get_category(category_id: str, current_user: User = Depends(get_current_user)):
     """Get category by ID"""
     category = await db.categories.find_one({"id": category_id}, {"_id": 0})
     if not category:
@@ -1434,8 +1436,10 @@ async def get_category(category_id: str):
     return Category(**parse_from_mongo(category))
 
 @api_router.put("/categories/{category_id}", response_model=Category)
-async def update_category(category_id: str, category_update: CategoryUpdate):
-    """Update category"""
+async def update_category(category_id: str, category_update: CategoryUpdate, current_user: User = Depends(get_current_user)):
+    """Update category (requires categories_manage permission)"""
+    await require_permission(current_user, 'categories_manage')
+    
     update_data = category_update.model_dump(exclude_unset=True)
     
     if not update_data:
@@ -1449,21 +1453,29 @@ async def update_category(category_id: str, category_update: CategoryUpdate):
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Категория не найдена")
     
-    updated_category = await db.categories.find_one({"id": category_id}, {"_id": 0})
-    return Category(**parse_from_mongo(updated_category))
+    updated_cat = await db.categories.find_one({"id": category_id}, {"_id": 0})
+    return Category(**parse_from_mongo(updated_cat))
 
 @api_router.delete("/categories/{category_id}")
-async def delete_category(category_id: str):
-    """Delete category"""
-    # Check if category has systems
-    systems = await db.systems.find_one({"category_id": category_id})
-    if systems:
-        raise HTTPException(status_code=400, detail="Невозможно удалить категорию с системами")
+async def delete_category(category_id: str, current_user: User = Depends(get_current_user)):
+    """Delete category and cascade to systems and scripts (requires categories_manage permission)"""
+    await require_permission(current_user, 'categories_manage')
     
+    # Delete all systems in category
+    systems = await db.systems.find({"category_id": category_id}).to_list(1000)
+    for system in systems:
+        # Delete all scripts in system
+        await db.scripts.delete_many({"system_id": system['id']})
+    
+    # Delete all systems
+    await db.systems.delete_many({"category_id": category_id})
+    
+    # Delete category
     result = await db.categories.delete_one({"id": category_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Категория не найдена")
-    return {"message": "Категория удалена"}
+    
+    return {"message": "Категория и связанные объекты удалены"}
 
 
 # API Routes - Systems
