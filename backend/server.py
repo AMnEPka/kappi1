@@ -1630,16 +1630,33 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
     return enriched_scripts
 
 @api_router.get("/scripts/{script_id}", response_model=Script)
-async def get_script(script_id: str):
+async def get_script(script_id: str, current_user: User = Depends(get_current_user)):
     """Get script by ID"""
     script = await db.scripts.find_one({"id": script_id}, {"_id": 0})
     if not script:
         raise HTTPException(status_code=404, detail="Скрипт не найден")
+    
+    # Check access
+    if not await has_permission(current_user, 'checks_edit_all'):
+        if script.get('created_by') != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    
     return Script(**parse_from_mongo(script))
 
 @api_router.put("/scripts/{script_id}", response_model=Script)
-async def update_script(script_id: str, script_update: ScriptUpdate):
-    """Update script"""
+async def update_script(script_id: str, script_update: ScriptUpdate, current_user: User = Depends(get_current_user)):
+    """Update script (requires checks_edit_own or checks_edit_all permission)"""
+    script = await db.scripts.find_one({"id": script_id})
+    if not script:
+        raise HTTPException(status_code=404, detail="Скрипт не найден")
+    
+    # Check permissions
+    is_owner = script.get('created_by') == current_user.id
+    if is_owner:
+        await require_permission(current_user, 'checks_edit_own')
+    else:
+        await require_permission(current_user, 'checks_edit_all')
+    
     update_data = script_update.model_dump(exclude_unset=True)
     
     if not update_data:
@@ -1650,18 +1667,24 @@ async def update_script(script_id: str, script_update: ScriptUpdate):
         {"$set": update_data}
     )
     
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Скрипт не найден")
-    
     updated_script = await db.scripts.find_one({"id": script_id}, {"_id": 0})
     return Script(**parse_from_mongo(updated_script))
 
 @api_router.delete("/scripts/{script_id}")
-async def delete_script(script_id: str):
-    """Delete script"""
-    result = await db.scripts.delete_one({"id": script_id})
-    if result.deleted_count == 0:
+async def delete_script(script_id: str, current_user: User = Depends(get_current_user)):
+    """Delete script (requires checks_delete_own or checks_delete_all permission)"""
+    script = await db.scripts.find_one({"id": script_id})
+    if not script:
         raise HTTPException(status_code=404, detail="Скрипт не найден")
+    
+    # Check permissions
+    is_owner = script.get('created_by') == current_user.id
+    if is_owner:
+        await require_permission(current_user, 'checks_delete_own')
+    else:
+        await require_permission(current_user, 'checks_delete_all')
+    
+    result = await db.scripts.delete_one({"id": script_id})
     return {"message": "Скрипт удален"}
 
 
