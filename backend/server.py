@@ -349,6 +349,9 @@ $script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64Str
 # Execute processor script
 Invoke-Expression $script
 """
+            # Debug: log command length
+            print(f"[DEBUG] PowerShell processor command length: {len(processor_cmd)} chars")
+            print(f"[DEBUG] Output chunks: {len(output_chunks)}, Reference chunks: {len(reference_chunks)}, Processor chunks: {len(processor_chunks)}")
         else:
             # Bash command for Linux
             processor_cmd = f"""
