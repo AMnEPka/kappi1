@@ -1477,19 +1477,28 @@ function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <Layout>
+        <AuthProvider>
           <Routes>
-            <Route path="/" element={<ProjectsPageWrapper />} />
-            <Route path="/hosts" element={<HostsPage />} />
-            <Route path="/scripts" element={<ScriptsPage />} />
-            <Route path="/execute" element={<ExecutePage />} />
-            <Route path="/projects/new" element={<ProjectWizardWrapper />} />
-            <Route path="/projects/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
-            <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/*" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<ProjectsPageWrapper />} />
+                    <Route path="/hosts" element={<HostsPage />} />
+                    <Route path="/scripts" element={<ScriptsPage />} />
+                    <Route path="/execute" element={<ExecutePage />} />
+                    <Route path="/projects/new" element={<ProjectWizardWrapper />} />
+                    <Route path="/projects/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
+                    <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />
+                    <Route path="/history" element={<HistoryPage />} />
+                    <Route path="/admin" element={<AdminPage />} />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
+            } />
           </Routes>
-        </Layout>
+        </AuthProvider>
       </BrowserRouter>
     </div>
   );
