@@ -247,6 +247,7 @@ class Project(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    created_by: Optional[str] = None
 
 class ProjectCreate(BaseModel):
     name: str
