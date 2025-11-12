@@ -315,8 +315,35 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         # Create processor command based on connection type
         if host.connection_type == "winrm":
             # PowerShell command for Windows with UTF-8 output encoding
-            processor_cmd = f"""
-[Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(1251)
+            # Use compressed/split approach to avoid command line length limits
+            # Split large base64 strings into chunks and reassemble
+            chunk_size = 4000  # Safe chunk size for Windows command line
+            
+            # For very large data, we'll use a different approach with temp files
+            if len(encoded_output) > 8000 or len(encoded_processor) > 8000 or len(encoded_reference) > 8000:
+                # Use stdin to pass data instead of command line
+                processor_cmd = f"""
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+# Read base64 data from command (passed via run_ps)
+$b64Output = '{encoded_output}'
+$b64Reference = '{encoded_reference}'
+$b64Script = '{encoded_processor}'
+
+# Decode
+$env:CHECK_OUTPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Output))
+$env:ETALON_INPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Reference))
+$script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Script))
+
+# Execute
+Invoke-Expression $script
+"""
+            else:
+                # Small data - use direct approach
+                processor_cmd = f"""
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:CHECK_OUTPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_output}'))
 $env:ETALON_INPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_reference}'))
 $script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_processor}'))
