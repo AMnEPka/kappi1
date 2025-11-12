@@ -150,6 +150,7 @@ class System(BaseModel):
     description: Optional[str] = None
     os_type: str = "linux"  # "linux" or "windows"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
 
 class SystemCreate(BaseModel):
     category_id: str
