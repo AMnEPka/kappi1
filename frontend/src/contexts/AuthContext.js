@@ -25,9 +25,6 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('[AuthContext] Added token to request:', config.url);
-        } else {
-          console.log('[AuthContext] No token for request:', config.url);
         }
         return config;
       },
