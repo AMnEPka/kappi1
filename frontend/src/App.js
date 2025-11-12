@@ -19,7 +19,7 @@ import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectWizard from "@/pages/ProjectWizard";
 import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
 import ProjectResultsPage from "@/pages/ProjectResultsPage";
-import { Menu, HelpCircle, Wifi, Loader2 } from 'lucide-react'; 
+import { Menu, HelpCircle, EthernetPort, Loader2 } from 'lucide-react'; 
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -299,7 +299,7 @@ const HostsPage = () => {
                             {testingHostId === host.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Wifi className="h-4 w-4" />
+                              <EthernetPort className="h-4 w-4" />
                             )}
                           </Button>
                         </TooltipTrigger>
