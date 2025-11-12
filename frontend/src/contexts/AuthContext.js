@@ -17,13 +17,31 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const API_URL = process.env.REACT_APP_BACKEND_URL;
 
+  // Setup axios interceptor to always add token
+  useEffect(() => {
+    const interceptor = axios.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Cleanup interceptor on unmount
+    return () => {
+      axios.interceptors.request.eject(interceptor);
+    };
+  }, []);
+
   // Check if user is logged in on mount
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      // Set axios default header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
       // Fetch current user
       fetchCurrentUser();
     } else {
