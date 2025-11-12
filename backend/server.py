@@ -1556,15 +1556,17 @@ async def delete_system(system_id: str, current_user: User = Depends(get_current
 
 
 # API Routes - Scripts
-@api_router.post("/scripts", response_model=Script)
-async def create_script(script_input: ScriptCreate):
-    """Create new script"""
+@api_router.post("/systems/{system_id}/scripts", response_model=Script)
+async def create_script(system_id: str, script_input: ScriptCreate, current_user: User = Depends(get_current_user)):
+    """Create new script (requires checks_create permission)"""
+    await require_permission(current_user, 'checks_create')
+    
     # Verify system exists
-    system = await db.systems.find_one({"id": script_input.system_id})
+    system = await db.systems.find_one({"id": system_id})
     if not system:
         raise HTTPException(status_code=404, detail="Система не найдена")
     
-    script_obj = Script(**script_input.model_dump())
+    script_obj = Script(**script_input.model_dump(), created_by=current_user.id)
     doc = prepare_for_mongo(script_obj.model_dump())
     
     await db.scripts.insert_one(doc)
