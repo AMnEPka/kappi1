@@ -1359,8 +1359,20 @@ async def test_host_connection(host_id: str):
     }
 
 @api_router.put("/hosts/{host_id}", response_model=Host)
-async def update_host(host_id: str, host_update: HostUpdate):
-    """Update host"""
+async def update_host(host_id: str, host_update: HostUpdate, current_user: User = Depends(get_current_user)):
+    """Update host (requires hosts_edit_own or hosts_edit_all permission)"""
+    # Check if host exists and get owner
+    host = await db.hosts.find_one({"id": host_id})
+    if not host:
+        raise HTTPException(status_code=404, detail="Хост не найден")
+    
+    # Check permissions
+    is_owner = host.get('created_by') == current_user.id
+    if is_owner:
+        await require_permission(current_user, 'hosts_edit_own')
+    else:
+        await require_permission(current_user, 'hosts_edit_all')
+    
     update_data = host_update.model_dump(exclude_unset=True)
     
     # Encrypt password if provided
@@ -1375,18 +1387,25 @@ async def update_host(host_id: str, host_update: HostUpdate):
         {"$set": update_data}
     )
     
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Хост не найден")
-    
     updated_host = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     return Host(**parse_from_mongo(updated_host))
 
 @api_router.delete("/hosts/{host_id}")
-async def delete_host(host_id: str):
-    """Delete host"""
-    result = await db.hosts.delete_one({"id": host_id})
-    if result.deleted_count == 0:
+async def delete_host(host_id: str, current_user: User = Depends(get_current_user)):
+    """Delete host (requires hosts_delete_own or hosts_delete_all permission)"""
+    # Check if host exists and get owner
+    host = await db.hosts.find_one({"id": host_id})
+    if not host:
         raise HTTPException(status_code=404, detail="Хост не найден")
+    
+    # Check permissions
+    is_owner = host.get('created_by') == current_user.id
+    if is_owner:
+        await require_permission(current_user, 'hosts_delete_own')
+    else:
+        await require_permission(current_user, 'hosts_delete_all')
+    
+    result = await db.hosts.delete_one({"id": host_id})
     return {"message": "Хост удален"}
 
 
