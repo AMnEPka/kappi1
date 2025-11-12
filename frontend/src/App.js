@@ -877,67 +877,80 @@ const ScriptsPage = () => {
             <p className="text-slate-400 text-sm">Создайте первую проверку этого типа</p>
           </div>
         ) : (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-3 px-4 text-slate-600 font-medium">Название</th>
-                <th className="text-left py-3 px-4 text-slate-600 font-medium">Категория</th>
-                <th className="text-left py-3 px-4 text-slate-600 font-medium">Описание</th>
-                <th className="text-left py-3 px-4 text-slate-600 font-medium">Действия</th>
+      <div className="overflow-hidden">
+        <table className="w-full border-collapse table-fixed">
+          <colgroup>
+            <col className="w-[25%]" /> {/* Название */}
+            <col className="w-[20%]" /> {/* Категория */}
+            <col className="w-[40%]" /> {/* Описание */}
+            <col className="w-[15%]" /> {/* Действия */}
+          </colgroup>
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Название</th>
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Категория</th>
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Описание</th>
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scripts.map((script) => (
+              <tr key={script.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`script-card-${script.id}`}>
+                <td className="py-1 px-4 overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-medium truncate">
+                      <FileCode className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                      <span className="truncate">{script.name}</span>
+                    </div>
+                    {script.has_reference_files && (
+                      <div className="text-xs text-slate-400 flex-shrink-0 ml-2" title="Есть эталонные файлы">
+                        📝
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="py-1 px-4 text-sm text-slate-600 overflow-hidden">
+                  {script.category_name && (
+                    <div className="truncate">
+                      {script.category_icon} {script.category_name} → {script.system_name}
+                    </div>
+                  )}
+                </td>
+                <td className="py-1 px-4 text-sm text-slate-500">
+                  {script.description ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="truncate cursor-help text-left">
+                            {script.description}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <div className="text-sm">
+                            {script.description}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    "-"
+                  )}
+                </td>
+                <td className="py-1 px-4">
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}>
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(script.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {scripts.map((script) => (
-                <tr key={script.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`script-card-${script.id}`}>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 font-medium">
-                        <FileCode className="h-4 w-4 text-slate-500" />
-                        {script.name}
-                      </div>
-                      {script.has_reference_files && (
-                        <div className="text-xs text-slate-400" title="Есть эталонные файлы">
-                          📝
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-sm text-slate-600">
-                    {script.category_name && (
-                      <div>
-                        {script.category_icon} {script.category_name} → {script.system_name}
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-sm text-slate-500 max-w-[200px]">
-                    {script.description ? (
-                      <div className="relative group">
-                        <div className="truncate">
-                          {script.description}
-                        </div>
-                        <div className="absolute invisible group-hover:visible bg-slate-900 text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-2 whitespace-nowrap z-10">
-                          {script.description}
-                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
-                        </div>
-                      </div>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(script)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(script.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
         )}
       </div>
     </div>
