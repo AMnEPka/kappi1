@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { ChevronLeft, CheckCircle, XCircle, Eye } from "lucide-react";
+import { ChevronLeft, CheckCircle, XCircle, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
 
@@ -121,6 +121,37 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     return { total, passed, failed, error, operator };
   };
 
+  const handleExportToExcel = async () => {
+    if (!selectedSession) {
+      toast.error("Выберите сессию для экспорта");
+      return;
+    }
+
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/projects/${projectId}/sessions/${selectedSession}/export-excel`,
+        {
+          responseType: 'blob',
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Протокол_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Excel файл успешно экспортирован");
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      toast.error("Не удалось экспортировать в Excel");
+    }
+  };
+
   // Get badge by check status with colors
   const getCheckStatusBadge = (execution) => {
     const status = execution.check_status;
@@ -185,21 +216,33 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
             <CardDescription>Просмотр результатов конкретного запуска проекта</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select value={selectedSession} onValueChange={setSelectedSession}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Выберите запуск" />
-              </SelectTrigger>
-              <SelectContent>
-                {sessions.map((session, index) => (
-                  <SelectItem key={session.session_id} value={session.session_id}>
-                    {index === 0 ? '🆕 ' : ''}
-                    {formatDate(session.executed_at)} 
-                    {' - '}
-                    Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Select value={selectedSession} onValueChange={setSelectedSession}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите запуск" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sessions.map((session, index) => (
+                      <SelectItem key={session.session_id} value={session.session_id}>
+                        {index === 0 ? '🆕 ' : ''}
+                        {formatDate(session.executed_at)} 
+                        {' - '}
+                        Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={handleExportToExcel}
+                disabled={!selectedSession}
+                variant="yellow"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Экспорт в Excel
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
