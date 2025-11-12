@@ -581,15 +581,15 @@ const ScriptsPage = () => {
     if (category.name.toLowerCase().includes('linux')) {
       return (
         <div>
-          <p className="font-semibold">Linux скрипт-обработчик</p>
-          <p>Используйте bash/shell скрипты</p>
+          <p className="font-semibold">Скрипт-обработчик для Linux-систем</p>
+          <p>Используйте bash</p>
           <p><strong>Доступные переменные:</strong></p>
           <ul className="list-disc list-inside text-xs mt-1">
             <li><code>$CHECK_OUTPUT</code> - вывод команды</li>
             <li><code>$ETALON_INPUT</code> - эталонные данные</li>
           </ul>
           <p className="text-xs mt-2">Примеры: grep, awk, sed, if-else</p>
-          <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
+          <p className="text-xs mt-2">Для корректной обработки результатов, скрипт должен вернуть одно из следующих значений:</p>
           <p className="text-xs mt-2"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
         </div>
       );
@@ -598,15 +598,15 @@ const ScriptsPage = () => {
     if (category.name.toLowerCase().includes('windows')) {
       return (
         <div>
-          <p className="font-semibold">Windows скрипт-обработчик</p>
-          <p>Используйте bash/shell скрипты</p>
+          <p className="font-semibold">Скрипт-обработчик для Windows-систем</p>
+          <p>Используйте bash</p>
           <p><strong>Доступные переменные:</strong></p>
           <ul className="list-disc list-inside text-xs mt-1">
             <li><code>$CHECK_OUTPUT</code> - вывод команды</li>
             <li><code>$ETALON_INPUT</code> - эталонные данные</li>
           </ul>
-          <p className="text-xs mt-2">Примеры: Where-Object, Select-String, if-else</p>
-          <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
+          <p className="text-xs mt-2">Примеры: grep, awk, sed, if-else</p>
+          <p className="text-xs mt-2">Для корректной обработки результатов, скрипт должен вернуть одно из следующих значений:</p>
           <p className="text-xs mt-2"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
         </div>
       );
