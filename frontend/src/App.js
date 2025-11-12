@@ -1494,6 +1494,7 @@ function App() {
                     <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />
                     <Route path="/history" element={<HistoryPage />} />
                     <Route path="/admin" element={<AdminPage />} />
+                    <Route path="/users" element={<UsersPage />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>
