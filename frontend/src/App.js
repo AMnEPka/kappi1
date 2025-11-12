@@ -1322,6 +1322,8 @@ const HistoryPage = () => {
 // Main Layout
 const Layout = ({ children }) => {
   const location = useLocation();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   
   const isActive = (path) => {
     if (path === '/hosts') return location.pathname === '/hosts';
@@ -1333,6 +1335,11 @@ const Layout = ({ children }) => {
     return isActive(path) 
       ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700" 
       : "hover:bg-gray-100";
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
   
   return (
