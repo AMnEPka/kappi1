@@ -89,11 +89,8 @@ export const AuthProvider = ({ children }) => {
 
       const { access_token, user: userData } = response.data;
       
-      // Save token
+      // Save token (interceptor will automatically add it to requests)
       localStorage.setItem('token', access_token);
-      
-      // Set axios default header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
       // Set user data
       setUser(userData);
