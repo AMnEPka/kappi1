@@ -1662,31 +1662,59 @@ async def delete_script(script_id: str):
 
 # API Routes - Projects
 @api_router.post("/projects", response_model=Project)
-async def create_project(project_input: ProjectCreate):
-    """Create new project"""
-    project_obj = Project(**project_input.model_dump())
+async def create_project(project_input: ProjectCreate, current_user: User = Depends(get_current_user)):
+    """Create new project (requires projects_create permission)"""
+    await require_permission(current_user, 'projects_create')
+    
+    project_obj = Project(**project_input.model_dump(), created_by=current_user.id)
     doc = prepare_for_mongo(project_obj.model_dump())
     
     await db.projects.insert_one(doc)
     return project_obj
 
 @api_router.get("/projects", response_model=List[Project])
-async def get_projects():
-    """Get all projects"""
-    projects = await db.projects.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+async def get_projects(current_user: User = Depends(get_current_user)):
+    """Get all accessible projects"""
+    if current_user.is_admin or await has_permission(current_user, 'results_view_all'):
+        # Admin or curator sees all projects
+        projects = await db.projects.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    else:
+        # Get projects created by user
+        my_projects = await db.projects.find({"created_by": current_user.id}, {"_id": 0}).to_list(1000)
+        
+        # Get projects with explicit access
+        access_records = await db.project_access.find({"user_id": current_user.id}).to_list(1000)
+        project_ids = [rec['project_id'] for rec in access_records]
+        accessible_projects = await db.projects.find({"id": {"$in": project_ids}}, {"_id": 0}).to_list(1000) if project_ids else []
+        
+        # Combine and deduplicate
+        all_projects = {p['id']: p for p in my_projects + accessible_projects}
+        projects = list(all_projects.values())
+        projects.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    
     return [Project(**parse_from_mongo(proj)) for proj in projects]
 
 @api_router.get("/projects/{project_id}", response_model=Project)
-async def get_project(project_id: str):
+async def get_project(project_id: str, current_user: User = Depends(get_current_user)):
     """Get project by ID"""
+    if not await can_access_project(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    
     project = await db.projects.find_one({"id": project_id}, {"_id": 0})
     if not project:
         raise HTTPException(status_code=404, detail="Проект не найден")
     return Project(**parse_from_mongo(project))
 
 @api_router.put("/projects/{project_id}", response_model=Project)
-async def update_project(project_id: str, project_update: ProjectUpdate):
-    """Update project"""
+async def update_project(project_id: str, project_update: ProjectUpdate, current_user: User = Depends(get_current_user)):
+    """Update project (only creator or admin)"""
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    if project.get('created_by') != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only project creator or admin can update")
+    
     update_data = project_update.model_dump(exclude_unset=True)
     
     if not update_data:
@@ -1697,25 +1725,30 @@ async def update_project(project_id: str, project_update: ProjectUpdate):
         {"$set": update_data}
     )
     
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Проект не найден")
-    
     updated_project = await db.projects.find_one({"id": project_id}, {"_id": 0})
     return Project(**parse_from_mongo(updated_project))
 
 @api_router.delete("/projects/{project_id}")
-async def delete_project(project_id: str):
-    """Delete project"""
+async def delete_project(project_id: str, current_user: User = Depends(get_current_user)):
+    """Delete project (only creator or admin)"""
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    if project.get('created_by') != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only project creator or admin can delete")
+    
     # Delete associated tasks
     await db.project_tasks.delete_many({"project_id": project_id})
+    
+    # Delete project access records
+    await db.project_access.delete_many({"project_id": project_id})
     
     # Delete associated executions
     await db.executions.delete_many({"project_id": project_id})
     
     # Delete project
     result = await db.projects.delete_one({"id": project_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Проект не найден")
     return {"message": "Проект удален"}
 
 
