@@ -2217,8 +2217,13 @@ async def get_project_sessions(project_id: str):
 
 # Get executions for specific session
 @api_router.get("/projects/{project_id}/sessions/{session_id}/executions", response_model=List[Execution])
-async def get_session_executions(project_id: str, session_id: str):
-    """Get all executions for a specific session"""
+async def get_session_executions(project_id: str, session_id: str, current_user: User = Depends(get_current_user)):
+    """Get all executions for a specific session (requires results_view_all or project access)"""
+    # Check if user can view all results or has access to project
+    if not await has_permission(current_user, 'results_view_all'):
+        if not await can_access_project(current_user, project_id):
+            raise HTTPException(status_code=403, detail="Access denied to this project")
+    
     executions = await db.executions.find(
         {"project_id": project_id, "execution_session_id": session_id},
         {"_id": 0}
@@ -2229,7 +2234,7 @@ async def get_session_executions(project_id: str, session_id: str):
 
 # API Routes - Execution (Legacy single-script execution)
 @api_router.post("/execute")
-async def execute_script(execute_req: ExecuteRequest):
+async def execute_script(execute_req: ExecuteRequest, current_user: User = Depends(get_current_user)):
     """Execute script on selected hosts (legacy endpoint)"""
     # Get script
     script_doc = await db.scripts.find_one({"id": execute_req.script_id}, {"_id": 0})
