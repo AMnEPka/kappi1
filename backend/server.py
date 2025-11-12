@@ -311,34 +311,24 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         import subprocess
         import os
         
-        # Determine which shell to use based on script type
-        # We'll detect by checking if script contains PowerShell syntax
-        is_powershell = '$env:' in processor_script or 'Write-Output' in processor_script or 'Write-Host' in processor_script
-        
         # Set environment variables for the local process
         env = os.environ.copy()
         env['CHECK_OUTPUT'] = main_result.output
         env['ETALON_INPUT'] = reference_data or ''
         
-        # Execute processor script locally
-        if is_powershell:
-            # Execute PowerShell script locally
-            result = subprocess.run(
-                ['pwsh', '-Command', processor_script],
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-        else:
-            # Execute Bash script locally
-            result = subprocess.run(
-                ['bash', '-c', processor_script],
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+        print(f"[DEBUG] Executing processor script locally, output size: {len(main_result.output)} bytes")
+        
+        # Execute processor script locally using bash
+        # User should write processor scripts in bash regardless of target OS
+        result = subprocess.run(
+            ['bash', '-c', processor_script],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        print(f"[DEBUG] Local processor execution completed, return code: {result.returncode}")
         
         # Create processor result from local execution
         processor_result = type('obj', (object,), {
