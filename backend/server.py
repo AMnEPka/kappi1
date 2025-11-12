@@ -308,6 +308,7 @@ class Execution(BaseModel):
     error: Optional[str] = None
     check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    executed_by: Optional[str] = None
 
 class ExecuteProjectRequest(BaseModel):
     """Request to execute a project"""
