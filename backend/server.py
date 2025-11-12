@@ -212,6 +212,7 @@ class Script(BaseModel):
     success_criteria: Optional[str] = None  # Критерий успешного прохождения испытания
     order: int = 0  # Порядок отображения
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
 
 class ScriptCreate(BaseModel):
     system_id: str
