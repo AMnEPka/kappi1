@@ -736,7 +736,6 @@ const ScriptsPage = () => {
                       required
                     />                    
                   </div>
-
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="has_reference_files"
@@ -763,7 +762,7 @@ const ScriptsPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
-                  
+
                 </div>
 
                 {/* Правый столбец */}
