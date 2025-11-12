@@ -302,105 +302,50 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             error=main_result.error
         )
     
-    # Step 2: Run processor script with main command output as input
+    # Step 2: Run processor script LOCALLY with main command output as input
     try:
         loop = asyncio.get_event_loop()
         
-        # Use here-documents to pass data without command line length issues
-        import uuid
+        # Execute processor script LOCALLY on our server
+        # This avoids command line length limits and doesn't require write permissions on remote hosts
+        import subprocess
+        import os
         
-        # Generate unique temp file names
-        temp_id = str(uuid.uuid4())[:8]
+        # Determine which shell to use based on script type
+        # We'll detect by checking if script contains PowerShell syntax
+        is_powershell = '$env:' in processor_script or 'Write-Output' in processor_script or 'Write-Host' in processor_script
         
-        if host.connection_type == "winrm":
-            # Windows: Use here-strings and temp files for large data
-            temp_output = f"$env:TEMP\\check_output_{temp_id}.txt"
-            temp_reference = f"$env:TEMP\\check_reference_{temp_id}.txt"
-            temp_script = f"$env:TEMP\\check_script_{temp_id}.ps1"
-            
-            # Escape PowerShell special characters
-            def escape_powershell(s):
-                # Escape backticks and dollar signs
-                return s.replace('`', '``').replace('$', '`$')
-            
-            escaped_output = escape_powershell(main_result.output)
-            escaped_reference = escape_powershell(reference_data or '')
-            escaped_processor = escape_powershell(processor_script)
-            
-            # Use here-strings (@" ... "@) to write data to files
-            processor_cmd = f"""
-$ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-
-try {{
-    # Write data to temp files using here-strings
-    @"
-{escaped_output}
-"@ | Out-File -FilePath {temp_output} -Encoding UTF8
-    
-    @"
-{escaped_reference}
-"@ | Out-File -FilePath {temp_reference} -Encoding UTF8
-    
-    @"
-{escaped_processor}
-"@ | Out-File -FilePath {temp_script} -Encoding UTF8
-    
-    # Set environment variables by reading from files
-    $env:CHECK_OUTPUT = Get-Content -Path {temp_output} -Raw -Encoding UTF8
-    $env:ETALON_INPUT = Get-Content -Path {temp_reference} -Raw -Encoding UTF8
-    
-    # Execute processor script
-    & {temp_script}
-}} finally {{
-    # Cleanup temp files
-    Remove-Item -Path {temp_output} -ErrorAction SilentlyContinue
-    Remove-Item -Path {temp_reference} -ErrorAction SilentlyContinue
-    Remove-Item -Path {temp_script} -ErrorAction SilentlyContinue
-}}
-"""
-            print(f"[DEBUG] PowerShell command length: {len(processor_cmd)} chars")
+        # Set environment variables for the local process
+        env = os.environ.copy()
+        env['CHECK_OUTPUT'] = main_result.output
+        env['ETALON_INPUT'] = reference_data or ''
+        
+        # Execute processor script locally
+        if is_powershell:
+            # Execute PowerShell script locally
+            result = subprocess.run(
+                ['pwsh', '-Command', processor_script],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
         else:
-            # Linux: Use here-documents for clean data passing
-            temp_output = f"/tmp/check_output_{temp_id}.txt"
-            temp_reference = f"/tmp/check_reference_{temp_id}.txt"
-            temp_script = f"/tmp/check_script_{temp_id}.sh"
-            
-            # For bash, here-documents with 'EOF' delimiter are safe
-            # No need to escape anything inside heredoc
-            processor_cmd = f"""
-set -e
-
-# Write data to temp files using here-documents
-cat > {temp_output} << 'EOF_OUTPUT'
-{main_result.output}
-EOF_OUTPUT
-
-cat > {temp_reference} << 'EOF_REFERENCE'
-{reference_data or ''}
-EOF_REFERENCE
-
-cat > {temp_script} << 'EOF_SCRIPT'
-{processor_script}
-EOF_SCRIPT
-
-# Set environment variables
-export CHECK_OUTPUT=$(cat {temp_output})
-export ETALON_INPUT=$(cat {temp_reference})
-
-# Execute processor script
-bash {temp_script}
-
-# Cleanup
-rm -f {temp_output} {temp_reference} {temp_script}
-"""
-            print(f"[DEBUG] Bash command length: {len(processor_cmd)} chars")
+            # Execute Bash script locally
+            result = subprocess.run(
+                ['bash', '-c', processor_script],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
         
-        # Execute processor script using appropriate connection method
-        if host.connection_type == "winrm":
-            processor_result = await loop.run_in_executor(None, _winrm_connect_and_execute, host, processor_cmd)
-        else:
-            processor_result = await loop.run_in_executor(None, _ssh_connect_and_execute, host, processor_cmd)
+        # Create processor result from local execution
+        processor_result = type('obj', (object,), {
+            'output': result.stdout,
+            'error': result.stderr if result.returncode != 0 else None,
+            'success': result.returncode == 0
+        })()
         
         # Parse processor output to determine check result
         output = processor_result.output.strip()
