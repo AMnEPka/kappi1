@@ -544,14 +544,15 @@ const ScriptsPage = () => {
     }
 
     if (category.name.toLowerCase().includes('windows')) {
-      return `# PowerShell скрипт
-  # Результат команды доступен в переменной $env:CHECK_OUTPUT
-  # Эталонные данные доступны в переменной $env:ETALON_INPUT
-  if ($env:CHECK_OUTPUT -match "нужная строка") {
-    Write-Output "Пройдена"
-  } else {
-    Write-Output "Не пройдена"
-  }`;
+      return `#!/bin/bash
+  # Скрипт-обработчик даже для Windows пишем на BASH
+  # Результат команды доступен в переменной $CHECK_OUTPUT
+  # Эталонные данные доступны в переменной $env:ETALON_INPUT  
+  if echo "$CHECK_OUTPUT" | grep -q "нужная строка"; then
+    echo "Пройдена"
+  else
+    echo "Не пройдена"
+  fi`;
     }
 
     // Общий пример для других категорий
@@ -598,11 +599,11 @@ const ScriptsPage = () => {
       return (
         <div>
           <p className="font-semibold">Windows скрипт-обработчик</p>
-          <p>Используйте PowerShell или Batch скрипты</p>
+          <p>Используйте bash/shell скрипты</p>
           <p><strong>Доступные переменные:</strong></p>
           <ul className="list-disc list-inside text-xs mt-1">
-            <li><code>$env:CHECK_OUTPUT</code> - вывод команды</li>
-            <li><code>$env:ETALON_INPUT</code> - эталонные данные</li>
+            <li><code>$CHECK_OUTPUT</code> - вывод команды</li>
+            <li><code>$ETALON_INPUT</code> - эталонные данные</li>
           </ul>
           <p className="text-xs mt-2">Примеры: Where-Object, Select-String, if-else</p>
           <p className="text-xs mt-2">Для корректной обработки данных, скрипт должен вернуть одно из следюущих значений:</p>
