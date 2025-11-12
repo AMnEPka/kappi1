@@ -306,34 +306,45 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
     try:
         loop = asyncio.get_event_loop()
         
-        # Use temporary files approach to avoid command line length limits
-        import base64
+        # Use here-documents to pass data without command line length issues
         import uuid
         
         # Generate unique temp file names
         temp_id = str(uuid.uuid4())[:8]
         
         if host.connection_type == "winrm":
-            # Windows: Use temp files in %TEMP%
+            # Windows: Use here-strings and temp files for large data
             temp_output = f"$env:TEMP\\check_output_{temp_id}.txt"
             temp_reference = f"$env:TEMP\\check_reference_{temp_id}.txt"
             temp_script = f"$env:TEMP\\check_script_{temp_id}.ps1"
             
-            # Encode data as base64
-            encoded_output = base64.b64encode(main_result.output.encode('utf-8')).decode('ascii')
-            encoded_reference = base64.b64encode((reference_data or '').encode('utf-8')).decode('ascii')
-            encoded_processor = base64.b64encode(processor_script.encode('utf-8')).decode('ascii')
+            # Escape PowerShell special characters
+            def escape_powershell(s):
+                # Escape backticks and dollar signs
+                return s.replace('`', '``').replace('$', '`$')
             
-            # Create command that writes to temp files and executes
+            escaped_output = escape_powershell(main_result.output)
+            escaped_reference = escape_powershell(reference_data or '')
+            escaped_processor = escape_powershell(processor_script)
+            
+            # Use here-strings (@" ... "@) to write data to files
             processor_cmd = f"""
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 try {{
-    # Decode and write to temp files
-    [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_output}')) | Out-File -FilePath {temp_output} -Encoding UTF8
-    [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_reference}')) | Out-File -FilePath {temp_reference} -Encoding UTF8
-    [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_processor}')) | Out-File -FilePath {temp_script} -Encoding UTF8
+    # Write data to temp files using here-strings
+    @"
+{escaped_output}
+"@ | Out-File -FilePath {temp_output} -Encoding UTF8
+    
+    @"
+{escaped_reference}
+"@ | Out-File -FilePath {temp_reference} -Encoding UTF8
+    
+    @"
+{escaped_processor}
+"@ | Out-File -FilePath {temp_script} -Encoding UTF8
     
     # Set environment variables by reading from files
     $env:CHECK_OUTPUT = Get-Content -Path {temp_output} -Raw -Encoding UTF8
@@ -348,35 +359,29 @@ try {{
     Remove-Item -Path {temp_script} -ErrorAction SilentlyContinue
 }}
 """
-            print(f"[DEBUG] PowerShell processor command length: {len(processor_cmd)} chars (using temp files)")
+            print(f"[DEBUG] PowerShell command length: {len(processor_cmd)} chars")
         else:
-            # Linux: Use temp files in /tmp
+            # Linux: Use here-documents for clean data passing
             temp_output = f"/tmp/check_output_{temp_id}.txt"
             temp_reference = f"/tmp/check_reference_{temp_id}.txt"
             temp_script = f"/tmp/check_script_{temp_id}.sh"
             
-            # Escape single quotes in data for bash
-            def escape_bash(s):
-                return s.replace("'", "'\"'\"'")
-            
-            escaped_output = escape_bash(main_result.output)
-            escaped_reference = escape_bash(reference_data or '')
-            escaped_processor = escape_bash(processor_script)
-            
-            # Create command that writes to temp files and executes
+            # For bash, here-documents with 'EOF' delimiter are safe
+            # No need to escape anything inside heredoc
             processor_cmd = f"""
 set -e
-# Write to temp files
+
+# Write data to temp files using here-documents
 cat > {temp_output} << 'EOF_OUTPUT'
-{escaped_output}
+{main_result.output}
 EOF_OUTPUT
 
 cat > {temp_reference} << 'EOF_REFERENCE'
-{escaped_reference}
+{reference_data or ''}
 EOF_REFERENCE
 
 cat > {temp_script} << 'EOF_SCRIPT'
-{escaped_processor}
+{processor_script}
 EOF_SCRIPT
 
 # Set environment variables
@@ -389,7 +394,7 @@ bash {temp_script}
 # Cleanup
 rm -f {temp_output} {temp_reference} {temp_script}
 """
-            print(f"[DEBUG] Bash processor command length: {len(processor_cmd)} chars (using temp files)")
+            print(f"[DEBUG] Bash command length: {len(processor_cmd)} chars")
         
         # Execute processor script using appropriate connection method
         if host.connection_type == "winrm":
