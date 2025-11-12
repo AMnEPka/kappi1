@@ -52,10 +52,17 @@ const HostsPage = () => {
   }, []);
 
   const fetchHosts = async () => {
+    // Check if token exists before making request
+    const token = localStorage.getItem('token');
+    if (!token) {
+      return; // Don't fetch if not authenticated
+    }
+    
     try {
       const response = await axios.get(`${API}/hosts`);
       setHosts(response.data);
     } catch (error) {
+      console.error('Error fetching hosts:', error);
       toast.error("Ошибка загрузки хостов");
     }
   };
