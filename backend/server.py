@@ -315,6 +315,89 @@ class ExecuteRequest(BaseModel):
     host_ids: List[str]
 
 
+# Auth Models
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    username: str
+    full_name: str
+    password_hash: str
+    is_active: bool = True
+    is_admin: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
+
+class UserCreate(BaseModel):
+    username: str
+    full_name: str
+    password: str
+    is_admin: bool = False
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_admin: Optional[bool] = None
+
+class UserResponse(BaseModel):
+    """User response without password hash"""
+    id: str
+    username: str
+    full_name: str
+    is_active: bool
+    is_admin: bool
+    created_at: datetime
+    created_by: Optional[str] = None
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+class Role(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    permissions: List[str]
+    description: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
+
+class RoleCreate(BaseModel):
+    name: str
+    permissions: List[str]
+    description: Optional[str] = None
+
+class RoleUpdate(BaseModel):
+    name: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    description: Optional[str] = None
+
+class UserRole(BaseModel):
+    """Many-to-many relationship between users and roles"""
+    model_config = ConfigDict(extra="ignore")
+    
+    user_id: str
+    role_id: str
+
+class ProjectAccess(BaseModel):
+    """Access control for projects"""
+    model_config = ConfigDict(extra="ignore")
+    
+    project_id: str
+    user_id: str
+    granted_by: str
+    granted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PasswordResetRequest(BaseModel):
+    new_password: str
+
+
 # SSH Execution Function
 async def execute_command(host: Host, command: str) -> ExecutionResult:
     """Execute command on host via appropriate connection method (SSH or WinRM)"""
