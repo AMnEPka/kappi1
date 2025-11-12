@@ -1573,8 +1573,8 @@ async def create_script(system_id: str, script_input: ScriptCreate, current_user
     return script_obj
 
 @api_router.get("/scripts")
-async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str] = None):
-    """Get all scripts with filtering options"""
+async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    """Get all scripts with filtering options (filtered by permissions)"""
     query = {}
     
     if system_id:
@@ -1584,6 +1584,11 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
         systems = await db.systems.find({"category_id": category_id}, {"_id": 0}).to_list(1000)
         system_ids = [sys["id"] for sys in systems]
         query["system_id"] = {"$in": system_ids}
+    
+    # Filter by permissions
+    if not await has_permission(current_user, 'checks_edit_all'):
+        # Show only own scripts
+        query["created_by"] = current_user.id
     
     scripts = await db.scripts.find(query, {"_id": 0}).sort("order", 1).to_list(1000)
     
