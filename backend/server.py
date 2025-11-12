@@ -1595,7 +1595,11 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
         query["system_id"] = {"$in": system_ids}
     
     # Filter by permissions
-    if not await has_permission(current_user, 'checks_edit_all'):
+    # If user can edit all scripts OR can work with projects, show all scripts
+    if not (await has_permission(current_user, 'checks_edit_all') or 
+            await has_permission(current_user, 'projects_create') or 
+            await has_permission(current_user, 'projects_execute') or
+            await has_permission(current_user, 'results_view_all')):
         # Show only own scripts
         query["created_by"] = current_user.id
     
