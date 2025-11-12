@@ -315,38 +315,38 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         # Create processor command based on connection type
         if host.connection_type == "winrm":
             # PowerShell command for Windows with UTF-8 output encoding
-            # Use compressed/split approach to avoid command line length limits
-            # Split large base64 strings into chunks and reassemble
-            chunk_size = 4000  # Safe chunk size for Windows command line
+            # Split base64 strings into chunks to avoid command line length limits (8191 chars)
+            chunk_size = 3000  # Safe chunk size for Windows command line
             
-            # For very large data, we'll use a different approach with temp files
-            if len(encoded_output) > 8000 or len(encoded_processor) > 8000 or len(encoded_reference) > 8000:
-                # Use stdin to pass data instead of command line
-                processor_cmd = f"""
+            def split_base64(data: str, size: int) -> list:
+                """Split base64 string into chunks"""
+                return [data[i:i+size] for i in range(0, len(data), size)]
+            
+            # Split large base64 strings
+            output_chunks = split_base64(encoded_output, chunk_size)
+            reference_chunks = split_base64(encoded_reference, chunk_size)
+            processor_chunks = split_base64(encoded_processor, chunk_size)
+            
+            # Build reassembly commands
+            output_parts = " + ".join([f"'{chunk}'" for chunk in output_chunks])
+            reference_parts = " + ".join([f"'{chunk}'" for chunk in reference_chunks])
+            processor_parts = " + ".join([f"'{chunk}'" for chunk in processor_chunks])
+            
+            processor_cmd = f"""
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-# Read base64 data from command (passed via run_ps)
-$b64Output = '{encoded_output}'
-$b64Reference = '{encoded_reference}'
-$b64Script = '{encoded_processor}'
+# Reassemble base64 strings from chunks
+$b64Output = {output_parts}
+$b64Reference = {reference_parts}
+$b64Script = {processor_parts}
 
-# Decode
+# Decode from base64
 $env:CHECK_OUTPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Output))
 $env:ETALON_INPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Reference))
 $script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Script))
 
-# Execute
-Invoke-Expression $script
-"""
-            else:
-                # Small data - use direct approach
-                processor_cmd = f"""
-$ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$env:CHECK_OUTPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_output}'))
-$env:ETALON_INPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_reference}'))
-$script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_processor}'))
+# Execute processor script
 Invoke-Expression $script
 """
         else:
