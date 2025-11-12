@@ -306,59 +306,90 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
     try:
         loop = asyncio.get_event_loop()
         
-        # Encode output, processor script, and reference data as base64 to safely pass any characters
+        # Use temporary files approach to avoid command line length limits
         import base64
-        encoded_output = base64.b64encode(main_result.output.encode('utf-8')).decode('ascii')
-        encoded_processor = base64.b64encode(processor_script.encode('utf-8')).decode('ascii')
-        encoded_reference = base64.b64encode((reference_data or '').encode('utf-8')).decode('ascii')
+        import uuid
         
-        # Create processor command based on connection type
+        # Generate unique temp file names
+        temp_id = str(uuid.uuid4())[:8]
+        
         if host.connection_type == "winrm":
-            # PowerShell command for Windows with UTF-8 output encoding
-            # Split base64 strings into chunks to avoid command line length limits (8191 chars)
-            chunk_size = 3000  # Safe chunk size for Windows command line
+            # Windows: Use temp files in %TEMP%
+            temp_output = f"$env:TEMP\\check_output_{temp_id}.txt"
+            temp_reference = f"$env:TEMP\\check_reference_{temp_id}.txt"
+            temp_script = f"$env:TEMP\\check_script_{temp_id}.ps1"
             
-            def split_base64(data: str, size: int) -> list:
-                """Split base64 string into chunks"""
-                return [data[i:i+size] for i in range(0, len(data), size)]
+            # Encode data as base64
+            encoded_output = base64.b64encode(main_result.output.encode('utf-8')).decode('ascii')
+            encoded_reference = base64.b64encode((reference_data or '').encode('utf-8')).decode('ascii')
+            encoded_processor = base64.b64encode(processor_script.encode('utf-8')).decode('ascii')
             
-            # Split large base64 strings
-            output_chunks = split_base64(encoded_output, chunk_size)
-            reference_chunks = split_base64(encoded_reference, chunk_size)
-            processor_chunks = split_base64(encoded_processor, chunk_size)
-            
-            # Build reassembly commands
-            output_parts = " + ".join([f"'{chunk}'" for chunk in output_chunks])
-            reference_parts = " + ".join([f"'{chunk}'" for chunk in reference_chunks])
-            processor_parts = " + ".join([f"'{chunk}'" for chunk in processor_chunks])
-            
+            # Create command that writes to temp files and executes
             processor_cmd = f"""
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-# Reassemble base64 strings from chunks
-$b64Output = {output_parts}
-$b64Reference = {reference_parts}
-$b64Script = {processor_parts}
+try {{
+    # Decode and write to temp files
+    [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_output}')) | Out-File -FilePath {temp_output} -Encoding UTF8
+    [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_reference}')) | Out-File -FilePath {temp_reference} -Encoding UTF8
+    [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded_processor}')) | Out-File -FilePath {temp_script} -Encoding UTF8
+    
+    # Set environment variables by reading from files
+    $env:CHECK_OUTPUT = Get-Content -Path {temp_output} -Raw -Encoding UTF8
+    $env:ETALON_INPUT = Get-Content -Path {temp_reference} -Raw -Encoding UTF8
+    
+    # Execute processor script
+    & {temp_script}
+}} finally {{
+    # Cleanup temp files
+    Remove-Item -Path {temp_output} -ErrorAction SilentlyContinue
+    Remove-Item -Path {temp_reference} -ErrorAction SilentlyContinue
+    Remove-Item -Path {temp_script} -ErrorAction SilentlyContinue
+}}
+"""
+            print(f"[DEBUG] PowerShell processor command length: {len(processor_cmd)} chars (using temp files)")
+        else:
+            # Linux: Use temp files in /tmp
+            temp_output = f"/tmp/check_output_{temp_id}.txt"
+            temp_reference = f"/tmp/check_reference_{temp_id}.txt"
+            temp_script = f"/tmp/check_script_{temp_id}.sh"
+            
+            # Escape single quotes in data for bash
+            def escape_bash(s):
+                return s.replace("'", "'\"'\"'")
+            
+            escaped_output = escape_bash(main_result.output)
+            escaped_reference = escape_bash(reference_data or '')
+            escaped_processor = escape_bash(processor_script)
+            
+            # Create command that writes to temp files and executes
+            processor_cmd = f"""
+set -e
+# Write to temp files
+cat > {temp_output} << 'EOF_OUTPUT'
+{escaped_output}
+EOF_OUTPUT
 
-# Decode from base64
-$env:CHECK_OUTPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Output))
-$env:ETALON_INPUT = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Reference))
-$script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Script))
+cat > {temp_reference} << 'EOF_REFERENCE'
+{escaped_reference}
+EOF_REFERENCE
+
+cat > {temp_script} << 'EOF_SCRIPT'
+{escaped_processor}
+EOF_SCRIPT
+
+# Set environment variables
+export CHECK_OUTPUT=$(cat {temp_output})
+export ETALON_INPUT=$(cat {temp_reference})
 
 # Execute processor script
-Invoke-Expression $script
+bash {temp_script}
+
+# Cleanup
+rm -f {temp_output} {temp_reference} {temp_script}
 """
-            # Debug: log command length
-            print(f"[DEBUG] PowerShell processor command length: {len(processor_cmd)} chars")
-            print(f"[DEBUG] Output chunks: {len(output_chunks)}, Reference chunks: {len(reference_chunks)}, Processor chunks: {len(processor_chunks)}")
-        else:
-            # Bash command for Linux
-            processor_cmd = f"""
-export CHECK_OUTPUT=$(echo '{encoded_output}' | base64 -d)
-export ETALON_INPUT=$(echo '{encoded_reference}' | base64 -d)
-echo '{encoded_output}' | base64 -d | echo '{encoded_processor}' | base64 -d | bash
-"""
+            print(f"[DEBUG] Bash processor command length: {len(processor_cmd)} chars (using temp files)")
         
         # Execute processor script using appropriate connection method
         if host.connection_type == "winrm":
