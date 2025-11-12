@@ -128,14 +128,17 @@ export default function ProjectsPage({ onNavigate }) {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => onNavigate('project-execute', project.id)}
-                    className="flex-1"
-                  >
-                    <Play className="mr-1 h-3 w-3" />
-                    Запустить
-                  </Button>
+                  {canExecuteProjects && (
+                    <Button
+                      size="sm"
+                      onClick={() => onNavigate('project-execute', project.id)}
+                      className="flex-1"
+                      variant="yellow"
+                    >
+                      <Play className="mr-1 h-3 w-3" />
+                      Запустить
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -145,13 +148,15 @@ export default function ProjectsPage({ onNavigate }) {
                     <Eye className="mr-1 h-3 w-3" />
                     Результаты
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDeleteProject(project.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  {(isAdmin || project.created_by === null) && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteProject(project.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
