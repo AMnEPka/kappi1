@@ -1506,6 +1506,12 @@ async def get_systems(category_id: str, current_user: User = Depends(get_current
     systems = await db.systems.find({"category_id": category_id}, {"_id": 0}).to_list(1000)
     return [System(**parse_from_mongo(sys)) for sys in systems]
 
+@api_router.get("/systems", response_model=List[System])
+async def get_all_systems(current_user: User = Depends(get_current_user)):
+    """Get all systems"""
+    systems = await db.systems.find({}, {"_id": 0}).to_list(1000)
+    return [System(**parse_from_mongo(sys)) for sys in systems]
+
 @api_router.get("/systems/{system_id}", response_model=System)
 async def get_system(system_id: str, current_user: User = Depends(get_current_user)):
     """Get system by ID"""
