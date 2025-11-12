@@ -91,7 +91,6 @@ export const AuthProvider = ({ children }) => {
       
       // Save token (interceptor will automatically add it to requests)
       localStorage.setItem('token', access_token);
-      console.log('[AuthContext] Token saved to localStorage');
       
       // Set user data
       setUser(userData);
