@@ -17,9 +17,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const API_URL = process.env.REACT_APP_BACKEND_URL;
 
-  // Setup axios interceptor to always add token
+  // Setup axios interceptors
   useEffect(() => {
-    const interceptor = axios.interceptors.request.use(
+    // Request interceptor - add token to all requests
+    const requestInterceptor = axios.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem('token');
         if (token) {
@@ -32,9 +33,25 @@ export const AuthProvider = ({ children }) => {
       }
     );
 
-    // Cleanup interceptor on unmount
+    // Response interceptor - handle 401 errors (auto logout)
+    const responseInterceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          // Token expired or invalid - logout
+          localStorage.removeItem('token');
+          setUser(null);
+          setPermissions([]);
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Cleanup interceptors on unmount
     return () => {
-      axios.interceptors.request.eject(interceptor);
+      axios.interceptors.request.eject(requestInterceptor);
+      axios.interceptors.response.eject(responseInterceptor);
     };
   }, []);
 
