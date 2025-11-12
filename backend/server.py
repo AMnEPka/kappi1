@@ -1863,6 +1863,9 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
     
     async def event_generator():
         try:
+            # Store user_id for executions
+            user_id = current_user.id
+            
             # Get project
             project = await db.projects.find_one({"id": project_id}, {"_id": 0})
             if not project:
