@@ -39,8 +39,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center">
-            <span className="text-4xl">🛡️</span>
+          <div className="mx-auto mb-4 w-32 h-32 flex items-center justify-center">
+            <img
+              src="/logo.png" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <CardTitle className="text-2xl">Инструмент автоматизации ОСИБ</CardTitle>
           <CardDescription>Вход в систему</CardDescription>
@@ -76,6 +79,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
               />
             </div>
+            
 
             <Button 
               type="submit" 
