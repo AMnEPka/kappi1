@@ -823,8 +823,15 @@ def _winrm_connect_and_execute(host: Host, command: str) -> ExecutionResult:
             transport='ntlm'  # Use NTLM authentication
         )
         
+        # Wrap command to ensure UTF-8 output encoding
+        wrapped_command = f"""
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+{command}
+"""
+        
         # Execute command
-        result = session.run_ps(command)  # Run PowerShell command
+        result = session.run_ps(wrapped_command)  # Run PowerShell command
         
         # Decode output - PowerShell returns output in cp1251 (Windows-1251) for Russian locale
         # Try different encodings: cp1251, utf-8, utf-16
