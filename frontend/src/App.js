@@ -20,6 +20,7 @@ import ProjectWizard from "@/pages/ProjectWizard";
 import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
 import ProjectResultsPage from "@/pages/ProjectResultsPage";
 import LoginPage from "@/pages/LoginPage";
+import UsersPage from "@/pages/UsersPage";
 import { Menu, HelpCircle, EthernetPort, Loader2 } from 'lucide-react'; 
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
