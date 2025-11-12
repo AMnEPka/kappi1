@@ -1391,6 +1391,11 @@ const Layout = ({ children }) => {
                   <Settings className="mr-2 h-4 w-4" /> Админ-панель
                 </div>
               </Link>
+              <Link to="/users">
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                  <User className="mr-2 h-4 w-4" /> Пользователи
+                </div>
+              </Link>
             </div>
           </div>
 
