@@ -1952,7 +1952,8 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
                             success=False,
                             output="",
                             error=network_msg,
-                            check_status="Ошибка"
+                            check_status="Ошибка",
+                            executed_by=user_id
                         )
                         exec_doc = prepare_for_mongo(execution.model_dump())
                         await db.executions.insert_one(exec_doc)
@@ -1985,7 +1986,8 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
                                 success=False,
                                 output="",
                                 error=login_msg,
-                                check_status="Ошибка"
+                                check_status="Ошибка",
+                            executed_by=user_id
                             )
                             exec_doc = prepare_for_mongo(execution.model_dump())
                             await db.executions.insert_one(exec_doc)
@@ -2020,7 +2022,8 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
                                 success=False,
                                 output="",
                                 error=login_msg,
-                                check_status="Ошибка"
+                                check_status="Ошибка",
+                            executed_by=user_id
                             )
                             exec_doc = prepare_for_mongo(execution.model_dump())
                             await db.executions.insert_one(exec_doc)
@@ -2050,7 +2053,8 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
                             success=False,
                             output="",
                             error=sudo_msg,
-                            check_status="Ошибка"
+                            check_status="Ошибка",
+                            executed_by=user_id
                         )
                         exec_doc = prepare_for_mongo(execution.model_dump())
                         await db.executions.insert_one(exec_doc)
