@@ -525,7 +525,53 @@ export default function ProjectWizard({ onNavigate }) {
   const renderStep5 = () => (
     <Card>
       <CardHeader>
-        <CardTitle>Шаг 5: Подтверждение</CardTitle>
+        <CardTitle>Шаг 5: Управление доступом</CardTitle>
+        <CardDescription>Выберите пользователей, которые смогут выполнять этот проект</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            По умолчанию доступ к проекту есть у вас (создателя). Вы можете предоставить доступ другим пользователям.
+          </p>
+          
+          <div className="space-y-2">
+            {users.filter(u => u.is_active).map((user) => (
+              <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                <Checkbox
+                  id={`user-${user.id}`}
+                  checked={projectData.accessUserIds.includes(user.id)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setProjectData(prev => ({
+                        ...prev,
+                        accessUserIds: [...prev.accessUserIds, user.id]
+                      }));
+                    } else {
+                      setProjectData(prev => ({
+                        ...prev,
+                        accessUserIds: prev.accessUserIds.filter(id => id !== user.id)
+                      }));
+                    }
+                  }}
+                />
+                <div className="flex-1">
+                  <Label htmlFor={`user-${user.id}`} className="cursor-pointer font-medium">
+                    {user.full_name}
+                  </Label>
+                  <p className="text-sm text-gray-500">@{user.username}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderStep6 = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Шаг 6: Подтверждение</CardTitle>
         <CardDescription>Проверьте настройки проекта перед созданием</CardDescription>
       </CardHeader>
       <CardContent>
