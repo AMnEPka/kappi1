@@ -240,6 +240,88 @@ export default function ProjectsPage({ onNavigate }) {
           ))}
         </div>
       )}
+
+      {/* Access Management Dialog */}
+      <Dialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Управление доступом к проекту</DialogTitle>
+            <DialogDescription>
+              {selectedProject?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingAccess ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="text-gray-500">Загрузка...</div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Current users with access */}
+              <div>
+                <h3 className="font-semibold mb-3 flex items-center">
+                  <Users className="mr-2 h-4 w-4" />
+                  Пользователи с доступом ({projectUsers.length})
+                </h3>
+                {projectUsers.length === 0 ? (
+                  <p className="text-sm text-gray-500">Нет пользователей с доступом</p>
+                ) : (
+                  <div className="space-y-2">
+                    {projectUsers.map((projectUser) => (
+                      <div key={projectUser.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{projectUser.full_name}</p>
+                          <p className="text-sm text-gray-500">@{projectUser.username}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRevokeAccess(projectUser.id)}
+                        >
+                          <UserMinus className="mr-1 h-3 w-3" />
+                          Отозвать
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Available users to grant access */}
+              <div>
+                <h3 className="font-semibold mb-3 flex items-center">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Предоставить доступ
+                </h3>
+                {allUsers.filter(u => !projectUsers.find(pu => pu.id === u.id)).length === 0 ? (
+                  <p className="text-sm text-gray-500">Все пользователи уже имеют доступ</p>
+                ) : (
+                  <div className="space-y-2">
+                    {allUsers
+                      .filter(u => !projectUsers.find(pu => pu.id === u.id))
+                      .map((availableUser) => (
+                        <div key={availableUser.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                          <div>
+                            <p className="font-medium">{availableUser.full_name}</p>
+                            <p className="text-sm text-gray-500">@{availableUser.username}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleGrantAccess(availableUser.id)}
+                          >
+                            <UserPlus className="mr-1 h-3 w-3" />
+                            Добавить
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
