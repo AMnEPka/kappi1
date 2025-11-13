@@ -22,7 +22,7 @@ import ProjectResultsPage from "@/pages/ProjectResultsPage";
 import LoginPage from "@/pages/LoginPage";
 import UsersPage from "@/pages/UsersPage";
 import RolesPage from "@/pages/RolesPage";
-import { Menu, HelpCircle, EthernetPort, Loader2 } from 'lucide-react'; 
+import { Menu, HelpCircle, EthernetPort, Loader2, Calendar, FileText } from 'lucide-react'; 
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -1391,6 +1391,7 @@ const Layout = ({ children }) => {
   
   return (
 <div className="min-h-screen bg-gray-50">
+  {/* Первая строка шапки */}
   <nav className="bg-white border-b border-gray-200 shadow-sm">
     <div className="container mx-auto px-4">
       <div className="flex items-center justify-between h-16">
@@ -1398,26 +1399,90 @@ const Layout = ({ children }) => {
           <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
           <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
         </Link>
-        <div className="flex gap-2 items-center">
-          <Link to="/">
-            <Button variant="ghost" data-testid="nav-projects" className={navLinkClass('/')}>
-              <Briefcase className="mr-2 h-4 w-4" /> Проекты
-            </Button>
-          </Link>
-          <Link to="/hosts">
-            <Button variant="ghost" data-testid="nav-hosts" className={navLinkClass('/hosts')}>
-              <Server className="mr-2 h-4 w-4" /> Хосты
-            </Button>
-          </Link>
-          <Link to="/scripts">
-            <Button variant="ghost" data-testid="nav-scripts" className={navLinkClass('/scripts')}>
-              <FileCode className="mr-2 h-4 w-4" /> Проверки
-            </Button>
-          </Link>
-          
-          {/* Выпадающее меню */}
+        
+        {/* Блок пользователя и выхода */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm">
+            <User className="h-4 w-4 text-gray-500" />
+            <span className="text-gray-700 font-medium">{user?.full_name}</span>
+            {user?.is_admin && (
+              <Badge className="bg-yellow-400 text-white text-xs border-0">Админ</Badge>
+            )}
+          </div>
+          <Button 
+            className="bg-yellow-400 hover:bg-white text-black"
+            size="sm"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4 mr-1" />
+            Выйти
+          </Button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  {/* Вторая строка шапки - навигация */}
+  <div className="w-full">
+    <div className="container mx-auto px-4">
+      <div className="bg-yellow-400 rounded-b-lg shadow-md"> {/* Желтый фон здесь */}
+        <div className="flex items-center justify-between h-12 px-4">
+          {/* Основные пункты меню слева */}
+          <div className="flex items-center gap-1">
+            <Link to="/">
+              <Button 
+                variant="ghost" 
+                data-testid="nav-projects" 
+                className="text-white hover:bg-white h-10 px-4 font-medium"
+              >
+                <Briefcase className="mr-2 h-4 w-4" /> Проекты
+              </Button>
+            </Link>
+            <Link to="/hosts">
+              <Button 
+                variant="ghost" 
+                data-testid="nav-hosts" 
+                className="text-white hover:bg-white h-10 px-4 font-medium"
+              >
+                <Server className="mr-2 h-4 w-4" /> Хосты
+              </Button>
+            </Link>
+            <Link to="/scripts">
+              <Button 
+                variant="ghost" 
+                data-testid="nav-scripts" 
+                className="text-white hover:bg-white h-10 px-4 font-medium"
+              >
+                <FileCode className="mr-2 h-4 w-4" /> Проверки
+              </Button>
+            </Link>
+            <Link to="/scheduler">
+              <Button 
+                variant="ghost" 
+                data-testid="nav-scheduler" 
+                className="text-white hover:bg-white h-10 px-4 font-medium"
+              >
+                <Calendar className="mr-2 h-4 w-4" /> Планировщик
+              </Button>
+            </Link>
+            <Link to="/logs">
+              <Button 
+                variant="ghost" 
+                data-testid="nav-logs" 
+                className="text-white hover:bg-white h-10 px-4 font-medium"
+              >
+                <FileText className="mr-2 h-4 w-4" /> Логи
+              </Button>
+            </Link>
+          </div>
+
+          {/* Выпадающее меню справа */}
           <div className="relative group">
-            <Button variant="ghost" size="icon">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="text-white hover:bg-white"
+            >
               <Menu className="h-5 w-5" />
             </Button>
             <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
@@ -1449,29 +1514,11 @@ const Layout = ({ children }) => {
               </Link>
             </div>
           </div>
-
-          {/* User info and logout */}
-          <div className="ml-4 flex items-center gap-2 border-l pl-4">
-            <div className="flex items-center gap-2 text-sm">
-              <User className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-700 font-medium">{user?.full_name}</span>
-              {user?.is_admin && (
-                <Badge variant="yellow" className="text-xs">Админ</Badge>
-              )}
-            </div>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={handleLogout}
-              title="Выйти"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
       </div>
     </div>
-  </nav>
+  </div>
+
   <main className="container mx-auto px-4 py-8">
     {children}
   </main>

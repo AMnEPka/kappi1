@@ -647,7 +647,7 @@ export default function ProjectWizard({ onNavigate }) {
             <div key={s} className="flex items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  s <= step ? 'bg-yellow-500 text-white' : 'bg-gray-300 text-gray-600'
+                  s <= step ? 'bg-yellow-400 text-white' : 'bg-gray-300 text-gray-600'
                 }`}
               >
                 {s < step ? <Check className="h-4 w-4" /> : s}
@@ -655,7 +655,7 @@ export default function ProjectWizard({ onNavigate }) {
               {s < 6 && (
                 <div
                   className={`w-16 h-1 ${
-                    s < step ? 'bg-yellow-500' : 'bg-gray-300'
+                    s < step ? 'bg-yellow-400' : 'bg-gray-300'
                   }`}
                 />
               )}
