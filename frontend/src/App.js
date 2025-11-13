@@ -1433,83 +1433,79 @@ const Layout = ({ children }) => {
               <Button 
                 variant="ghost" 
                 data-testid="nav-projects" 
-                className="text-white hover:bg-white h-10 px-4 font-medium"
+                className="text-white hover:bg-white h-12 px-4 font-medium"
               >
-                <Briefcase className="mr-2 h-4 w-4" /> Проекты
+                <Briefcase className="mr-3 h-5 w-5" /> Проекты
               </Button>
             </Link>
             <Link to="/hosts">
               <Button 
                 variant="ghost" 
                 data-testid="nav-hosts" 
-                className="text-white hover:bg-white h-10 px-4 font-medium"
+                className="text-white hover:bg-white h-12 px-4 font-medium"
               >
-                <Server className="mr-2 h-4 w-4" /> Хосты
+                <Server className="mr-3 h-5 w-5" /> Хосты
               </Button>
             </Link>
             <Link to="/scripts">
               <Button 
                 variant="ghost" 
                 data-testid="nav-scripts" 
-                className="text-white hover:bg-white h-10 px-4 font-medium"
+                className="text-white hover:bg-white h-12 px-4 font-medium"
               >
-                <FileCode className="mr-2 h-4 w-4" /> Проверки
+                <FileCode className="mr-3 h-5 w-5" /> Проверки
               </Button>
             </Link>
             <Link to="/scheduler">
               <Button 
                 variant="ghost" 
                 data-testid="nav-scheduler" 
-                className="text-white hover:bg-white h-10 px-4 font-medium"
+                className="text-white hover:bg-white h-12 px-4 font-medium"
               >
-                <Calendar className="mr-2 h-4 w-4" /> Планировщик
+                <Calendar className="mr-3 h-8 w-8" /> Планировщик
               </Button>
             </Link>
             <Link to="/logs">
               <Button 
                 variant="ghost" 
                 data-testid="nav-logs" 
-                className="text-white hover:bg-white h-10 px-4 font-medium"
+                className="text-white hover:bg-white h-12 px-4 py-3 font-medium"
               >
-                <FileText className="mr-2 h-4 w-4" /> Логи
+                <FileText className="mr-3 h-8 w-8" /> Логи
               </Button>
             </Link>
           </div>
 
           {/* Выпадающее меню справа */}
           <div className="relative group">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="text-white hover:bg-white"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+            <button className="flex items-center justify-center text-white hover:bg-white hover:text-black h-12 w-12 rounded-md transition-colors">
+              <Menu className="h-8 w-8" />
+            </button>
+            <div className="absolute right-0 top-full mt-1 w-56 bg-white border-2 border-gray-300 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
               <Link to="/execute">
-                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                  <Play className="mr-2 h-4 w-4" /> Единичный запуск
+                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
+                  <Play className="mr-3 h-5 w-5" /> Единичный запуск
                 </div>
               </Link>
               <Link to="/history">
-                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                  <History className="mr-2 h-4 w-4" /> История
+                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
+                  <History className="mr-3 h-5 w-5" /> История
                 </div>
               </Link>
-              <div className="border-t border-gray-100"></div>
+              <div className="border-t-2 border-gray-200 my-1"></div>
               <Link to="/admin">
-                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" /> Админ-панель
+                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
+                  <Settings className="mr-3 h-5 w-5" /> Админ-панель
                 </div>
               </Link>
               <Link to="/users">
-                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                  <User className="mr-2 h-4 w-4" /> Пользователи
+                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
+                  <User className="mr-3 h-5 w-5" /> Пользователи
                 </div>
               </Link>
               <Link to="/roles">
-                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                  <Shield className="mr-2 h-4 w-4" /> Роли
+                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
+                  <Shield className="mr-3 h-5 w-5" /> Роли
                 </div>
               </Link>
             </div>
