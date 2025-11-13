@@ -58,12 +58,18 @@ const SystemsPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.category_id) {
+      toast.error("Выберите категорию");
+      return;
+    }
+    
     try {
       if (editingSystem) {
         await axios.put(`${API}/systems/${editingSystem.id}`, formData);
         toast.success("Система обновлена");
       } else {
-        await axios.post(`${API}/systems`, formData);
+        await axios.post(`${API}/categories/${formData.category_id}/systems`, formData);
         toast.success("Система создана");
       }
       setIsDialogOpen(false);
