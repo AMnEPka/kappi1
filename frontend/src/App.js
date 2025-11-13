@@ -1508,6 +1508,7 @@ function App() {
                     <Route path="/history" element={<HistoryPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/users" element={<UsersPage />} />
+                    <Route path="/roles" element={<RolesPage />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>
