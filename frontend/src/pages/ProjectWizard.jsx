@@ -25,12 +25,14 @@ export default function ProjectWizard({ onNavigate }) {
     description: '',
     hosts: [],
     tasks: [], // { host_id, systems: [{ system_id, script_ids, reference_data: {script_id: text} }] }
+    accessUserIds: [], // List of user IDs who will have access to this project
   });
 
   const [hosts, setHosts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
   const [scripts, setScripts] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
