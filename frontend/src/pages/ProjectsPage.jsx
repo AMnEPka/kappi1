@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { PlusCircle, Play, Trash2, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Checkbox } from "../components/ui/checkbox";
+import { Label } from "../components/ui/label";
+import { PlusCircle, Play, Trash2, Eye, Users, UserPlus, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
