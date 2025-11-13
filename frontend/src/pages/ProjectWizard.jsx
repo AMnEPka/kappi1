@@ -185,7 +185,7 @@ export default function ProjectWizard({ onNavigate }) {
         )
       );
       if (!hasReferenceFiles) {
-        setStep(5); // Skip to confirmation
+        setStep(5); // Skip to access management
         return;
       }
     }
