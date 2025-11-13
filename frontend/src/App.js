@@ -985,12 +985,16 @@ const ScriptsPage = () => {
                 </td>
                 <td className="py-1 px-4">
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}>
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(script.id)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    {canEditScript(script) && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}>
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {canDeleteScript(script) && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(script.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 </td>
               </tr>
