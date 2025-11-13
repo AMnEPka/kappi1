@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Server, FileCode, Play, History, Plus, Edit, Trash2, Terminal, Settings, Folder, HardDrive, Briefcase, LogOut, User } from "lucide-react";
+import { Server, FileCode, Play, History, Plus, Edit, Trash2, Terminal, Settings, Folder, HardDrive, Briefcase, LogOut, User, Shield } from "lucide-react";
 import AdminPage from "@/pages/AdminPage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectWizard from "@/pages/ProjectWizard";
