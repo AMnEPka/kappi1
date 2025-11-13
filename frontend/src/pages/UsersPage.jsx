@@ -6,7 +6,7 @@ import { Label } from "../components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import { Checkbox } from "../components/ui/checkbox";
-import { PlusCircle, Edit, Trash2, Key, User, Shield } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Key, User, Shield, Lock } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -180,6 +180,7 @@ export default function UsersPage() {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-64">
+          <Lock className="h-12 w-12 text-gray-400 mb-4" />
           <p className="text-gray-500">У вас нет прав для управления пользователями</p>
         </CardContent>
       </Card>
