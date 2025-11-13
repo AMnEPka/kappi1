@@ -1331,7 +1331,7 @@ const HistoryPage = () => {
 // Main Layout
 const Layout = ({ children }) => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission, isAdmin } = useAuth();
   const navigate = useNavigate();
   
   const isActive = (path) => {
