@@ -41,16 +41,18 @@ export default function ProjectWizard({ onNavigate }) {
 
   const fetchData = async () => {
     try {
-      const [hostsRes, categoriesRes, systemsRes, scriptsRes] = await Promise.all([
+      const [hostsRes, categoriesRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
         axios.get(`${API_URL}/api/hosts`),
         axios.get(`${API_URL}/api/categories`),
         axios.get(`${API_URL}/api/systems`),
         axios.get(`${API_URL}/api/scripts`),
+        axios.get(`${API_URL}/api/users`),
       ]);
       setHosts(hostsRes.data);
       setCategories(categoriesRes.data);
       setSystems(systemsRes.data);
       setScripts(scriptsRes.data);
+      setUsers(usersRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error("Не удалось загрузить данные");
