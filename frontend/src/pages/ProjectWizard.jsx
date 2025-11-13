@@ -221,6 +221,16 @@ export default function ProjectWizard({ onNavigate }) {
         }
       }
 
+      // Grant access to selected users
+      for (const userId of projectData.accessUserIds) {
+        try {
+          await axios.post(`${API_URL}/api/projects/${projectId}/users/${userId}`);
+        } catch (error) {
+          console.error(`Failed to grant access to user ${userId}:`, error);
+          // Continue even if one fails
+        }
+      }
+
       toast.success("Проект создан");
 
       onNavigate('projects');
