@@ -1656,6 +1656,23 @@ async def get_script(script_id: str, current_user: User = Depends(get_current_us
     
     return Script(**parse_from_mongo(script))
 
+@api_router.post("/scripts", response_model=Script)
+async def create_script_alt(script_input: ScriptCreate, current_user: User = Depends(get_current_user)):
+    """Create new script - alternative endpoint (requires checks_create permission)"""
+    await require_permission(current_user, 'checks_create')
+    
+    # Verify system exists
+    if script_input.system_id:
+        system = await db.systems.find_one({"id": script_input.system_id})
+        if not system:
+            raise HTTPException(status_code=404, detail="Система не найдена")
+    
+    script_obj = Script(**script_input.model_dump(), created_by=current_user.id)
+    doc = prepare_for_mongo(script_obj.model_dump())
+    
+    await db.scripts.insert_one(doc)
+    return script_obj
+
 @api_router.put("/scripts/{script_id}", response_model=Script)
 async def update_script(script_id: str, script_update: ScriptUpdate, current_user: User = Depends(get_current_user)):
     """Update script (requires checks_edit_own or checks_edit_all permission)"""
