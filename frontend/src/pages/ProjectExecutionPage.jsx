@@ -319,6 +319,27 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         )}
       </div>
 
+      {/* Users with access */}
+      {projectUsers.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center text-base">
+              <Users className="mr-2 h-4 w-4" />
+              Пользователи с доступом ({projectUsers.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {projectUsers.map(user => (
+                <Badge key={user.id} variant="secondary" className="px-3 py-1">
+                  {user.full_name}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats */}
       {stats.total > 0 && (
         <div className="grid grid-cols-3 gap-4 mb-6">
