@@ -33,6 +33,7 @@ const API = `${BACKEND_URL}/api`;
 
 // Hosts Page
 const HostsPage = () => {
+  const { hasPermission, isAdmin, user } = useAuth();
   const [hosts, setHosts] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingHost, setEditingHost] = useState(null);
