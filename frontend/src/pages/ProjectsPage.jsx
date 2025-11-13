@@ -14,7 +14,12 @@ const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 export default function ProjectsPage({ onNavigate }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { hasPermission, isAdmin } = useAuth();
+  const [accessDialogOpen, setAccessDialogOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
+  const [projectUsers, setProjectUsers] = useState([]);
+  const [loadingAccess, setLoadingAccess] = useState(false);
+  const { hasPermission, isAdmin, user } = useAuth();
 
   useEffect(() => {
     fetchProjects();
