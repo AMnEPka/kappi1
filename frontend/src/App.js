@@ -128,6 +128,20 @@ const HostsPage = () => {
     setEditingHost(null);
   };
 
+  const canEditHost = (host) => {
+    if (isAdmin) return true;
+    if (hasPermission('hosts_edit_all')) return true;
+    if (host.created_by === user?.id && hasPermission('hosts_edit_own')) return true;
+    return false;
+  };
+
+  const canDeleteHost = (host) => {
+    if (isAdmin) return true;
+    if (hasPermission('hosts_delete_all')) return true;
+    if (host.created_by === user?.id && hasPermission('hosts_delete_own')) return true;
+    return false;
+  };
+
   const openEditDialog = (host) => {
     setEditingHost(host);
     setFormData({
