@@ -53,6 +53,60 @@ export default function ProjectsPage({ onNavigate }) {
     }
   };
 
+  const openAccessDialog = async (project) => {
+    setSelectedProject(project);
+    setAccessDialogOpen(true);
+    setLoadingAccess(true);
+    
+    try {
+      // Fetch all users and project users in parallel
+      const [usersRes, projectUsersRes] = await Promise.all([
+        axios.get(`${API_URL}/api/users`),
+        axios.get(`${API_URL}/api/projects/${project.id}/users`)
+      ]);
+      
+      setAllUsers(usersRes.data.filter(u => u.is_active));
+      setProjectUsers(projectUsersRes.data);
+    } catch (error) {
+      console.error('Error fetching access data:', error);
+      toast.error("Не удалось загрузить данные доступа");
+    } finally {
+      setLoadingAccess(false);
+    }
+  };
+
+  const handleGrantAccess = async (userId) => {
+    try {
+      await axios.post(`${API_URL}/api/projects/${selectedProject.id}/users/${userId}`);
+      toast.success("Доступ предоставлен");
+      
+      // Refresh project users list
+      const response = await axios.get(`${API_URL}/api/projects/${selectedProject.id}/users`);
+      setProjectUsers(response.data);
+    } catch (error) {
+      console.error('Error granting access:', error);
+      toast.error(error.response?.data?.detail || "Не удалось предоставить доступ");
+    }
+  };
+
+  const handleRevokeAccess = async (userId) => {
+    try {
+      await axios.delete(`${API_URL}/api/projects/${selectedProject.id}/users/${userId}`);
+      toast.success("Доступ отозван");
+      
+      // Refresh project users list
+      const response = await axios.get(`${API_URL}/api/projects/${selectedProject.id}/users`);
+      setProjectUsers(response.data);
+    } catch (error) {
+      console.error('Error revoking access:', error);
+      toast.error(error.response?.data?.detail || "Не удалось отозвать доступ");
+    }
+  };
+
+  const isProjectOwner = (project) => {
+    return project.created_by === user?.id || isAdmin;
+  };
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       draft: { label: 'Черновик', className: 'bg-gray-500' },
