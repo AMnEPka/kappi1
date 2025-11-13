@@ -213,7 +213,7 @@ export default function ProjectsPage({ onNavigate }) {
                     </Button>
                   </div>
                   <div className="flex gap-2">
-                    {isProjectOwner(project) && (
+                    {isAdmin && (
                       <Button
                         size="sm"
                         variant="outline"
