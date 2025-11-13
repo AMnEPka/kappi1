@@ -515,6 +515,20 @@ const ScriptsPage = () => {
     setEditingScript(null);
   };
 
+  const canEditScript = (script) => {
+    if (isAdmin) return true;
+    if (hasPermission('checks_edit_all')) return true;
+    if (script.created_by === user?.id && hasPermission('checks_edit_own')) return true;
+    return false;
+  };
+
+  const canDeleteScript = (script) => {
+    if (isAdmin) return true;
+    if (hasPermission('checks_delete_all')) return true;
+    if (script.created_by === user?.id && hasPermission('checks_delete_own')) return true;
+    return false;
+  };
+
   const openEditDialog = async (script) => {
     setEditingScript(script);
     setFormData({
