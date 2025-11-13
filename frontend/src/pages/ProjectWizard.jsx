@@ -659,6 +659,7 @@ export default function ProjectWizard({ onNavigate }) {
       {step === 3 && renderStep3()}
       {step === 4 && renderStep4()}
       {step === 5 && renderStep5()}
+      {step === 6 && renderStep6()}
 
       <div className="flex justify-between mt-6">
         <Button
