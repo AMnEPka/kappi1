@@ -44,12 +44,13 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
   const fetchProject = async () => {
     try {
-      const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes] = await Promise.all([
+      const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
         axios.get(`${API_URL}/api/projects/${projectId}`),
         axios.get(`${API_URL}/api/projects/${projectId}/tasks`),
         axios.get(`${API_URL}/api/hosts`),
         axios.get(`${API_URL}/api/systems`),
-        axios.get(`${API_URL}/api/scripts`)
+        axios.get(`${API_URL}/api/scripts`),
+        axios.get(`${API_URL}/api/projects/${projectId}/users`)
       ]);
       
       setProject(projectRes.data);
