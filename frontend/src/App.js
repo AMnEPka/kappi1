@@ -1404,6 +1404,11 @@ const Layout = ({ children }) => {
                   <User className="mr-2 h-4 w-4" /> Пользователи
                 </div>
               </Link>
+              <Link to="/roles">
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                  <Shield className="mr-2 h-4 w-4" /> Роли
+                </div>
+              </Link>
             </div>
           </div>
 
