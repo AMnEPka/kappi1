@@ -395,6 +395,7 @@ const HostsPage = () => {
 
 // Scripts Page
 const ScriptsPage = () => {
+  const { hasPermission, isAdmin, user } = useAuth();
   const [scripts, setScripts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
