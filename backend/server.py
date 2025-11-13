@@ -1510,9 +1510,12 @@ async def get_systems(category_id: str, current_user: User = Depends(get_current
     return [System(**parse_from_mongo(sys)) for sys in systems]
 
 @api_router.get("/systems", response_model=List[System])
-async def get_all_systems(current_user: User = Depends(get_current_user)):
-    """Get all systems"""
-    systems = await db.systems.find({}, {"_id": 0}).to_list(1000)
+async def get_all_systems(category_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    """Get all systems, optionally filtered by category"""
+    query = {}
+    if category_id:
+        query["category_id"] = category_id
+    systems = await db.systems.find(query, {"_id": 0}).to_list(1000)
     return [System(**parse_from_mongo(sys)) for sys in systems]
 
 @api_router.get("/systems/{system_id}", response_model=System)
