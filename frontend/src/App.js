@@ -791,7 +791,7 @@ const ScriptsPage = () => {
                     />
                     <div className="flex items-center gap-1">
                       <Label htmlFor="has_reference_files" className="cursor-pointer">
-                        Есть эталонные файлы
+                        Предусмотрены эталонные файлы
                       </Label>
                       <TooltipProvider>
                         <Tooltip>
@@ -849,7 +849,7 @@ const ScriptsPage = () => {
                     <Textarea
                       value={formData.test_methodology}
                       onChange={(e) => setFormData({...formData, test_methodology: e.target.value})}
-                      placeholder="Данные из ПМИ"
+                      placeholder="Данные из ПМИ (для формирования отчета)"
                       rows={3}
                     />
                   </div>
@@ -859,7 +859,7 @@ const ScriptsPage = () => {
                     <Textarea
                       value={formData.success_criteria}
                       onChange={(e) => setFormData({...formData, success_criteria: e.target.value})}
-                      placeholder="Данные из ПМИ"
+                      placeholder="Данные из ПМИ (для формирования отчета)"
                       rows={3}
                     />
                   </div>
@@ -950,7 +950,7 @@ const ScriptsPage = () => {
                       <span className="truncate">{script.name}</span>
                     </div>
                     {script.has_reference_files && (
-                      <div className="text-xs text-slate-400 flex-shrink-0 ml-2" title="Есть эталонные файлы">
+                      <div className="text-xs text-slate-400 flex-shrink-0 ml-2" title="Предусмотрены эталонные файлы">
                         📝
                       </div>
                     )}
