@@ -189,36 +189,51 @@ export default function ProjectsPage({ onNavigate }) {
                   <p className="text-gray-500">Создан: <span className="font-medium">{formatDate(project.created_at)}</span></p>
                 </div>
 
-                <div className="flex gap-2">
-                  {canExecuteProjects && (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    {canExecuteProjects && (
+                      <Button
+                        size="sm"
+                        onClick={() => onNavigate('project-execute', project.id)}
+                        className="flex-1"
+                        variant="yellow"
+                      >
+                        <Play className="mr-1 h-3 w-3" />
+                        Запустить
+                      </Button>
+                    )}
                     <Button
                       size="sm"
-                      onClick={() => onNavigate('project-execute', project.id)}
+                      variant="outline"
+                      onClick={() => onNavigate('project-results', project.id)}
                       className="flex-1"
-                      variant="yellow"
                     >
-                      <Play className="mr-1 h-3 w-3" />
-                      Запустить
+                      <Eye className="mr-1 h-3 w-3" />
+                      Результаты
                     </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onNavigate('project-results', project.id)}
-                    className="flex-1"
-                  >
-                    <Eye className="mr-1 h-3 w-3" />
-                    Результаты
-                  </Button>
-                  {(isAdmin || project.created_by === null) && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteProject(project.id)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
+                  </div>
+                  <div className="flex gap-2">
+                    {isProjectOwner(project) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openAccessDialog(project)}
+                        className="flex-1"
+                      >
+                        <Users className="mr-1 h-3 w-3" />
+                        Доступ
+                      </Button>
+                    )}
+                    {isProjectOwner(project) && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteProject(project.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
