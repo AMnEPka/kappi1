@@ -4,12 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Checkbox } from "../components/ui/checkbox";
 import { Label } from "../components/ui/label";
-import { PlusCircle, Play, Trash2, Eye, Users, UserPlus, UserMinus } from "lucide-react";
+import { PlusCircle, Play, Trash2, Eye, Users, UserPlus, UserMinus, User } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+
 
 export default function ProjectsPage({ onNavigate }) {
   const [projects, setProjects] = useState([]);
@@ -20,10 +21,35 @@ export default function ProjectsPage({ onNavigate }) {
   const [projectUsers, setProjectUsers] = useState([]);
   const [loadingAccess, setLoadingAccess] = useState(false);
   const { hasPermission, isAdmin, user } = useAuth();
+  const [users, setUsers] = useState({});
 
   useEffect(() => {
     fetchProjects();
+    fetchUsers();
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/users'); // ваш URL
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      const data = await response.json();
+
+      // Преобразуем массив в объект по ID (если сервер возвращает массив)
+      const usersMap = data.reduce((acc, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {});
+
+      setUsers(usersMap);
+      console.log('Users loaded:', usersMap);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setUsers({}); // Гарантируем, что users — это объект
+    }
+  };
+
 
   const fetchProjects = async () => {
     try {
@@ -180,6 +206,14 @@ export default function ProjectsPage({ onNavigate }) {
                         {project.description}
                       </CardDescription>
                     )}
+                  </div>
+                    <div className="flex items-center gap-2 ml-2">
+                      <User className="h-4 w-4 text-gray-400" />
+                      <span className="text-xs text-gray-500 font-medium">
+                        {users[project.created_by]
+                          ? (users[project.created_by].username || users[project.created_by].full_name || 'Неизвестно')
+                          : 'Неизвестно'}
+                      </span>
                   </div>
                 </div>
               </CardHeader>
