@@ -207,14 +207,14 @@ export default function ProjectsPage({ onNavigate }) {
                       </CardDescription>
                     )}
                   </div>
-                    <div className="flex items-center gap-2 ml-2">
-                      <User className="h-4 w-4 text-gray-400" />
+                  {project.creator_username && (
+                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                      <User className="h-3 w-3 text-gray-400" />
                       <span className="text-xs text-gray-500 font-medium">
-                        {users[project.created_by]
-                          ? (users[project.created_by].username || users[project.created_by].full_name || 'Неизвестно')
-                          : 'Неизвестно'}
+                        @{project.creator_username}
                       </span>
-                  </div>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               
