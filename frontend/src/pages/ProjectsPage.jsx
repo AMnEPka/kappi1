@@ -177,22 +177,21 @@ export default function ProjectsPage({ onNavigate }) {
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center"> 
                   <CardTitle className="text-lg line-clamp-1 flex-1">{project.name}</CardTitle>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                            <User className="h-3 w-3 text-gray-400" />
-                            <span className="text-xs text-gray-500 font-medium">
-                              {project.creator_full_name || project.creator_username || 'Неизвестно'}
-                            </span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Создатель проекта</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                          <User className="h-3 w-3 text-gray-400" />
+                          <span className="text-xs text-gray-500 font-medium">
+                            {project.creator_full_name || project.creator_username || 'Неизвестно'}
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Создатель проекта</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 {project.description && (
                   <CardDescription className="line-clamp-2 mt-2">
@@ -209,16 +208,15 @@ export default function ProjectsPage({ onNavigate }) {
                   {isProjectOwner(project) && (
                     <Button
                       size="sm"
-                      variant="destructive"
+                      variant="ghost"
                       onClick={() => handleDeleteProject(project.id)}
-                      className="flex-shrink-0"
-                    >
+                      className="flex-shrink-0 text-black hover:bg-red-500">
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   )}
                 </div>
 
-                <div className="flex gap-2"> {/* Все кнопки в одном ряду */}
+                <div className="flex gap-2"> 
                   {canExecuteProjects && (
                     <Button
                       size="sm"
