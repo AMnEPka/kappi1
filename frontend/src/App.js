@@ -1392,9 +1392,9 @@ const Layout = ({ children }) => {
   return (
 <div className="min-h-screen bg-gray-50">
   {/* Первая строка шапки */}
-  <nav className="bg-white border-b border-gray-200 shadow-sm">
+  <nav>
     <div className="container mx-auto px-4">
-      <div className="flex items-center justify-between h-16">
+      <div className="flex items-center justify-between h-16 bg-white border-b border-gray-200"> {/* Переносим фон и границу сюда */}
         <Link to="/" className="flex items-center gap-3">
           <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
           <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>

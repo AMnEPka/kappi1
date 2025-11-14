@@ -179,7 +179,7 @@ export default function ProjectsPage({ onNavigate }) {
                   <div className="flex items-center gap-1 ml-2 flex-shrink-0">
                     <User className="h-3 w-3 text-gray-400" />
                     <span className="text-xs text-gray-500 font-medium">
-                      {project.creator_fullname || 
+                      {project.creator_username || 
                       project.creator_username || 
                       'Неизвестно'}
                     </span>
