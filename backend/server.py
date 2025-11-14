@@ -1755,15 +1755,13 @@ async def get_projects(current_user: User = Depends(get_current_user)):
         projects = list(all_projects.values())
         projects.sort(key=lambda x: x.get('created_at', ''), reverse=True)
     
-    # Enrich projects with creator username
+    # Enrich projects with creator username & fullname
     for project in projects:
         if project.get('created_by'):
             creator = await db.users.find_one({"id": project['created_by']}, {"_id": 0, "username": 1, "full_name": 1})
             if creator:
                 project['creator_username'] = creator.get('username', 'Unknown')
-                project['creator_full_name'] = creator.get('full_name', 'Unknown') 
-
-          
+                project['creator_fullname'] = creator.get('full_name', 'Unknown')          
     
     return [Project(**parse_from_mongo(proj)) for proj in projects]
 
