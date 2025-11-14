@@ -21,34 +21,10 @@ export default function ProjectsPage({ onNavigate }) {
   const [projectUsers, setProjectUsers] = useState([]);
   const [loadingAccess, setLoadingAccess] = useState(false);
   const { hasPermission, isAdmin, user } = useAuth();
-  const [users, setUsers] = useState({});
 
   useEffect(() => {
     fetchProjects();
-    fetchUsers();
   }, []);
-
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch('/api/users'); // ваш URL
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
-      const data = await response.json();
-
-      // Преобразуем массив в объект по ID (если сервер возвращает массив)
-      const usersMap = data.reduce((acc, user) => {
-        acc[user.id] = user;
-        return acc;
-      }, {});
-
-      setUsers(usersMap);
-      console.log('Users loaded:', usersMap);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      setUsers({}); // Гарантируем, что users — это объект
-    }
-  };
 
 
   const fetchProjects = async () => {
@@ -198,76 +174,73 @@ export default function ProjectsPage({ onNavigate }) {
           {projects.map((project) => (
             <Card key={project.id} className="flex flex-col h-full">
               <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg line-clamp-1">{project.name}</CardTitle>
-                    {project.description && (
-                      <CardDescription className="line-clamp-2 mt-1">
-                        {project.description}
-                      </CardDescription>
-                    )}
+                <div className="flex justify-between items-center"> 
+                  <CardTitle className="text-lg line-clamp-1 flex-1">{project.name}</CardTitle>
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    <User className="h-3 w-3 text-gray-400" />
+                    <span className="text-xs text-gray-500 font-medium">
+                      {project.creator_fullname || 
+                      project.creator_username || 
+                      'Неизвестно'}
+                    </span>
                   </div>
-                  {project.creator_username && (
-                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      <User className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-500 font-medium">
-                        @{project.creator_username}
-                      </span>
-                    </div>
-                  )}
                 </div>
+                {project.description && (
+                  <CardDescription className="line-clamp-2 mt-2">
+                    {project.description}
+                  </CardDescription>
+                )}
               </CardHeader>
               
               <CardContent className="pb-4 flex-1">
-                <div className="mb-3 text-sm">
-                  <p className="text-gray-500">Создан: <span className="font-medium">{formatDate(project.created_at)}</span></p>
+                <div className="flex justify-between items-center mb-3"> 
+                  <div className="text-sm">
+                    <p className="text-gray-500">Создан: <span className="font-medium">{formatDate(project.created_at)}</span></p>
+                  </div>
+                  {isProjectOwner(project) && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteProject(project.id)}
+                      className="flex-shrink-0"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    {canExecuteProjects && (
-                      <Button
-                        size="sm"
-                        onClick={() => onNavigate('project-execute', project.id)}
-                        className="flex-1"
-                        variant="yellow"
-                      >
-                        <Play className="mr-1 h-3 w-3" />
-                        Запустить
-                      </Button>
-                    )}
+                <div className="flex gap-2"> {/* Все кнопки в одном ряду */}
+                  {canExecuteProjects && (
+                    <Button
+                      size="sm"
+                      onClick={() => onNavigate('project-execute', project.id)}
+                      className="flex-1"
+                      variant="yellow"
+                    >
+                      <Play className="mr-1 h-3 w-3" />
+                      Запустить
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onNavigate('project-results', project.id)}
+                    className="flex-1"
+                  >
+                    <Eye className="mr-1 h-3 w-3" />
+                    Результаты
+                  </Button>
+                  {isAdmin && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => onNavigate('project-results', project.id)}
+                      onClick={() => openAccessDialog(project)}
                       className="flex-1"
                     >
-                      <Eye className="mr-1 h-3 w-3" />
-                      Результаты
+                      <Users className="mr-1 h-3 w-3" />
+                      Доступ
                     </Button>
-                  </div>
-                  <div className="flex gap-2">
-                    {isAdmin && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openAccessDialog(project)}
-                        className="flex-1"
-                      >
-                        <Users className="mr-1 h-3 w-3" />
-                        Доступ
-                      </Button>
-                    )}
-                    {isProjectOwner(project) && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteProject(project.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

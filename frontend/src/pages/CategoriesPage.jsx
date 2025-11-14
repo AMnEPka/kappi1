@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Folder, Plus, Edit, Trash2 } from "lucide-react";
+import { Folder, Plus, Edit, Trash2, Smile } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -20,6 +20,7 @@ const CategoriesPage = () => {
     icon: "📁",
     description: ""
   });
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -116,12 +117,57 @@ const CategoriesPage = () => {
               
               <div>
                 <Label>Иконка (emoji)</Label>
-                <Input
-                  value={formData.icon}
-                  onChange={(e) => setFormData({...formData, icon: e.target.value})}
-                  placeholder="🐧 🪟 🗄️"
-                  maxLength={2}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={formData.icon}
+                    onChange={(e) => setFormData({...formData, icon: e.target.value})}
+                    placeholder=""
+                    maxLength={2}
+                    className="flex-1"
+                  />
+                  <div className="relative">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsIconPickerOpen(!isIconPickerOpen)}
+                    >
+                      <Smile className="h-4 w-4 mr-2" />
+                      Выбрать
+                    </Button>
+                    
+                    {isIconPickerOpen && (
+                      <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-3">
+                        <div className="grid grid-cols-8 gap-1 mb-2">
+                          {['🐧', '🗄️', '💻', '🖥️', '🔒', '🌐', '⚡', '📊', '🔍', '📁', '📋'].map((icon) => (
+                            <button
+                              key={icon}
+                              type="button"
+                              className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-lg"
+                              onClick={() => {
+                                setFormData({...formData, icon});
+                                setIsIconPickerOpen(false);
+                              }}
+                            >
+                              {icon}
+                            </button>
+                          ))}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setFormData({...formData, icon: ''});
+                            setIsIconPickerOpen(false);
+                          }}
+                          className="w-full text-xs"
+                        >
+                          Очистить
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div>
