@@ -1433,7 +1433,7 @@ const Layout = ({ children }) => {
               <Button 
                 variant="ghost" 
                 data-testid="nav-projects" 
-                className="text-white hover:bg-white h-12 px-4 font-medium"
+                className="text-black hover:bg-white h-12 px-4 font-medium"
               >
                 <Briefcase className="mr-3 h-5 w-5" /> Проекты
               </Button>
@@ -1442,7 +1442,7 @@ const Layout = ({ children }) => {
               <Button 
                 variant="ghost" 
                 data-testid="nav-hosts" 
-                className="text-white hover:bg-white h-12 px-4 font-medium"
+                className="text-black hover:bg-white h-12 px-4 font-medium"
               >
                 <Server className="mr-3 h-5 w-5" /> Хосты
               </Button>
@@ -1451,7 +1451,7 @@ const Layout = ({ children }) => {
               <Button 
                 variant="ghost" 
                 data-testid="nav-scripts" 
-                className="text-white hover:bg-white h-12 px-4 font-medium"
+                className="text-black hover:bg-white h-12 px-4 font-medium"
               >
                 <FileCode className="mr-3 h-5 w-5" /> Проверки
               </Button>
@@ -1460,7 +1460,7 @@ const Layout = ({ children }) => {
               <Button 
                 variant="ghost" 
                 data-testid="nav-scheduler" 
-                className="text-white hover:bg-white h-12 px-4 font-medium"
+                className="text-black hover:bg-white h-12 px-4 font-medium"
               >
                 <Calendar className="mr-3 h-8 w-8" /> Планировщик
               </Button>
@@ -1469,7 +1469,7 @@ const Layout = ({ children }) => {
               <Button 
                 variant="ghost" 
                 data-testid="nav-logs" 
-                className="text-white hover:bg-white h-12 px-4 py-3 font-medium"
+                className="text-black hover:bg-white h-12 px-4 py-3 font-medium"
               >
                 <FileText className="mr-3 h-8 w-8" /> Логи
               </Button>
@@ -1482,7 +1482,7 @@ const Layout = ({ children }) => {
               <Menu className="h-8 w-8" />
             </button>
             <div className="absolute right-0 top-full mt-1 w-56 bg-white border-2 border-gray-300 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-              <Link to="/execute">
+              {/* <Link to="/execute">
                 <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
                   <Play className="mr-3 h-5 w-5" /> Единичный запуск
                 </div>
@@ -1491,18 +1491,20 @@ const Layout = ({ children }) => {
                 <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
                   <History className="mr-3 h-5 w-5" /> История
                 </div>
-              </Link>
-              <div className="border-t-2 border-gray-200 my-1"></div>
+              </Link> */}
+              
               <Link to="/admin">
                 <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
                   <Settings className="mr-3 h-5 w-5" /> Админ-панель
                 </div>
               </Link>
+              <div className="border-t-2 border-gray-200 my-1"></div>
               <Link to="/users">
                 <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
                   <User className="mr-3 h-5 w-5" /> Пользователи
                 </div>
               </Link>
+              <div className="border-t-2 border-gray-200 my-1"></div>
               <Link to="/roles">
                 <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
                   <Shield className="mr-3 h-5 w-5" /> Роли
