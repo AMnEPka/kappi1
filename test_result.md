@@ -263,6 +263,12 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+recent_changes:
+  - Added creator_username to Project model and API response
+  - Fixed Executor role permissions (removed results_view_all)
+  - Projects filtering works correctly: users see only their projects + granted access + curators see all
+  - Execute button hidden for users without projects_execute permission
+
 agent_communication:
   - agent: "main"
     message: "Phase 2 implementation complete. Backend has SSE-based project execution with one SSH connection per host. Frontend has 4-page flow: Projects list -> Wizard -> Execution monitor -> Results. Ready for backend testing."
