@@ -248,6 +248,7 @@ class Project(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     created_by: Optional[str] = None
+    creator_username: Optional[str] = None
 
 class ProjectCreate(BaseModel):
     name: str
