@@ -8,6 +8,7 @@ import { PlusCircle, Play, Trash2, Eye, Users, UserPlus, UserMinus, User } from 
 import { toast } from "sonner";
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
@@ -176,12 +177,22 @@ export default function ProjectsPage({ onNavigate }) {
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center"> 
                   <CardTitle className="text-lg line-clamp-1 flex-1">{project.name}</CardTitle>
-                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                    <User className="h-3 w-3 text-gray-400" />
-                    <span className="text-xs text-gray-500 font-medium">
-                      {project.creator_full_name || project.creator_username || 'Неизвестно'}
-                    </span>
-                  </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                            <User className="h-3 w-3 text-gray-400" />
+                            <span className="text-xs text-gray-500 font-medium">
+                              {project.creator_full_name || project.creator_username || 'Неизвестно'}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Создатель проекта</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
                 </div>
                 {project.description && (
                   <CardDescription className="line-clamp-2 mt-2">
