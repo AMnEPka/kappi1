@@ -249,7 +249,7 @@ class Project(BaseModel):
     completed_at: Optional[datetime] = None
     created_by: Optional[str] = None
     creator_username: Optional[str] = None
-    creator_fullname: Optional[str] = None
+    creator_full_name: Optional[str] = None
 
 class ProjectCreate(BaseModel):
     name: str
@@ -1761,7 +1761,7 @@ async def get_projects(current_user: User = Depends(get_current_user)):
             creator = await db.users.find_one({"id": project['created_by']}, {"_id": 0, "username": 1, "full_name": 1})
             if creator:
                 project['creator_username'] = creator.get('username', 'Unknown')
-                project['creator_fullname'] = creator.get('full_name', 'Unknown')          
+                project['creator_full_name'] = creator.get('full_name', 'Unknown')          
     
     return [Project(**parse_from_mongo(proj)) for proj in projects]
 
