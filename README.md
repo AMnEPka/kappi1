@@ -30,7 +30,7 @@ docker-compose up -d
 
 ## 🛠 Технологический стек
 
-- **Frontend**: React, TailwindCSS, shadcn/ui
+- **Frontend**: React 19, TailwindCSS, shadcn/ui (Node.js 20)
 - **Backend**: FastAPI, Python 3.11
 - **Database**: MongoDB 6.0
 - **Infrastructure**: Docker, Docker Compose, Nginx (production)
