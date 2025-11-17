@@ -3,15 +3,18 @@ FROM node:18-alpine AS build
 
 WORKDIR /app/frontend
 
+# Install dependencies for node-gyp
+RUN apk add --no-cache python3 make g++
+
 # Install dependencies
-COPY package*.json ./
-RUN npm ci --only=production
+COPY package*.json yarn.lock ./
+RUN yarn install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
 # Build for production
-RUN npm run build
+RUN yarn build
 
 # Production stage with nginx
 FROM nginx:alpine
