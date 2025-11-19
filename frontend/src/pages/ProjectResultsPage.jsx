@@ -19,8 +19,8 @@ import {
 import { ChevronLeft, CheckCircle, XCircle, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
+import { api } from '../config/api';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
@@ -46,9 +46,9 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     try {
       setLoading(true);
       const [projectRes, sessionsRes, hostsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/projects/${projectId}`),
-        axios.get(`${API_URL}/api/projects/${projectId}/sessions`),
-        axios.get(`${API_URL}/api/hosts`),
+        api.get(`/api/projects/${projectId}`),
+        api.get(`/api/projects/${projectId}/sessions`),
+        api.get(`/api/hosts`),
       ]);
 
       setProject(projectRes.data);
@@ -76,8 +76,8 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
 
   const fetchSessionExecutions = async (sessionId) => {
     try {
-      const response = await axios.get(
-        `${API_URL}/api/projects/${projectId}/sessions/${sessionId}/executions`
+      const response = await api.get(
+        `/api/projects/${projectId}/sessions/${sessionId}/executions`
       );
       
       setExecutions(response.data);
@@ -128,8 +128,8 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     }
 
     try {
-      const response = await axios.get(
-        `${API_URL}/api/projects/${projectId}/sessions/${selectedSession}/export-excel`,
+      const response = await api.get(
+        `/api/projects/${projectId}/sessions/${selectedSession}/export-excel`,
         {
           responseType: 'blob',
         }

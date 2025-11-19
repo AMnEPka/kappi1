@@ -12,8 +12,7 @@ import { toast } from "sonner";
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import { api } from '../config/api';
 
 // Список всех доступных разрешений с описаниями
 const ALL_PERMISSIONS = {
@@ -68,7 +67,7 @@ export default function RolesPage() {
   const fetchRoles = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/roles`);
+      const response = await api.get(`/api/roles`);
       setRoles(response.data);
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -89,11 +88,11 @@ export default function RolesPage() {
     try {
       if (editingRole) {
         // Update role
-        await axios.put(`${API_URL}/api/roles/${editingRole.id}`, formData);
+        await api.put(`/api/roles/${editingRole.id}`, formData);
         toast.success("Роль обновлена");
       } else {
         // Create role
-        await axios.post(`${API_URL}/api/roles`, formData);
+        await api.post(`/api/roles`, formData);
         toast.success("Роль создана");
       }
 
@@ -112,7 +111,7 @@ export default function RolesPage() {
     }
 
     try {
-      await axios.delete(`${API_URL}/api/roles/${roleId}`);
+      await api.delete(`/api/roles/${roleId}`);
       toast.success("Роль удалена");
       fetchRoles();
     } catch (error) {

@@ -2,10 +2,22 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+
 export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, loading } = useAuth();
+
+  // Проверяем что user существует и имеет id
+  const isAuthenticated = !!(user && user.id);
+
+  console.log('🔍 ProtectedRoute user check:', {
+    user,
+    hasUser: !!user,
+    hasUserId: !!(user && user.id),
+    isAuthenticated
+  });  
 
   if (loading) {
+    console.log('🔄 ProtectedRoute: Still loading...');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -17,8 +29,9 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!isAuthenticated) {
+    console.log('🚫 ProtectedRoute: No user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
-
+  console.log('✅ ProtectedRoute: User authenticated, rendering children');
   return children;
 }

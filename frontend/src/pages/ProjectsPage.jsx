@@ -9,9 +9,7 @@ import { toast } from "sonner";
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
-
+import { api } from '../config/api';
 
 export default function ProjectsPage({ onNavigate }) {
   const [projects, setProjects] = useState([]);
@@ -21,7 +19,7 @@ export default function ProjectsPage({ onNavigate }) {
   const [allUsers, setAllUsers] = useState([]);
   const [projectUsers, setProjectUsers] = useState([]);
   const [loadingAccess, setLoadingAccess] = useState(false);
-  const { hasPermission, isAdmin, user } = useAuth();
+  const {hasPermission, isAdmin, user} = useAuth();
 
   useEffect(() => {
     fetchProjects();
@@ -31,7 +29,7 @@ export default function ProjectsPage({ onNavigate }) {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/projects`);
+      const response = await api.get(`/api/projects`);
       setProjects(response.data);
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -47,7 +45,7 @@ export default function ProjectsPage({ onNavigate }) {
     }
 
     try {
-      await axios.delete(`${API_URL}/api/projects/${projectId}`);
+      await api.delete(`/api/projects/${projectId}`);
       toast.success("Проект удален");
       fetchProjects();
     } catch (error) {
@@ -64,8 +62,8 @@ export default function ProjectsPage({ onNavigate }) {
     try {
       // Fetch all users and project users in parallel
       const [usersRes, projectUsersRes] = await Promise.all([
-        axios.get(`${API_URL}/api/users`),
-        axios.get(`${API_URL}/api/projects/${project.id}/users`)
+        api.get(`/api/users`),
+        api.get(`/api/projects/${project.id}/users`)
       ]);
       
       setAllUsers(usersRes.data.filter(u => u.is_active));
@@ -80,11 +78,11 @@ export default function ProjectsPage({ onNavigate }) {
 
   const handleGrantAccess = async (userId) => {
     try {
-      await axios.post(`${API_URL}/api/projects/${selectedProject.id}/users/${userId}`);
+      await api.post(`/api/projects/${selectedProject.id}/users/${userId}`);
       toast.success("Доступ предоставлен");
       
       // Refresh project users list
-      const response = await axios.get(`${API_URL}/api/projects/${selectedProject.id}/users`);
+      const response = await api.get(`/api/projects/${selectedProject.id}/users`);
       setProjectUsers(response.data);
     } catch (error) {
       console.error('Error granting access:', error);
@@ -94,11 +92,11 @@ export default function ProjectsPage({ onNavigate }) {
 
   const handleRevokeAccess = async (userId) => {
     try {
-      await axios.delete(`${API_URL}/api/projects/${selectedProject.id}/users/${userId}`);
+      await api.delete(`/api/projects/${selectedProject.id}/users/${userId}`);
       toast.success("Доступ отозван");
       
       // Refresh project users list
-      const response = await axios.get(`${API_URL}/api/projects/${selectedProject.id}/users`);
+      const response = await api.get(`/api/projects/${selectedProject.id}/users`);
       setProjectUsers(response.data);
     } catch (error) {
       console.error('Error revoking access:', error);

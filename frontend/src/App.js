@@ -23,13 +23,11 @@ import LoginPage from "@/pages/LoginPage";
 import UsersPage from "@/pages/UsersPage";
 import RolesPage from "@/pages/RolesPage";
 import { Menu, HelpCircle, EthernetPort, Loader2, Calendar, FileText } from 'lucide-react'; 
+import { api } from './config/api';
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin.replace(':3000', ':8001').replace('127.0.0.1', 'localhost');
-const API = `${BACKEND_URL}/api`;
 
 // Hosts Page
 const HostsPage = () => {
@@ -61,7 +59,7 @@ const HostsPage = () => {
     }
     
     try {
-      const response = await axios.get(`${API}/hosts`);
+      const response = await api.get(`/api/hosts`);
       setHosts(response.data);
     } catch (error) {
       console.error('Error fetching hosts:', error);
@@ -73,10 +71,10 @@ const HostsPage = () => {
     e.preventDefault();
     try {
       if (editingHost) {
-        await axios.put(`${API}/hosts/${editingHost.id}`, formData);
+        await api.put(`/api/hosts/${editingHost.id}`, formData);
         toast.success("Хост обновлен");
       } else {
-        await axios.post(`${API}/hosts`, formData);
+        await api.post(`/api/hosts`, formData);
         toast.success("Хост добавлен");
       }
       setIsDialogOpen(false);
@@ -90,7 +88,7 @@ const HostsPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Удалить хост?")) {
       try {
-        await axios.delete(`${API}/hosts/${id}`);
+        await api.delete(`/api/hosts/${id}`);
         toast.success("Хост удален");
         fetchHosts();
       } catch (error) {
@@ -102,7 +100,7 @@ const HostsPage = () => {
   const handleTestConnection = async (hostId) => {
     setTestingHostId(hostId);
     try {
-      const response = await axios.post(`${API}/hosts/${hostId}/test`);
+      const response = await api.post(`/api/hosts/${hostId}/test`);
       if (response.data.success) {
         toast.success(`✅ ${response.data.message}\n${response.data.output}`);
       } else {
@@ -437,7 +435,7 @@ const ScriptsPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${API}/categories`);
+      const response = await api.get(`/api/categories`);
       setCategories(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки категорий");
@@ -446,7 +444,7 @@ const ScriptsPage = () => {
 
   const fetchSystemsByCategory = async (categoryId) => {
     try {
-      const response = await axios.get(`${API}/systems?category_id=${categoryId}`);
+      const response = await api.get(`/api/systems?category_id=${categoryId}`);
       setSystems(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки систем");
@@ -455,13 +453,13 @@ const ScriptsPage = () => {
 
   const fetchScripts = async () => {
     try {
-      let url = `${API}/scripts`;
+      let url = `/api/scripts`;
       if (selectedSystem && selectedSystem !== "all") {
         url += `?system_id=${selectedSystem}`;
       } else if (selectedCategory && selectedCategory !== "all") {
         url += `?category_id=${selectedCategory}`;
       }
-      const response = await axios.get(url);
+      const response = await api.get(url);
       setScripts(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки проверок");
@@ -472,10 +470,10 @@ const ScriptsPage = () => {
     e.preventDefault();
     try {
       if (editingScript) {
-        await axios.put(`${API}/scripts/${editingScript.id}`, formData);
+        await api.put(`/api/scripts/${editingScript.id}`, formData);
         toast.success("Проверка обновлена");
       } else {
-        await axios.post(`${API}/scripts`, formData);
+        await api.post(`/api/scripts`, formData);
         toast.success("Проверка создана");
       }
       setIsDialogOpen(false);
@@ -489,7 +487,7 @@ const ScriptsPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Удалить проверку?")) {
       try {
-        await axios.delete(`${API}/scripts/${id}`);
+        await api.delete(`/api/scripts/${id}`);
         toast.success("Проверка удалена");
         fetchScripts();
       } catch (error) {
@@ -545,11 +543,11 @@ const ScriptsPage = () => {
     
     // Load category and systems for editing
     try {
-      const systemRes = await axios.get(`${API}/systems/${script.system_id}`);
+      const systemRes = await api.get(`/api/systems/${script.system_id}`);
       const system = systemRes.data;
       setFormCategoryId(system.category_id);
       
-      const systemsRes = await axios.get(`${API}/systems?category_id=${system.category_id}`);
+      const systemsRes = await api.get(`/api/systems?category_id=${system.category_id}`);
       setFormSystems(systemsRes.data);
     } catch (error) {
       console.error("Error loading system info:", error);
@@ -563,7 +561,7 @@ const ScriptsPage = () => {
     setFormData({...formData, system_id: ""});
     
     try {
-      const response = await axios.get(`${API}/systems?category_id=${categoryId}`);
+      const response = await api.get(`/api/systems?category_id=${categoryId}`);
       setFormSystems(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки систем");
@@ -1024,8 +1022,8 @@ const ExecutePage = () => {
   const fetchData = async () => {
     try {
       const [scriptsRes, hostsRes] = await Promise.all([
-        axios.get(`${API}/scripts`),
-        axios.get(`${API}/hosts`)
+        api.get(`/api/scripts`),
+        api.get(`/api/hosts`)
       ]);
       setScripts(scriptsRes.data);
       setHosts(hostsRes.data);
@@ -1042,7 +1040,7 @@ const ExecutePage = () => {
 
     setIsExecuting(true);
     try {
-      const response = await axios.post(`${API}/execute`, {
+      const response = await api.post(`/api/execute`, {
         script_id: selectedScript,
         host_ids: selectedHosts
       });
@@ -1180,8 +1178,8 @@ const HistoryPage = () => {
   const fetchData = async () => {
     try {
       const [executionsRes, hostsRes] = await Promise.all([
-        axios.get(`${API}/executions`),
-        axios.get(`${API}/hosts`)
+        api.get(`/api/executions`),
+        api.get(`/api/hosts`)
       ]);
       setExecutions(executionsRes.data);
       

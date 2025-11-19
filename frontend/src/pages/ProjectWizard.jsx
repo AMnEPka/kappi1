@@ -15,8 +15,7 @@ import {
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import { api } from '../config/api';
 
 export default function ProjectWizard({ onNavigate }) {
   const [step, setStep] = useState(1);
@@ -42,11 +41,11 @@ export default function ProjectWizard({ onNavigate }) {
   const fetchData = async () => {
     try {
       const [hostsRes, categoriesRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
-        axios.get(`${API_URL}/api/hosts`),
-        axios.get(`${API_URL}/api/categories`),
-        axios.get(`${API_URL}/api/systems`),
-        axios.get(`${API_URL}/api/scripts`),
-        axios.get(`${API_URL}/api/users`),
+        api.get(`/api/hosts`),
+        api.get(`/api/categories`),
+        api.get(`/api/systems`),
+        api.get(`/api/scripts`),
+        api.get(`/api/users`),
       ]);
       setHosts(hostsRes.data);
       setCategories(categoriesRes.data);
@@ -202,7 +201,7 @@ export default function ProjectWizard({ onNavigate }) {
       setLoading(true);
 
       // Create project
-      const projectResponse = await axios.post(`${API_URL}/api/projects`, {
+      const projectResponse = await api.post(`/api/projects`, {
         name: projectData.name,
         description: projectData.description,
       });
@@ -212,7 +211,7 @@ export default function ProjectWizard({ onNavigate }) {
       // Create tasks - каждая система создаёт отдельную задачу
       for (const task of projectData.tasks) {
         for (const system of task.systems) {
-          await axios.post(`${API_URL}/api/projects/${projectId}/tasks`, {
+          await api.post(`/api/projects/${projectId}/tasks`, {
             host_id: task.host_id,
             system_id: system.system_id,
             script_ids: system.script_ids,
@@ -224,7 +223,7 @@ export default function ProjectWizard({ onNavigate }) {
       // Grant access to selected users
       for (const userId of projectData.accessUserIds) {
         try {
-          await axios.post(`${API_URL}/api/projects/${projectId}/users/${userId}`);
+          await api.post(`/api/projects/${projectId}/users/${userId}`);
         } catch (error) {
           console.error(`Failed to grant access to user ${userId}:`, error);
           // Continue even if one fails

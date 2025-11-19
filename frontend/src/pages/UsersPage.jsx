@@ -11,8 +11,7 @@ import { toast } from "sonner";
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import { api } from '../config/api';
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -45,7 +44,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/users`);
+      const response = await api.get(`/api/users`);
       setUsers(response.data);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -57,7 +56,7 @@ export default function UsersPage() {
 
   const fetchRoles = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/roles`);
+      const response = await api.get(`/api/roles`);
       setRoles(response.data);
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -66,7 +65,7 @@ export default function UsersPage() {
 
   const fetchUserRoles = async (userId) => {
     try {
-      const response = await axios.get(`${API_URL}/api/users/${userId}/roles`);
+      const response = await api.get(`/api/users/${userId}/roles`);
       return response.data.map(r => r.id);
     } catch (error) {
       console.error('Error fetching user roles:', error);
@@ -85,11 +84,11 @@ export default function UsersPage() {
           is_admin: formData.is_admin,
           is_active: true
         };
-        await axios.put(`${API_URL}/api/users/${editingUser.id}`, updateData);
+        await api.put(`/api/users/${editingUser.id}`, updateData);
         toast.success("Пользователь обновлен");
       } else {
         // Create user
-        await axios.post(`${API_URL}/api/users`, formData);
+        await api.post(`/api/users`, formData);
         toast.success("Пользователь создан");
       }
 
@@ -108,7 +107,7 @@ export default function UsersPage() {
     }
 
     try {
-      await axios.delete(`${API_URL}/api/users/${userId}`);
+      await api.delete(`/api/users/${userId}`);
       toast.success("Пользователь удален");
       fetchUsers();
     } catch (error) {
@@ -124,7 +123,7 @@ export default function UsersPage() {
     }
 
     try {
-      await axios.put(`${API_URL}/api/users/${selectedUserId}/password`, {
+      await api.put(`/api/users/${selectedUserId}/password`, {
         new_password: newPassword
       });
       toast.success("Пароль изменен");
@@ -145,7 +144,7 @@ export default function UsersPage() {
 
   const handleSaveRoles = async () => {
     try {
-      await axios.put(`${API_URL}/api/users/${selectedUserId}/roles`, selectedRoles);
+      await api.put(`/api/users/${selectedUserId}/roles`, selectedRoles);
       toast.success("Роли назначены");
       setRolesDialogOpen(false);
       fetchUsers();

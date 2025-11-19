@@ -7,9 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Folder, Plus, Edit, Trash2, Smile } from "lucide-react";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { api } from '../config/api';
 
 const CategoriesPage = () => {
   const [categories, setCategories] = useState([]);
@@ -28,7 +26,7 @@ const CategoriesPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${API}/categories`);
+      const response = await api.get(`/api/categories`);
       setCategories(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки категорий");
@@ -39,10 +37,10 @@ const CategoriesPage = () => {
     e.preventDefault();
     try {
       if (editingCategory) {
-        await axios.put(`${API}/categories/${editingCategory.id}`, formData);
+        await api.put(`/api/categories/${editingCategory.id}`, formData);
         toast.success("Категория обновлена");
       } else {
-        await axios.post(`${API}/categories`, formData);
+        await api.post(`/api/categories`, formData);
         toast.success("Категория создана");
       }
       setIsDialogOpen(false);
@@ -56,7 +54,7 @@ const CategoriesPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Удалить категорию? Это удалит все связанные системы.")) {
       try {
-        await axios.delete(`${API}/categories/${id}`);
+        await api.delete(`/api/categories/${id}`);
         toast.success("Категория удалена");
         fetchCategories();
       } catch (error) {

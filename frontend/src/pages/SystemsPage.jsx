@@ -9,9 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { HardDrive, Plus, Edit, Trash2 } from "lucide-react";
+import { api } from '../config/api';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 const SystemsPage = () => {
   const [systems, setSystems] = useState([]);
@@ -37,7 +36,7 @@ const SystemsPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${API}/categories`);
+      const response = await api.get(`/api/categories`);
       setCategories(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки категорий");
@@ -47,9 +46,9 @@ const SystemsPage = () => {
   const fetchSystems = async () => {
     try {
       const url = selectedCategoryFilter && selectedCategoryFilter !== "all"
-        ? `${API}/systems?category_id=${selectedCategoryFilter}`
-        : `${API}/systems`;
-      const response = await axios.get(url);
+        ? `/api/systems?category_id=${selectedCategoryFilter}`
+        : `/api/systems`;
+      const response = await api.get(url);
       setSystems(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки систем");
@@ -66,10 +65,10 @@ const SystemsPage = () => {
     
     try {
       if (editingSystem) {
-        await axios.put(`${API}/systems/${editingSystem.id}`, formData);
+        await api.put(`/api/systems/${editingSystem.id}`, formData);
         toast.success("Система обновлена");
       } else {
-        await axios.post(`${API}/categories/${formData.category_id}/systems`, formData);
+        await api.post(`/api/categories/${formData.category_id}/systems`, formData);
         toast.success("Система создана");
       }
       setIsDialogOpen(false);
@@ -83,7 +82,7 @@ const SystemsPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Удалить систему? Это удалит все связанные скрипты.")) {
       try {
-        await axios.delete(`${API}/systems/${id}`);
+        await api.delete(`/api/systems/${id}`);
         toast.success("Система удалена");
         fetchSystems();
       } catch (error) {

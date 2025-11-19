@@ -6,8 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import { api } from '../config/api';
 
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
@@ -44,15 +43,15 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   }, [logs]);
 
   const fetchProject = async () => {
-    try {
-      const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
-        axios.get(`${API_URL}/api/projects/${projectId}`),
-        axios.get(`${API_URL}/api/projects/${projectId}/tasks`),
-        axios.get(`${API_URL}/api/hosts`),
-        axios.get(`${API_URL}/api/systems`),
-        axios.get(`${API_URL}/api/scripts`),
-        axios.get(`${API_URL}/api/projects/${projectId}/users`)
-      ]);
+  try {
+			const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
+				api.get(`/api/projects/${projectId}`),          
+				api.get(`/api/projects/${projectId}/tasks`),      
+				api.get('/api/hosts'),                          
+				api.get('/api/systems'),                        
+				api.get('/api/scripts'),                         
+				api.get(`/api/projects/${projectId}/users`)
+			]);
       
       setProject(projectRes.data);
       setTasks(tasksRes.data);
@@ -86,7 +85,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
     try {
       // Update each modified task
       const updates = Object.values(editedTasks).map(task => 
-        axios.put(`${API_URL}/api/projects/${projectId}/tasks/${task.id}`, {
+        api.put(`/api/projects/${projectId}/tasks/${task.id}`, {
           script_ids: task.script_ids,
           reference_data: task.reference_data
         })
@@ -95,7 +94,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       await Promise.all(updates);
       
       // Refresh tasks
-      const tasksRes = await axios.get(`${API_URL}/api/projects/${projectId}/tasks`);
+      const tasksRes = await api.get(`/api/projects/${projectId}/tasks`);
       setTasks(tasksRes.data);
       
       setEditMode(false);
@@ -136,7 +135,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
       // Connect to SSE for real-time updates (EventSource uses GET by default)
       // The backend endpoint will start execution when first connected
-      const eventSource = new EventSource(`${API_URL}/api/projects/${projectId}/execute`);
+      const eventSource = new EventSource(`/api/projects/${projectId}/execute`);
       eventSourceRef.current = eventSource;
 
       eventSource.onmessage = (event) => {
