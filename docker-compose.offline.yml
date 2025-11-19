@@ -44,8 +44,6 @@ services:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=ssh_runner_db
       - CORS_ORIGINS=*
-      - CORS_ALLOW_CREDENTIALS=true
-      - CORS_ALLOW_ALL_ORIGINS=true      
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
     # НЕ монтируем volumes для production/offline
     healthcheck:
