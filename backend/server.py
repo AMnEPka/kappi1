@@ -177,6 +177,7 @@ class Host(BaseModel):
     ssh_key: Optional[str] = None
     connection_type: str = "ssh"  # "ssh" for Linux, "winrm" for Windows, "k8s" for Kubernetes
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
 
 class HostCreate(BaseModel):
     name: str
@@ -2138,7 +2139,8 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
                             success=result.success,
                             output=result.output,
                             error=result.error,
-                            check_status=result.check_status
+                            check_status=result.check_status,
+                            executed_by=user_id
                         )
                         
                         exec_doc = prepare_for_mongo(execution.model_dump())
@@ -2201,8 +2203,13 @@ async def get_project_executions(project_id: str):
 
 # Get execution sessions for project (list of unique session runs)
 @api_router.get("/projects/{project_id}/sessions")
-async def get_project_sessions(project_id: str):
-    """Get list of execution sessions for a project"""
+async def get_project_sessions(project_id: str, current_user: User = Depends(get_current_user)):
+    """Get list of execution sessions for a project (requires results_view_all or project access)"""
+    # Check access: user must either view all results or have access to the project
+    if not await has_permission(current_user, 'results_view_all'):
+        if not await can_access_project(current_user, project_id):
+            raise HTTPException(status_code=403, detail="Access denied to this project")
+
     # Get distinct session IDs with their timestamps and check status counts
     # If check_status is not one of the expected values, count it as error
     pipeline = [
@@ -2314,7 +2321,8 @@ async def execute_script(execute_req: ExecuteRequest, current_user: User = Depen
             success=result.success,
             output=result.output,
             error=result.error,
-            check_status=result.check_status
+            check_status=result.check_status,
+            executed_by=current_user.id
         )
         
         doc = prepare_for_mongo(execution.model_dump())
