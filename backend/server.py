@@ -25,6 +25,7 @@ from datetime import date
 import tempfile
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from typing import Tuple 
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -157,174 +158,7 @@ def log_audit(event: str, *, user_id: Optional[str] = None, username: Optional[s
         asyncio.run(_persist_audit_log(payload))
 
 
-def _parse_datetime_param(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
-    if not value:
-        return None
-    try:
-        dt = datetime.fromisoformat(value)
-    except ValueError:
-        # Support date-only input
-        try:
-            dt = datetime.fromisoformat(f"{value}T00:00:00")
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid date format: {value}")
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    if end_of_day:
-        dt = dt + timedelta(days=1)
-    return dt
 
-def _parse_time_of_day(value: str) -> time:
-    parts = value.split(":")
-    if len(parts) < 2:
-        raise HTTPException(status_code=400, detail=f"Invalid time format: {value}")
-    hour = int(parts[0])
-    minute = int(parts[1])
-    return time(hour=hour, minute=minute, tzinfo=timezone.utc)
-
-def _next_daily_occurrence(config: Dict[str, Any], *, reference: datetime, initial: bool = False) -> Optional[datetime]:
-    time_str = config.get("recurrence_time")
-    if not time_str:
-        return None
-    target_time = _parse_time_of_day(time_str)
-    start_date_str = config.get("recurrence_start_date")
-    start_date_value = datetime.fromisoformat(f"{start_date_str}T00:00:00").date() if start_date_str else reference.date()
-    candidate_date = start_date_value if initial else reference.date()
-    candidate = datetime.combine(candidate_date, target_time)
-    if candidate <= reference:
-        candidate += timedelta(days=1)
-    return candidate
-
-def _normalize_run_times(run_times: List[datetime]) -> List[datetime]:
-    cleaned = []
-    for value in run_times:
-        if value.tzinfo is None:
-            cleaned.append(value.replace(tzinfo=timezone.utc))
-        else:
-            cleaned.append(value.astimezone(timezone.utc))
-    cleaned.sort()
-    return cleaned
-
-def _calculate_next_run(job: SchedulerJob, *, reference: Optional[datetime] = None, initial: bool = False) -> Optional[datetime]:
-    reference_dt = reference or datetime.now(timezone.utc)
-    if job.job_type == "one_time":
-        return job.next_run_at
-    if job.job_type == "multi_run":
-        future_runs = [rt for rt in job.run_times if rt >= reference_dt]
-        return future_runs[0] if future_runs else None
-    if job.job_type == "recurring":
-        return _next_daily_occurrence(job.schedule_config, reference=reference_dt, initial=initial)
-    return None
-
-async def _consume_streaming_response(streaming_response) -> Tuple[Optional[str], Optional[str]]:
-    session_id = None
-    final_status = None
-    buffer = ""
-    body_iterator = getattr(streaming_response, "body_iterator", None)
-    if body_iterator is None:
-        return session_id, final_status
-    async for chunk in body_iterator:
-        text = chunk.decode() if isinstance(chunk, (bytes, bytearray)) else str(chunk)
-        buffer += text
-        while "\n\n" in buffer:
-            block, buffer = buffer.split("\n\n", 1)
-            line = block.strip()
-            if line.startswith("data: "):
-                try:
-                    payload = json.loads(line[len("data: "):])
-                except json.JSONDecodeError:
-                    continue
-                if payload.get("type") == "complete":
-                    session_id = payload.get("session_id")
-                    final_status = payload.get("status")
-    if hasattr(body_iterator, "aclose"):
-        await body_iterator.aclose()
-    return session_id, final_status
-
-async def _update_job_after_run(job: SchedulerJob, *, run_success: bool) -> None:
-    now = datetime.now(timezone.utc)
-    update_fields: Dict[str, Any] = {
-        "last_run_at": now.isoformat(),
-        "last_run_status": "success" if run_success else "failed",
-        "updated_at": now.isoformat(),
-    }
-    if job.job_type == "one_time":
-        update_fields["status"] = "completed"
-        update_fields["next_run_at"] = None
-    elif job.job_type == "multi_run":
-        future_runs = [rt for rt in job.run_times if rt > now]
-        update_fields["run_times"] = [rt.isoformat() for rt in future_runs]
-        update_fields["remaining_runs"] = len(future_runs)
-        if future_runs:
-            update_fields["next_run_at"] = future_runs[0].isoformat()
-        else:
-            update_fields["status"] = "completed"
-            update_fields["next_run_at"] = None
-    elif job.job_type == "recurring":
-        next_run = _calculate_next_run(job, reference=now)
-        update_fields["next_run_at"] = next_run.isoformat() if next_run else None
-    await db.scheduler_jobs.update_one({"id": job.id}, {"$set": update_fields})
-
-async def _execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Optional[str]]:
-    user_doc = await db.users.find_one({"id": job.created_by}, {"_id": 0})
-    if not user_doc:
-        raise RuntimeError("Creator of scheduler job not found")
-    scheduler_user = User(**user_doc)
-    log_audit(
-        "launched_using_scheduler",
-        user_id=scheduler_user.id,
-        username=scheduler_user.username,
-        details={"project_id": job.project_id, "scheduler_job_id": job.id}
-    )
-    response = await execute_project(job.project_id, current_user=scheduler_user)  # type: ignore[arg-type]
-    session_id, final_status = await _consume_streaming_response(response)
-    return session_id, final_status
-
-async def _handle_due_scheduler_job(job_doc: dict) -> None:
-    job = SchedulerJob(**parse_from_mongo(job_doc))
-    now_iso = datetime.now(timezone.utc).isoformat()
-    await db.scheduler_jobs.update_one({"id": job.id}, {"$set": {"next_run_at": None, "updated_at": now_iso}})
-    run = SchedulerRun(job_id=job.id, project_id=job.project_id, launched_by_user=job.created_by)
-    await db.scheduler_runs.insert_one(prepare_for_mongo(run.model_dump()))
-    error_message = None
-    try:
-        session_id, final_status = await _execute_scheduler_job(job)
-        run_status = "success" if final_status == "completed" else "failed"
-    except Exception as exc:
-        logger.error(f"Scheduler job {job.id} failed: {str(exc)}")
-        session_id = None
-        run_status = "failed"
-        error_message = str(exc)
-    update_run = {
-        "status": run_status,
-        "finished_at": datetime.now(timezone.utc).isoformat(),
-        "session_id": session_id
-    }
-    if error_message:
-        update_run["error"] = error_message
-    await db.scheduler_runs.update_one({"id": run.id}, {"$set": update_run})
-    if job.job_type == "multi_run":
-        now = datetime.now(timezone.utc)
-        job.run_times = [rt for rt in job.run_times if rt > now]
-    await _update_job_after_run(job, run_success=run_status == "success")
-
-async def scheduler_worker():
-    await asyncio.sleep(5)
-    while True:
-        try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            jobs = await db.scheduler_jobs.find(
-                {
-                    "status": "active",
-                    "next_run_at": {"$ne": None, "$lte": now_iso}
-                },
-                {"_id": 0}
-            ).to_list(20)
-            for job_doc in jobs:
-                await _handle_due_scheduler_job(job_doc)
-        except Exception as exc:
-            logger.error(f"Scheduler worker error: {str(exc)}")
-        await asyncio.sleep(SCHEDULER_POLL_SECONDS)
 
 # Auth helper functions
 def hash_password(password: str) -> str:
@@ -692,6 +526,178 @@ class ProjectAccess(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     new_password: str
+
+
+#scheduler
+def _parse_datetime_param(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        # Support date-only input
+        try:
+            dt = datetime.fromisoformat(f"{value}T00:00:00")
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid date format: {value}")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if end_of_day:
+        dt = dt + timedelta(days=1)
+    return dt
+
+def _parse_time_of_day(value: str) -> time:
+    parts = value.split(":")
+    if len(parts) < 2:
+        raise HTTPException(status_code=400, detail=f"Invalid time format: {value}")
+    hour = int(parts[0])
+    minute = int(parts[1])
+    return time(hour=hour, minute=minute, tzinfo=timezone.utc)
+
+def _next_daily_occurrence(config: Dict[str, Any], *, reference: datetime, initial: bool = False) -> Optional[datetime]:
+    time_str = config.get("recurrence_time")
+    if not time_str:
+        return None
+    target_time = _parse_time_of_day(time_str)
+    start_date_str = config.get("recurrence_start_date")
+    start_date_value = datetime.fromisoformat(f"{start_date_str}T00:00:00").date() if start_date_str else reference.date()
+    candidate_date = start_date_value if initial else reference.date()
+    candidate = datetime.combine(candidate_date, target_time)
+    if candidate <= reference:
+        candidate += timedelta(days=1)
+    return candidate
+
+def _normalize_run_times(run_times: List[datetime]) -> List[datetime]:
+    cleaned = []
+    for value in run_times:
+        if value.tzinfo is None:
+            cleaned.append(value.replace(tzinfo=timezone.utc))
+        else:
+            cleaned.append(value.astimezone(timezone.utc))
+    cleaned.sort()
+    return cleaned
+
+def _calculate_next_run(job: SchedulerJob, *, reference: Optional[datetime] = None, initial: bool = False) -> Optional[datetime]:
+    reference_dt = reference or datetime.now(timezone.utc)
+    if job.job_type == "one_time":
+        return job.next_run_at
+    if job.job_type == "multi_run":
+        future_runs = [rt for rt in job.run_times if rt >= reference_dt]
+        return future_runs[0] if future_runs else None
+    if job.job_type == "recurring":
+        return _next_daily_occurrence(job.schedule_config, reference=reference_dt, initial=initial)
+    return None
+
+async def _consume_streaming_response(streaming_response) -> Tuple[Optional[str], Optional[str]]:
+    session_id = None
+    final_status = None
+    buffer = ""
+    body_iterator = getattr(streaming_response, "body_iterator", None)
+    if body_iterator is None:
+        return session_id, final_status
+    async for chunk in body_iterator:
+        text = chunk.decode() if isinstance(chunk, (bytes, bytearray)) else str(chunk)
+        buffer += text
+        while "\n\n" in buffer:
+            block, buffer = buffer.split("\n\n", 1)
+            line = block.strip()
+            if line.startswith("data: "):
+                try:
+                    payload = json.loads(line[len("data: "):])
+                except json.JSONDecodeError:
+                    continue
+                if payload.get("type") == "complete":
+                    session_id = payload.get("session_id")
+                    final_status = payload.get("status")
+    if hasattr(body_iterator, "aclose"):
+        await body_iterator.aclose()
+    return session_id, final_status
+
+async def _update_job_after_run(job: SchedulerJob, *, run_success: bool) -> None:
+    now = datetime.now(timezone.utc)
+    update_fields: Dict[str, Any] = {
+        "last_run_at": now.isoformat(),
+        "last_run_status": "success" if run_success else "failed",
+        "updated_at": now.isoformat(),
+    }
+    if job.job_type == "one_time":
+        update_fields["status"] = "completed"
+        update_fields["next_run_at"] = None
+    elif job.job_type == "multi_run":
+        future_runs = [rt for rt in job.run_times if rt > now]
+        update_fields["run_times"] = [rt.isoformat() for rt in future_runs]
+        update_fields["remaining_runs"] = len(future_runs)
+        if future_runs:
+            update_fields["next_run_at"] = future_runs[0].isoformat()
+        else:
+            update_fields["status"] = "completed"
+            update_fields["next_run_at"] = None
+    elif job.job_type == "recurring":
+        next_run = _calculate_next_run(job, reference=now)
+        update_fields["next_run_at"] = next_run.isoformat() if next_run else None
+    await db.scheduler_jobs.update_one({"id": job.id}, {"$set": update_fields})
+
+async def _execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Optional[str]]:
+    user_doc = await db.users.find_one({"id": job.created_by}, {"_id": 0})
+    if not user_doc:
+        raise RuntimeError("Creator of scheduler job not found")
+    scheduler_user = User(**user_doc)
+    log_audit(
+        "launched_using_scheduler",
+        user_id=scheduler_user.id,
+        username=scheduler_user.username,
+        details={"project_id": job.project_id, "scheduler_job_id": job.id}
+    )
+    response = await execute_project(job.project_id, current_user=scheduler_user)  # type: ignore[arg-type]
+    session_id, final_status = await _consume_streaming_response(response)
+    return session_id, final_status
+
+async def _handle_due_scheduler_job(job_doc: dict) -> None:
+    job = SchedulerJob(**parse_from_mongo(job_doc))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.scheduler_jobs.update_one({"id": job.id}, {"$set": {"next_run_at": None, "updated_at": now_iso}})
+    run = SchedulerRun(job_id=job.id, project_id=job.project_id, launched_by_user=job.created_by)
+    await db.scheduler_runs.insert_one(prepare_for_mongo(run.model_dump()))
+    error_message = None
+    try:
+        session_id, final_status = await _execute_scheduler_job(job)
+        run_status = "success" if final_status == "completed" else "failed"
+    except Exception as exc:
+        logger.error(f"Scheduler job {job.id} failed: {str(exc)}")
+        session_id = None
+        run_status = "failed"
+        error_message = str(exc)
+    update_run = {
+        "status": run_status,
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id
+    }
+    if error_message:
+        update_run["error"] = error_message
+    await db.scheduler_runs.update_one({"id": run.id}, {"$set": update_run})
+    if job.job_type == "multi_run":
+        now = datetime.now(timezone.utc)
+        job.run_times = [rt for rt in job.run_times if rt > now]
+    await _update_job_after_run(job, run_success=run_status == "success")
+
+async def scheduler_worker():
+    await asyncio.sleep(5)
+    while True:
+        try:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            jobs = await db.scheduler_jobs.find(
+                {
+                    "status": "active",
+                    "next_run_at": {"$ne": None, "$lte": now_iso}
+                },
+                {"_id": 0}
+            ).to_list(20)
+            for job_doc in jobs:
+                await _handle_due_scheduler_job(job_doc)
+        except Exception as exc:
+            logger.error(f"Scheduler worker error: {str(exc)}")
+        await asyncio.sleep(SCHEDULER_POLL_SECONDS)
+
 
 # SSH Execution Function
 async def execute_command(host: Host, command: str) -> ExecutionResult:
