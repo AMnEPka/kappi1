@@ -404,7 +404,6 @@ class ProjectAccess(BaseModel):
 class PasswordResetRequest(BaseModel):
     new_password: str
 
-
 # SSH Execution Function
 async def execute_command(host: Host, command: str) -> ExecutionResult:
     """Execute command on host via appropriate connection method (SSH or WinRM)"""
@@ -2795,13 +2794,17 @@ async def revoke_project_access(project_id: str, user_id: str, current_user: Use
     return {"message": "Access revoked successfully"}
 
 
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
+
+# Минимальная рабочая CORS конфигурация
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=["*"],  # Просто хардкодим для теста
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -2812,6 +2815,12 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "healthy"}
+
 
 @app.on_event("startup")
 async def startup_db_init():

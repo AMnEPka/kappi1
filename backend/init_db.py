@@ -40,14 +40,14 @@ async def init_database():
             "id": admin_id,
             "username": "admin",
             "full_name": "Администратор",
-            "password_hash": pwd_context.hash("admin123"),
+            "password_hash": pwd_context.hash("admin"),
             "is_active": True,
             "is_admin": True,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "created_by": None
         }
         await db.users.insert_one(admin_user)
-        print("✅ Created admin user (username: admin, password: admin123)")
+        print("✅ Created admin user (username: admin, password: admin)")
     
     # Check if roles exist
     existing_roles = await db.roles.count_documents({})
