@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Depends, status, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
@@ -54,6 +54,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # HTTP Bearer for JWT
 security = HTTPBearer()
 
+# Logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("ssh_runner")
+
 # Permissions list
 PERMISSIONS = {
     'categories_manage': 'Управление категориями и системами',
@@ -96,6 +103,58 @@ def parse_from_mongo(item: dict) -> dict:
     if isinstance(item.get('created_at'), str):
         item['created_at'] = datetime.fromisoformat(item['created_at'])
     return item
+
+
+async def _persist_audit_log(entry: Dict[str, Any]) -> None:
+    try:
+        doc = entry.copy()
+        doc["id"] = str(uuid.uuid4())
+        doc["created_at"] = datetime.now(timezone.utc).isoformat()
+        await db.audit_logs.insert_one(doc)
+    except Exception as e:
+        logger.error("Failed to persist audit log: %s", str(e))
+
+
+def log_audit(event: str, *, user_id: Optional[str] = None, username: Optional[str] = None,
+              details: Optional[Dict[str, Any]] = None, level: int = logging.INFO) -> None:
+    """Structured audit logging helper"""
+    payload: Dict[str, Any] = {
+        "event": event,
+        "level": logging.getLevelName(level)
+    }
+    if user_id:
+        payload["user_id"] = user_id
+    if username:
+        payload["username"] = username
+    if details:
+        payload["details"] = details
+    
+    logger.log(level, "[AUDIT] %s", json.dumps(payload, ensure_ascii=False, default=str))
+    
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_persist_audit_log(payload))
+    except RuntimeError:
+        # No running loop (e.g., during startup). Persist synchronously.
+        asyncio.run(_persist_audit_log(payload))
+
+
+def _parse_datetime_param(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        # Support date-only input
+        try:
+            dt = datetime.fromisoformat(f"{value}T00:00:00")
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid date format: {value}")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if end_of_day:
+        dt = dt + timedelta(days=1)
+    return dt
 
 # Auth helper functions
 def hash_password(password: str) -> str:
@@ -312,6 +371,17 @@ class Execution(BaseModel):
     check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     executed_by: Optional[str] = None
+
+class AuditLog(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    event: str
+    level: str = "INFO"
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ExecuteProjectRequest(BaseModel):
     """Request to execute a project"""
@@ -1239,11 +1309,18 @@ async def can_access_project(user: User, project_id: str) -> bool:
 
 # API Routes - Authentication
 @api_router.post("/auth/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, request: Request):
     """Login and get JWT token"""
+    client_ip = request.client.host if request.client else None
+    
     # Find user
     user_doc = await db.users.find_one({"username": login_data.username})
     if not user_doc:
+        log_audit(
+            "user_login_failed",
+            username=login_data.username,
+            details={"reason": "user_not_found", "ip": client_ip}
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password"
@@ -1253,12 +1330,24 @@ async def login(login_data: LoginRequest):
     
     # Verify password
     if not verify_password(login_data.password, user.password_hash):
+        log_audit(
+            "user_login_failed",
+            user_id=user.id,
+            username=user.username,
+            details={"reason": "invalid_password", "ip": client_ip}
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password"
         )
     
     if not user.is_active:
+        log_audit(
+            "user_login_failed",
+            user_id=user.id,
+            username=user.username,
+            details={"reason": "inactive_user", "ip": client_ip}
+        )
         raise HTTPException(status_code=400, detail="Inactive user")
     
     # Create access token
@@ -1273,6 +1362,13 @@ async def login(login_data: LoginRequest):
         is_admin=user.is_admin,
         created_at=user.created_at,
         created_by=user.created_by
+    )
+    
+    log_audit(
+        "user_login_success",
+        user_id=user.id,
+        username=user.username,
+        details={"ip": client_ip}
     )
     
     return LoginResponse(
@@ -1318,6 +1414,13 @@ async def create_host(host_input: HostCreate, current_user: User = Depends(get_c
     doc = prepare_for_mongo(host_obj.model_dump())
     
     await db.hosts.insert_one(doc)
+    
+    log_audit(
+        "host_created",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"host_id": host_obj.id, "host_name": host_obj.name}
+    )
     return host_obj
 
 @api_router.get("/hosts", response_model=List[Host])
@@ -1398,6 +1501,13 @@ async def update_host(host_id: str, host_update: HostUpdate, current_user: User 
     )
     
     updated_host = await db.hosts.find_one({"id": host_id}, {"_id": 0})
+    
+    log_audit(
+        "host_updated",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"host_id": host_id, "updated_fields": list(update_data.keys())}
+    )
     return Host(**parse_from_mongo(updated_host))
 
 @api_router.delete("/hosts/{host_id}")
@@ -1584,6 +1694,13 @@ async def create_script(system_id: str, script_input: ScriptCreate, current_user
     doc = prepare_for_mongo(script_obj.model_dump())
     
     await db.scripts.insert_one(doc)
+    
+    log_audit(
+        "check_created",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"script_id": script_obj.id, "script_name": script_obj.name}
+    )
     return script_obj
 
 @api_router.get("/scripts")
@@ -1703,6 +1820,13 @@ async def update_script(script_id: str, script_update: ScriptUpdate, current_use
     )
     
     updated_script = await db.scripts.find_one({"id": script_id}, {"_id": 0})
+    
+    log_audit(
+        "check_updated",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"script_id": script_id, "updated_fields": list(update_data.keys())}
+    )
     return Script(**parse_from_mongo(updated_script))
 
 @api_router.delete("/scripts/{script_id}")
@@ -1733,6 +1857,13 @@ async def create_project(project_input: ProjectCreate, current_user: User = Depe
     doc = prepare_for_mongo(project_obj.model_dump())
     
     await db.projects.insert_one(doc)
+    
+    log_audit(
+        "project_created",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"project_id": project_obj.id, "project_name": project_obj.name}
+    )
     return project_obj
 
 @api_router.get("/projects", response_model=List[Project])
@@ -1903,6 +2034,13 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
     # Check project access
     if not await can_access_project(current_user, project_id):
         raise HTTPException(status_code=403, detail="Access denied to this project")
+    
+    log_audit(
+        "project_execution_started",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"project_id": project_id}
+    )
     
     async def event_generator():
         try:
@@ -2190,14 +2328,61 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
     )
 
 
+@api_router.get("/audit/logs", response_model=List[AuditLog])
+async def get_audit_logs(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    event_types: Optional[str] = None,
+    limit: int = 200,
+    current_user: User = Depends(get_current_user)
+):
+    """Fetch audit logs with optional filters (admin only)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query: Dict[str, Any] = {}
+    created_filter: Dict[str, Any] = {}
+    
+    start_dt = _parse_datetime_param(start_date) if start_date else None
+    end_dt = _parse_datetime_param(end_date, end_of_day=True) if end_date else None
+    
+    if start_dt:
+        created_filter["$gte"] = start_dt.isoformat()
+    if end_dt:
+        created_filter["$lte"] = end_dt.isoformat()
+    if created_filter:
+        query["created_at"] = created_filter
+    
+    if event_types:
+        events = [event.strip() for event in event_types.split(",") if event.strip()]
+        if events:
+            query["event"] = {"$in": events}
+    
+    limit = max(1, min(limit, 500))
+    
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return [AuditLog(**parse_from_mongo(log)) for log in logs]
+
+
 # Get project execution results
 @api_router.get("/projects/{project_id}/executions", response_model=List[Execution])
-async def get_project_executions(project_id: str):
+async def get_project_executions(project_id: str, current_user: User = Depends(get_current_user)):
     """Get all execution results for a project"""
+    if not await has_permission(current_user, 'results_view_all'):
+        if not await can_access_project(current_user, project_id):
+            raise HTTPException(status_code=403, detail="Access denied to this project")
+    
     executions = await db.executions.find(
         {"project_id": project_id},
         {"_id": 0}
     ).sort("executed_at", -1).to_list(1000)
+    
+    log_audit(
+        "project_results_viewed",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"project_id": project_id, "scope": "project"}
+    )
     
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
@@ -2277,6 +2462,13 @@ async def get_session_executions(project_id: str, session_id: str, current_user:
         {"project_id": project_id, "execution_session_id": session_id},
         {"_id": 0}
     ).sort("executed_at", 1).to_list(1000)
+    
+    log_audit(
+        "project_results_viewed",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"project_id": project_id, "session_id": session_id, "scope": "session"}
+    )
     
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
@@ -2365,6 +2557,13 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
     if not await has_permission(current_user, 'results_export_all'):
         if not await can_access_project(current_user, project_id):
             raise HTTPException(status_code=403, detail="Access denied to this project")
+    
+    log_audit(
+        "project_results_exported",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"project_id": project_id, "session_id": session_id}
+    )
     
     # Get project info
     project = await db.projects.find_one({"id": project_id}, {"_id": 0})
@@ -2816,14 +3015,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
 
 @app.get("/api/health")
 def health():

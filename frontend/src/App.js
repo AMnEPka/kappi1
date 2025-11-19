@@ -24,6 +24,7 @@ import UsersPage from "@/pages/UsersPage";
 import RolesPage from "@/pages/RolesPage";
 import { Menu, HelpCircle, EthernetPort, Loader2, Calendar, FileText } from 'lucide-react'; 
 import { api } from './config/api';
+import LogsPage from "@/pages/LogsPage";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -1463,15 +1464,17 @@ const Layout = ({ children }) => {
                 <Calendar className="mr-3 h-8 w-8" /> Планировщик
               </Button>
             </Link>
-            <Link to="/logs">
-              <Button 
-                variant="ghost" 
-                data-testid="nav-logs" 
-                className="text-black hover:bg-white h-12 px-4 py-3 font-medium"
-              >
-                <FileText className="mr-3 h-8 w-8" /> Логи
-              </Button>
-            </Link>
+            {isAdmin && (
+              <Link to="/logs">
+                <Button 
+                  variant="ghost" 
+                  data-testid="nav-logs" 
+                  className="text-black hover:bg-white h-12 px-4 py-3 font-medium"
+                >
+                  <FileText className="mr-3 h-8 w-8" /> Логи
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Выпадающее меню справа */}
@@ -1592,6 +1595,7 @@ function App() {
                     <Route path="/projects/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
                     <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />
                     <Route path="/history" element={<HistoryPage />} />
+                    <Route path="/logs" element={<LogsPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/users" element={<UsersPage />} />
                     <Route path="/roles" element={<RolesPage />} />
