@@ -8,15 +8,16 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, time
 import paramiko
 import winrm
 import asyncio
 from cryptography.fernet import Fernet
 import base64
 import json
+import contextlib
 import socket
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
@@ -36,6 +37,9 @@ cipher_suite = Fernet(ENCRYPTION_KEY.encode())
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+SCHEDULER_POLL_SECONDS = int(os.environ.get("SCHEDULER_POLL_SECONDS", "30"))
+scheduler_task: Optional[asyncio.Task] = None
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -94,15 +98,29 @@ def decrypt_password(encrypted_password: str) -> str:
 
 def prepare_for_mongo(data: dict) -> dict:
     """Prepare data for MongoDB storage"""
-    if isinstance(data.get('created_at'), datetime):
-        data['created_at'] = data['created_at'].isoformat()
-    return data
+    prepared = data.copy()
+    for field in ["created_at", "updated_at", "executed_at", "next_run_at", "last_run_at", "started_at", "finished_at"]:
+        if isinstance(prepared.get(field), datetime):
+            prepared[field] = prepared[field].isoformat()
+    if isinstance(prepared.get("run_times"), list):
+        prepared["run_times"] = [
+            value.isoformat() if isinstance(value, datetime) else value
+            for value in prepared["run_times"]
+        ]
+    return prepared
 
 def parse_from_mongo(item: dict) -> dict:
     """Parse data from MongoDB"""
-    if isinstance(item.get('created_at'), str):
-        item['created_at'] = datetime.fromisoformat(item['created_at'])
-    return item
+    parsed = item.copy()
+    for field in ["created_at", "updated_at", "executed_at", "next_run_at", "last_run_at", "started_at", "finished_at"]:
+        if isinstance(parsed.get(field), str):
+            parsed[field] = datetime.fromisoformat(parsed[field])
+    if isinstance(parsed.get("run_times"), list):
+        parsed["run_times"] = [
+            datetime.fromisoformat(value) if isinstance(value, str) else value
+            for value in parsed["run_times"]
+        ]
+    return parsed
 
 
 async def _persist_audit_log(entry: Dict[str, Any]) -> None:
@@ -155,6 +173,158 @@ def _parse_datetime_param(value: Optional[str], *, end_of_day: bool = False) -> 
     if end_of_day:
         dt = dt + timedelta(days=1)
     return dt
+
+def _parse_time_of_day(value: str) -> time:
+    parts = value.split(":")
+    if len(parts) < 2:
+        raise HTTPException(status_code=400, detail=f"Invalid time format: {value}")
+    hour = int(parts[0])
+    minute = int(parts[1])
+    return time(hour=hour, minute=minute, tzinfo=timezone.utc)
+
+def _next_daily_occurrence(config: Dict[str, Any], *, reference: datetime, initial: bool = False) -> Optional[datetime]:
+    time_str = config.get("recurrence_time")
+    if not time_str:
+        return None
+    target_time = _parse_time_of_day(time_str)
+    start_date_str = config.get("recurrence_start_date")
+    start_date_value = datetime.fromisoformat(f"{start_date_str}T00:00:00").date() if start_date_str else reference.date()
+    candidate_date = start_date_value if initial else reference.date()
+    candidate = datetime.combine(candidate_date, target_time)
+    if candidate <= reference:
+        candidate += timedelta(days=1)
+    return candidate
+
+def _normalize_run_times(run_times: List[datetime]) -> List[datetime]:
+    cleaned = []
+    for value in run_times:
+        if value.tzinfo is None:
+            cleaned.append(value.replace(tzinfo=timezone.utc))
+        else:
+            cleaned.append(value.astimezone(timezone.utc))
+    cleaned.sort()
+    return cleaned
+
+def _calculate_next_run(job: SchedulerJob, *, reference: Optional[datetime] = None, initial: bool = False) -> Optional[datetime]:
+    reference_dt = reference or datetime.now(timezone.utc)
+    if job.job_type == "one_time":
+        return job.next_run_at
+    if job.job_type == "multi_run":
+        future_runs = [rt for rt in job.run_times if rt >= reference_dt]
+        return future_runs[0] if future_runs else None
+    if job.job_type == "recurring":
+        return _next_daily_occurrence(job.schedule_config, reference=reference_dt, initial=initial)
+    return None
+
+async def _consume_streaming_response(streaming_response) -> Tuple[Optional[str], Optional[str]]:
+    session_id = None
+    final_status = None
+    buffer = ""
+    body_iterator = getattr(streaming_response, "body_iterator", None)
+    if body_iterator is None:
+        return session_id, final_status
+    async for chunk in body_iterator:
+        text = chunk.decode() if isinstance(chunk, (bytes, bytearray)) else str(chunk)
+        buffer += text
+        while "\n\n" in buffer:
+            block, buffer = buffer.split("\n\n", 1)
+            line = block.strip()
+            if line.startswith("data: "):
+                try:
+                    payload = json.loads(line[len("data: "):])
+                except json.JSONDecodeError:
+                    continue
+                if payload.get("type") == "complete":
+                    session_id = payload.get("session_id")
+                    final_status = payload.get("status")
+    if hasattr(body_iterator, "aclose"):
+        await body_iterator.aclose()
+    return session_id, final_status
+
+async def _update_job_after_run(job: SchedulerJob, *, run_success: bool) -> None:
+    now = datetime.now(timezone.utc)
+    update_fields: Dict[str, Any] = {
+        "last_run_at": now.isoformat(),
+        "last_run_status": "success" if run_success else "failed",
+        "updated_at": now.isoformat(),
+    }
+    if job.job_type == "one_time":
+        update_fields["status"] = "completed"
+        update_fields["next_run_at"] = None
+    elif job.job_type == "multi_run":
+        future_runs = [rt for rt in job.run_times if rt > now]
+        update_fields["run_times"] = [rt.isoformat() for rt in future_runs]
+        update_fields["remaining_runs"] = len(future_runs)
+        if future_runs:
+            update_fields["next_run_at"] = future_runs[0].isoformat()
+        else:
+            update_fields["status"] = "completed"
+            update_fields["next_run_at"] = None
+    elif job.job_type == "recurring":
+        next_run = _calculate_next_run(job, reference=now)
+        update_fields["next_run_at"] = next_run.isoformat() if next_run else None
+    await db.scheduler_jobs.update_one({"id": job.id}, {"$set": update_fields})
+
+async def _execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Optional[str]]:
+    user_doc = await db.users.find_one({"id": job.created_by}, {"_id": 0})
+    if not user_doc:
+        raise RuntimeError("Creator of scheduler job not found")
+    scheduler_user = User(**user_doc)
+    log_audit(
+        "launched_using_scheduler",
+        user_id=scheduler_user.id,
+        username=scheduler_user.username,
+        details={"project_id": job.project_id, "scheduler_job_id": job.id}
+    )
+    response = await execute_project(job.project_id, current_user=scheduler_user)  # type: ignore[arg-type]
+    session_id, final_status = await _consume_streaming_response(response)
+    return session_id, final_status
+
+async def _handle_due_scheduler_job(job_doc: dict) -> None:
+    job = SchedulerJob(**parse_from_mongo(job_doc))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.scheduler_jobs.update_one({"id": job.id}, {"$set": {"next_run_at": None, "updated_at": now_iso}})
+    run = SchedulerRun(job_id=job.id, project_id=job.project_id, launched_by_user=job.created_by)
+    await db.scheduler_runs.insert_one(prepare_for_mongo(run.model_dump()))
+    error_message = None
+    try:
+        session_id, final_status = await _execute_scheduler_job(job)
+        run_status = "success" if final_status == "completed" else "failed"
+    except Exception as exc:
+        logger.error(f"Scheduler job {job.id} failed: {str(exc)}")
+        session_id = None
+        run_status = "failed"
+        error_message = str(exc)
+    update_run = {
+        "status": run_status,
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id
+    }
+    if error_message:
+        update_run["error"] = error_message
+    await db.scheduler_runs.update_one({"id": run.id}, {"$set": update_run})
+    if job.job_type == "multi_run":
+        now = datetime.now(timezone.utc)
+        job.run_times = [rt for rt in job.run_times if rt > now]
+    await _update_job_after_run(job, run_success=run_status == "success")
+
+async def scheduler_worker():
+    await asyncio.sleep(5)
+    while True:
+        try:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            jobs = await db.scheduler_jobs.find(
+                {
+                    "status": "active",
+                    "next_run_at": {"$ne": None, "$lte": now_iso}
+                },
+                {"_id": 0}
+            ).to_list(20)
+            for job_doc in jobs:
+                await _handle_due_scheduler_job(job_doc)
+        except Exception as exc:
+            logger.error(f"Scheduler worker error: {str(exc)}")
+        await asyncio.sleep(SCHEDULER_POLL_SECONDS)
 
 # Auth helper functions
 def hash_password(password: str) -> str:
@@ -371,6 +541,54 @@ class Execution(BaseModel):
     check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     executed_by: Optional[str] = None
+
+class SchedulerJob(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    project_id: str
+    job_type: Literal["one_time", "multi_run", "recurring"]
+    status: Literal["active", "paused", "completed"] = "active"
+    next_run_at: Optional[datetime] = None
+    run_times: List[datetime] = Field(default_factory=list)
+    schedule_config: Dict[str, Any] = Field(default_factory=dict)
+    remaining_runs: Optional[int] = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_run_at: Optional[datetime] = None
+    last_run_status: Optional[str] = None
+
+class SchedulerJobCreate(BaseModel):
+    name: str
+    project_id: str
+    job_type: Literal["one_time", "multi_run", "recurring"]
+    run_at: Optional[datetime] = None
+    run_times: Optional[List[datetime]] = None
+    recurrence_time: Optional[str] = None  # HH:MM format
+    recurrence_start_date: Optional[date] = None  # yyyy-mm-dd
+
+class SchedulerJobUpdate(BaseModel):
+    name: Optional[str] = None
+    run_at: Optional[datetime] = None
+    run_times: Optional[List[datetime]] = None
+    recurrence_time: Optional[str] = None
+    recurrence_start_date: Optional[date] = None
+    status: Optional[Literal["active", "paused"]] = None
+
+class SchedulerRun(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str
+    project_id: str
+    session_id: Optional[str] = None
+    status: Literal["running", "success", "failed"] = "running"
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    finished_at: Optional[datetime] = None
+    error: Optional[str] = None
+    launched_by_user: Optional[str] = None
 
 class AuditLog(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -1954,6 +2172,138 @@ async def delete_project(project_id: str, current_user: User = Depends(get_curre
     return {"message": "Проект удален"}
 
 
+# Scheduler API
+@api_router.get("/scheduler/jobs", response_model=List[SchedulerJob])
+async def list_scheduler_jobs(current_user: User = Depends(get_current_user)):
+    query = {} if current_user.is_admin else {"created_by": current_user.id}
+    jobs = await db.scheduler_jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return [SchedulerJob(**parse_from_mongo(job)) for job in jobs]
+
+async def _ensure_project_access(current_user: User, project_id: str):
+    if not (await can_access_project(current_user, project_id)):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+
+@api_router.post("/scheduler/jobs", response_model=SchedulerJob)
+async def create_scheduler_job(job_input: SchedulerJobCreate, current_user: User = Depends(get_current_user)):
+    await require_permission(current_user, 'projects_execute')
+    await _ensure_project_access(current_user, job_input.project_id)
+    
+    job = SchedulerJob(
+        name=job_input.name,
+        project_id=job_input.project_id,
+        job_type=job_input.job_type,
+        created_by=current_user.id,
+    )
+    now = datetime.now(timezone.utc)
+    if job.job_type == "one_time":
+        if not job_input.run_at:
+            raise HTTPException(status_code=400, detail="Укажите время запуска")
+        job.next_run_at = job_input.run_at if job_input.run_at.tzinfo else job_input.run_at.replace(tzinfo=timezone.utc)
+    elif job.job_type == "multi_run":
+        if not job_input.run_times:
+            raise HTTPException(status_code=400, detail="Укажите список запусков")
+        job.run_times = _normalize_run_times(job_input.run_times)
+        if not job.run_times:
+            raise HTTPException(status_code=400, detail="Нет валидных дат запусков")
+        job.remaining_runs = len(job.run_times)
+        job.next_run_at = job.run_times[0]
+    elif job.job_type == "recurring":
+        if not job_input.recurrence_time:
+            raise HTTPException(status_code=400, detail="Укажите время повторения")
+        start_date = job_input.recurrence_start_date or now.date()
+        job.schedule_config = {
+            "recurrence_time": job_input.recurrence_time,
+            "recurrence_start_date": start_date.isoformat()
+        }
+        job.next_run_at = _next_daily_occurrence(job.schedule_config, reference=now, initial=True)
+    else:
+        raise HTTPException(status_code=400, detail="Неверный тип задания")
+    doc = prepare_for_mongo(job.model_dump())
+    await db.scheduler_jobs.insert_one(doc)
+    return job
+
+async def _get_scheduler_job(job_id: str, current_user: User) -> SchedulerJob:
+    job_doc = await db.scheduler_jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job_doc:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    if not current_user.is_admin and job_doc.get("created_by") != current_user.id:
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    return SchedulerJob(**parse_from_mongo(job_doc))
+
+@api_router.put("/scheduler/jobs/{job_id}", response_model=SchedulerJob)
+async def update_scheduler_job(job_id: str, job_update: SchedulerJobUpdate, current_user: User = Depends(get_current_user)):
+    await require_permission(current_user, 'projects_execute')
+    job = await _get_scheduler_job(job_id, current_user)
+    changed = False
+    now = datetime.now(timezone.utc)
+    if job_update.name:
+        job.name = job_update.name
+        changed = True
+    if job.job_type == "one_time" and job_update.run_at:
+        job.next_run_at = job_update.run_at if job_update.run_at.tzinfo else job_update.run_at.replace(tzinfo=timezone.utc)
+        job.status = "active"
+        changed = True
+    if job.job_type == "multi_run" and job_update.run_times:
+        job.run_times = _normalize_run_times(job_update.run_times)
+        job.remaining_runs = len(job.run_times)
+        job.next_run_at = job.run_times[0] if job.run_times else None
+        job.status = "active" if job.run_times else "completed"
+        changed = True
+    if job.job_type == "recurring":
+        recurrence_changed = False
+        if job_update.recurrence_time:
+            job.schedule_config["recurrence_time"] = job_update.recurrence_time
+            recurrence_changed = True
+        if job_update.recurrence_start_date:
+            job.schedule_config["recurrence_start_date"] = job_update.recurrence_start_date.isoformat()
+            recurrence_changed = True
+        if recurrence_changed:
+            job.next_run_at = _next_daily_occurrence(job.schedule_config, reference=now, initial=True)
+            changed = True
+    if job_update.status in {"active", "paused"}:
+        job.status = job_update.status
+        if job.status == "active" and job.job_type == "recurring":
+            job.next_run_at = job.next_run_at or _next_daily_occurrence(job.schedule_config, reference=now, initial=True)
+        changed = True
+    job.updated_at = now
+    if not changed:
+        return job
+    await db.scheduler_jobs.update_one(
+        {"id": job.id},
+        {"$set": prepare_for_mongo(job.model_dump())}
+    )
+    return job
+
+@api_router.post("/scheduler/jobs/{job_id}/pause")
+async def pause_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await _get_scheduler_job(job_id, current_user)
+    await db.scheduler_jobs.update_one({"id": job.id}, {"$set": {"status": "paused", "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return {"message": "Задание приостановлено"}
+
+@api_router.post("/scheduler/jobs/{job_id}/resume")
+async def resume_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await _get_scheduler_job(job_id, current_user)
+    next_run = _calculate_next_run(job, initial=True)
+    await db.scheduler_jobs.update_one(
+        {"id": job.id},
+        {"$set": {"status": "active", "next_run_at": next_run.isoformat() if next_run else None, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Задание возобновлено"}
+
+@api_router.delete("/scheduler/jobs/{job_id}")
+async def delete_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await _get_scheduler_job(job_id, current_user)
+    await db.scheduler_jobs.delete_one({"id": job.id})
+    await db.scheduler_runs.delete_many({"job_id": job.id})
+    return {"message": "Задание удалено"}
+
+@api_router.get("/scheduler/jobs/{job_id}/runs", response_model=List[SchedulerRun])
+async def get_scheduler_runs(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await _get_scheduler_job(job_id, current_user)
+    runs = await db.scheduler_runs.find({"job_id": job.id}, {"_id": 0}).sort("started_at", -1).limit(50).to_list(50)
+    return [SchedulerRun(**parse_from_mongo(run)) for run in runs]
+
+
 # API Routes - Project Tasks
 @api_router.post("/projects/{project_id}/tasks", response_model=ProjectTask)
 async def create_project_task(project_id: str, task_input: ProjectTaskCreate, current_user: User = Depends(get_current_user)):
@@ -3132,10 +3482,18 @@ async def startup_db_init():
             logger.info("✨ Database initialization complete!")
         else:
             logger.info("✅ Database already initialized")
-            
+        global scheduler_task
+        if scheduler_task is None:
+            scheduler_task = asyncio.create_task(scheduler_worker())
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+    global scheduler_task
+    if scheduler_task:
+        scheduler_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await scheduler_task
+        scheduler_task = None

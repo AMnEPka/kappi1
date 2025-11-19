@@ -1,0 +1,465 @@
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { api } from "@/config/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon } from "lucide-react";
+
+const JOB_TYPES = [
+  { value: "one_time", label: "Одиночный запуск" },
+  { value: "multi_run", label: "Несколько запусков" },
+  { value: "recurring", label: "Ежедневно" },
+];
+
+const statusMap = {
+  active: { label: "Активно", variant: "default" },
+  paused: { label: "Пауза", variant: "secondary" },
+  completed: { label: "Завершено", variant: "outline" },
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  return date.toLocaleString("ru-RU");
+};
+
+const toInputDateTime = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return date.toISOString().slice(0, 16);
+};
+
+const SchedulerPage = () => {
+  const { hasPermission, isAdmin } = useAuth();
+  const canSchedule = isAdmin || hasPermission("projects_execute");
+  const [jobs, setJobs] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [runs, setRuns] = useState({});
+  const [expandedJobId, setExpandedJobId] = useState(null);
+  const [editingJob, setEditingJob] = useState(null);
+  const [form, setForm] = useState({
+    name: "",
+    project_id: "",
+    job_type: "one_time",
+    run_at: "",
+    run_times: [""],
+    recurrence_time: "10:00",
+    recurrence_start_date: "",
+  });
+
+  useEffect(() => {
+    if (canSchedule) {
+      fetchJobs();
+      fetchProjects();
+    }
+  }, [canSchedule]);
+
+  const fetchJobs = async () => {
+    try {
+      const response = await api.get("/api/scheduler/jobs");
+      setJobs(response.data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Не удалось загрузить задания");
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const response = await api.get("/api/projects");
+      setProjects(response.data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Не удалось загрузить проекты");
+    }
+  };
+
+  const resetForm = () => {
+    setEditingJob(null);
+    setForm({
+      name: "",
+      project_id: "",
+      job_type: "one_time",
+      run_at: "",
+      run_times: [""],
+      recurrence_time: "10:00",
+      recurrence_start_date: "",
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.project_id) {
+      toast.error("Выберите проект");
+      return;
+    }
+
+    if (form.job_type === "one_time" && !form.run_at) {
+      toast.error("Укажите время запуска");
+      return;
+    }
+
+    if (form.job_type === "multi_run" && !form.run_times.filter(Boolean).length) {
+      toast.error("Добавьте хотя бы одно время запуска");
+      return;
+    }
+
+    if (form.job_type === "recurring" && !form.recurrence_time) {
+      toast.error("Укажите время ежедневного запуска");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        name: form.name,
+        project_id: form.project_id,
+        job_type: form.job_type,
+      };
+
+      if (form.job_type === "one_time") {
+        payload.run_at = new Date(form.run_at).toISOString();
+      } else if (form.job_type === "multi_run") {
+        payload.run_times = form.run_times
+          .filter(Boolean)
+          .map((value) => new Date(value).toISOString());
+      } else if (form.job_type === "recurring") {
+        payload.recurrence_time = form.recurrence_time;
+        if (form.recurrence_start_date) {
+          payload.recurrence_start_date = form.recurrence_start_date;
+        }
+      }
+
+      if (editingJob) {
+        await api.put(`/api/scheduler/jobs/${editingJob.id}`, payload);
+        toast.success("Задание обновлено");
+      } else {
+        await api.post("/api/scheduler/jobs", payload);
+        toast.success("Задание создано");
+      }
+      resetForm();
+      fetchJobs();
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.detail || "Ошибка сохранения задания");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePause = async (jobId) => {
+    try {
+      await api.post(`/api/scheduler/jobs/${jobId}/pause`);
+      toast.success("Задание приостановлено");
+      fetchJobs();
+    } catch (error) {
+      toast.error("Не удалось приостановить");
+    }
+  };
+
+  const handleResume = async (jobId) => {
+    try {
+      await api.post(`/api/scheduler/jobs/${jobId}/resume`);
+      toast.success("Задание возобновлено");
+      fetchJobs();
+    } catch (error) {
+      toast.error("Не удалось возобновить");
+    }
+  };
+
+  const handleDelete = async (jobId) => {
+    if (!window.confirm("Удалить задание и историю запусков?")) return;
+    try {
+      await api.delete(`/api/scheduler/jobs/${jobId}`);
+      toast.success("Задание удалено");
+      fetchJobs();
+    } catch (error) {
+      toast.error("Не удалось удалить");
+    }
+  };
+
+  const handleEdit = (job) => {
+    setEditingJob(job);
+    setForm({
+      name: job.name,
+      project_id: job.project_id,
+      job_type: job.job_type,
+      run_at: job.next_run_at ? toInputDateTime(job.next_run_at) : "",
+      run_times: (job.run_times || []).map((value) => toInputDateTime(value)),
+      recurrence_time: job.schedule_config?.recurrence_time || "10:00",
+      recurrence_start_date: job.schedule_config?.recurrence_start_date || "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const toggleHistory = async (jobId) => {
+    if (expandedJobId === jobId) {
+      setExpandedJobId(null);
+      return;
+    }
+    setExpandedJobId(jobId);
+    if (runs[jobId]) return;
+    try {
+      const response = await api.get(`/api/scheduler/jobs/${jobId}/runs`);
+      setRuns((prev) => ({ ...prev, [jobId]: response.data }));
+    } catch (error) {
+      toast.error("Не удалось загрузить историю запусков");
+    }
+  };
+
+  const projectName = (projectId) => {
+    const project = projects.find((p) => p.id === projectId);
+    return project ? project.name : "Проект";
+  };
+
+  if (!canSchedule) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-gray-500">
+          <p>У вас нет прав для управления планировщиком</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>{editingJob ? "Редактирование задания" : "Новое задание"}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Название</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Проверка ежедневная"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Проект</Label>
+                <select
+                  className="w-full h-10 border rounded px-3"
+                  value={form.project_id}
+                  onChange={(e) => setForm({ ...form, project_id: e.target.value })}
+                  required
+                >
+                  <option value="">Выберите проект</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label>Тип запуска</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {JOB_TYPES.map((type) => (
+                  <Button
+                    key={type.value}
+                    type="button"
+                    variant={form.job_type === type.value ? "default" : "outline"}
+                    onClick={() => setForm({ ...form, job_type: type.value })}
+                  >
+                    {type.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {form.job_type === "one_time" && (
+              <div>
+                <Label>Дата и время запуска</Label>
+                <Input
+                  type="datetime-local"
+                  value={form.run_at}
+                  onChange={(e) => setForm({ ...form, run_at: e.target.value })}
+                  required
+                />
+              </div>
+            )}
+
+            {form.job_type === "multi_run" && (
+              <div className="space-y-2">
+                <Label>Список запусков</Label>
+                {form.run_times.map((value, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      type="datetime-local"
+                      value={value}
+                      onChange={(e) => {
+                        const next = [...form.run_times];
+                        next[index] = e.target.value;
+                        setForm({ ...form, run_times: next });
+                      }}
+                      required
+                    />
+                    {form.run_times.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          const next = form.run_times.filter((_, i) => i !== index);
+                          setForm({ ...form, run_times: next.length ? next : [""] });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setForm({ ...form, run_times: [...form.run_times, ""] })}
+                >
+                  Добавить запуск
+                </Button>
+              </div>
+            )}
+
+            {form.job_type === "recurring" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Время запуска (ежедневно)</Label>
+                  <Input
+                    type="time"
+                    value={form.recurrence_time}
+                    onChange={(e) => setForm({ ...form, recurrence_time: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Дата начала (опционально)</Label>
+                  <Input
+                    type="date"
+                    value={form.recurrence_start_date}
+                    onChange={(e) => setForm({ ...form, recurrence_start_date: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button type="submit" disabled={loading}>
+                {editingJob ? "Сохранить изменения" : "Создать задание"}
+              </Button>
+              {editingJob && (
+                <Button type="button" variant="ghost" onClick={resetForm}>
+                  Отмена
+                </Button>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold">Запланированные задания</h2>
+        <Button variant="outline" onClick={fetchJobs}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Обновить
+        </Button>
+      </div>
+
+      {jobs.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-gray-500">
+            <CalendarClock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <p>Пока нет запланированных запусков</p>
+          </CardContent>
+        </Card>
+      ) : (
+        jobs.map((job) => (
+          <Card key={job.id}>
+            <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <CardTitle>{job.name}</CardTitle>
+                <p className="text-sm text-gray-500">{projectName(job.project_id)}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={statusMap[job.status]?.variant || "secondary"}>
+                  {statusMap[job.status]?.label || job.status}
+                </Badge>
+                <Badge variant="outline">
+                  {JOB_TYPES.find((type) => type.value === job.job_type)?.label || job.job_type}
+                </Badge>
+                {job.next_run_at && (
+                  <Badge variant="outline">Следующий запуск: {formatDateTime(job.next_run_at)}</Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {job.status === "active" ? (
+                  <Button variant="outline" size="sm" onClick={() => handlePause(job.id)}>
+                    <PauseCircle className="h-4 w-4 mr-2" /> Пауза
+                  </Button>
+                ) : job.status === "paused" ? (
+                  <Button variant="outline" size="sm" onClick={() => handleResume(job.id)}>
+                    <PlayCircle className="h-4 w-4 mr-2" /> Возобновить
+                  </Button>
+                ) : null}
+                <Button variant="outline" size="sm" onClick={() => handleEdit(job)}>
+                  <Repeat className="h-4 w-4 mr-2" /> Изменить
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => toggleHistory(job.id)}>
+                  <HistoryIcon className="h-4 w-4 mr-2" /> История
+                </Button>
+                <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(job.id)}>
+                  <Trash2 className="h-4 w-4 mr-2" /> Удалить
+                </Button>
+              </div>
+
+              {expandedJobId === job.id && (
+                <div className="border rounded-lg p-4 bg-gray-50 space-y-2">
+                  <h4 className="font-semibold">Запуски</h4>
+                  {(runs[job.id] || []).length === 0 ? (
+                    <p className="text-sm text-gray-500">Запусков пока не было</p>
+                  ) : (
+                    (runs[job.id] || []).map((run) => (
+                      <div key={run.id} className="flex flex-col md:flex-row md:items-center md:justify-between py-2 border-b last:border-0">
+                        <div>
+                          <p className="font-medium">{formatDateTime(run.started_at)}</p>
+                          <p className="text-sm text-gray-500">Статус: {run.status}</p>
+                          {run.session_id && (
+                            <p className="text-xs text-gray-500">Session ID: {run.session_id}</p>
+                          )}
+                          {run.error && <p className="text-xs text-red-500">{run.error}</p>}
+                        </div>
+                        {run.status !== "running" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(`/projects/${job.project_id}/results`, "_blank")}
+                          >
+                            Перейти к результатам
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))
+      )}
+    </div>
+  );
+};
+
+export default SchedulerPage;
+

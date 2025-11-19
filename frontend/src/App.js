@@ -25,6 +25,7 @@ import RolesPage from "@/pages/RolesPage";
 import { Menu, HelpCircle, EthernetPort, Loader2, Calendar, FileText } from 'lucide-react'; 
 import { api } from './config/api';
 import LogsPage from "@/pages/LogsPage";
+import SchedulerPage from "@/pages/SchedulerPage";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -1370,6 +1371,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const { user, logout, hasPermission, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const showScheduler = isAdmin || hasPermission('projects_execute');
   
   const isActive = (path) => {
     if (path === '/hosts') return location.pathname === '/hosts';
@@ -1455,15 +1457,17 @@ const Layout = ({ children }) => {
                 <FileCode className="mr-3 h-5 w-5" /> Проверки
               </Button>
             </Link>
-            <Link to="/scheduler">
-              <Button 
-                variant="ghost" 
-                data-testid="nav-scheduler" 
-                className="text-black hover:bg-white h-12 px-4 font-medium"
-              >
-                <Calendar className="mr-3 h-8 w-8" /> Планировщик
-              </Button>
-            </Link>
+            {showScheduler && (
+              <Link to="/scheduler">
+                <Button 
+                  variant="ghost" 
+                  data-testid="nav-scheduler" 
+                  className="text-black hover:bg-white h-12 px-4 font-medium"
+                >
+                  <Calendar className="mr-3 h-8 w-8" /> Планировщик
+                </Button>
+              </Link>
+            )}
             {isAdmin && (
               <Link to="/logs">
                 <Button 
@@ -1595,6 +1599,7 @@ function App() {
                     <Route path="/projects/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
                     <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />
                     <Route path="/history" element={<HistoryPage />} />
+                    <Route path="/scheduler" element={<SchedulerPage />} />
                     <Route path="/logs" element={<LogsPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/users" element={<UsersPage />} />
