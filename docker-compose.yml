@@ -19,7 +19,7 @@ services:
     networks:
       - ssh-runner-network
 
-  # FastAPI Backend
+  # Fast API Backend
   backend:
     build:
       context: ./backend
@@ -34,7 +34,8 @@ services:
     environment:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=ssh_runner_db
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001
+      - CORS_ORIGINS=*
+      - PYTHONPATH=/app
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
     volumes:
       - ./backend:/app/backend
@@ -60,7 +61,7 @@ services:
     depends_on:
       - backend
     environment:
-      - REACT_APP_BACKEND_URL=http://localhost:8001
+ #     - REACT_APP_BACKEND_URL=http://localhost:8001
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
     volumes:
