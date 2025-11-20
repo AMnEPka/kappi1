@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -18,11 +19,11 @@ import {
 } from "../components/ui/dialog";
 import { ChevronLeft, CheckCircle, XCircle, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
-import axios from 'axios';
 import { api } from '../config/api';
 
 
 export default function ProjectResultsPage({ projectId, onNavigate }) {
+  const [searchParams, setSearchParams] = useSearchParams(); // ← Добавьте этот хук
   const [project, setProject] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -31,6 +32,8 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [hosts, setHosts] = useState({});
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  
 
   useEffect(() => {
     fetchProjectAndSessions();
@@ -41,6 +44,28 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       fetchSessionExecutions(selectedSession);
     }
   }, [selectedSession]);
+
+  const handleBack = () => {
+    const returnTo = searchParams.get('returnTo');
+    
+    if (returnTo === 'scheduler') {
+      navigate('/scheduler'); // или тот путь, по которому доступен планировщик
+    } else {
+      navigate('/projects'); // или путь к списку проектов
+    }
+  };
+
+  // эффект для обработки параметра URL
+  useEffect(() => {
+    const sessionFromUrl = searchParams.get('session');
+    if (sessionFromUrl && sessions.length > 0) {
+      // Проверяем что сессия существует в списке
+      const sessionExists = sessions.some(session => session.session_id === sessionFromUrl);
+      if (sessionExists) {
+        setSelectedSession(sessionFromUrl);
+      }
+    }
+  }, [sessions, searchParams]);  
 
   const fetchProjectAndSessions = async () => {
     try {
@@ -171,6 +196,19 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     }
   };
 
+  // Обновите функцию изменения сессии чтобы обновлять URL
+  const handleSessionChange = (sessionId) => {
+    setSelectedSession(sessionId);
+    // Обновляем параметр URL
+    if (sessionId) {
+      searchParams.set('session', sessionId);
+      setSearchParams(searchParams);
+    } else {
+      searchParams.delete('session');
+      setSearchParams(searchParams);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -196,7 +234,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   return (
     <div className="p-6">
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" onClick={() => onNavigate('projects')}>
+        <Button variant="outline" onClick={handleBack}>
           <ChevronLeft className="mr-2 h-4 w-4" />
           Назад
         </Button>
@@ -218,7 +256,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
           <CardContent>
             <div className="flex gap-4">
               <div className="flex-1">
-                <Select value={selectedSession} onValueChange={setSelectedSession}>
+                <Select value={selectedSession} onValueChange={handleSessionChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Выберите запуск" />
                   </SelectTrigger>

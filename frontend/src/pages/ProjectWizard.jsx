@@ -15,8 +15,10 @@ import {
 } from "../components/ui/select";
 import { ChevronLeft, ChevronRight, Check, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import axios from 'axios';
 import { api } from '../config/api';
+import { useAuth } from '../contexts/AuthContext';
+
+
 
 export default function ProjectWizard({ onNavigate }) {
   const [step, setStep] = useState(1);
@@ -28,6 +30,9 @@ export default function ProjectWizard({ onNavigate }) {
     accessUserIds: [], // List of user IDs who will have access to this project
   });
 
+
+    
+
   const [hosts, setHosts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
@@ -35,6 +40,7 @@ export default function ProjectWizard({ onNavigate }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState([]);
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     fetchData();
@@ -482,130 +488,158 @@ export default function ProjectWizard({ onNavigate }) {
     }
 
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Шаг 4: Эталонные данные</CardTitle>
-          <CardDescription>Введите эталонные данные для проверок (общие для всех хостов)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {(() => {
-              // Группируем скрипты по ID, чтобы избежать дублирования
-              const uniqueScripts = {};
-              scriptsWithReferences.forEach(item => {
-                if (!uniqueScripts[item.script.id]) {
-                  uniqueScripts[item.script.id] = {
-                    script: item.script,
-                    hosts: []
-                  };
-                }
-                uniqueScripts[item.script.id].hosts.push({
-                  hostId: item.hostId,
-                  systemId: item.systemId,
-                  taskIndex: item.taskIndex,
-                  systemIndex: item.systemIndex
+    <Card>
+      <CardHeader>
+        <CardTitle>Шаг 4: Эталонные данные</CardTitle>
+        <CardDescription>Введите эталонные данные для проверок (общие для всех хостов)</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {(() => {
+            console.log('🔍 scriptsWithReferences:', scriptsWithReferences);
+            
+            // Создаем мапу для группировки по script.id
+            const scriptGroups = new Map();
+            
+            scriptsWithReferences.forEach(item => {
+              if (!scriptGroups.has(item.script.id)) {
+                scriptGroups.set(item.script.id, {
+                  script: item.script,
+                  hosts: []
                 });
+              }
+              scriptGroups.get(item.script.id).hosts.push({
+                hostId: item.hostId,
+                systemId: item.systemId,
+                taskIndex: item.taskIndex,
+                systemIndex: item.systemIndex
               });
-      
-              return Object.values(uniqueScripts).map((group, index) => {
-                const firstHost = group.hosts[0];
-                const currentValue = projectData.tasks[firstHost.taskIndex]
-                  .systems[firstHost.systemIndex].reference_data?.[group.script.id] || '';
-      
-                // Функция для загрузки файла
-                const handleFileUpload = (event) => {
-                  const file = event.target.files[0];
-                  if (!file) return;
-      
-                  const reader = new FileReader();
-                  reader.onload = (e) => {
-                    const content = e.target.result;
-                    setProjectData(prev => {
-                      const newTasks = [...prev.tasks];
-                      
-                      // Применяем одинаковые эталонные данные ко всем хостам для этого скрипта
-                      group.hosts.forEach(host => {
-                        const task = newTasks[host.taskIndex];
-                        const system = task.systems[host.systemIndex];
-                        
-                        if (!system.reference_data) {
-                          system.reference_data = {};
-                        }
-                        
-                        system.reference_data[group.script.id] = content;
-                      });
-                      
-                      return { ...prev, tasks: newTasks };
-                    });
-                  };
-                  reader.readAsText(file);
-                };
-      
-                return (
-                  <div key={group.script.id} className="border rounded-lg p-4">
-                    <div className="mb-2">
-                      <p className="font-semibold">{group.script.name}</p>
-                      <p className="text-sm text-gray-600">
-                        Применяется к {group.hosts.length} хостам: {group.hosts.map(host => {
-                          const hostObj = getHostById(host.hostId);
-                          const systemObj = getSystemById(host.systemId);
-                          return `${hostObj?.name} (${systemObj?.name})`;
-                        }).join(', ')}
-                      </p>
-                    </div>
+            });
+
+            const groupedScripts = Array.from(scriptGroups.values());
+            console.log('🔍 Grouped scripts:', groupedScripts);
+
+            return groupedScripts.map((group, index) => {
+              // Берем первый хост для получения текущего значения
+              const firstHost = group.hosts[0];
+              const currentValue = projectData.tasks[firstHost.taskIndex]
+                .systems[firstHost.systemIndex].reference_data?.[group.script.id] || '';
+
+              console.log(`🔍 Script ${group.script.name}:`, {
+                hostsCount: group.hosts.length,
+                currentValue: currentValue.substring(0, 50) + '...',
+                hosts: group.hosts.map(h => ({
+                  host: getHostById(h.hostId)?.name,
+                  system: getSystemById(h.systemId)?.name
+                }))
+              });
+
+              const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  const content = e.target.result;
+                  setProjectData(prev => {
+                    const newTasks = [...prev.tasks];
                     
-                    {/* Кнопка загрузки файла */}
-                    <div className="mb-3">
-                      <input
-                        type="file"
-                        id={`file-upload-${group.script.id}`}
-                        accept=".txt,.json,.xml,.csv,.log"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => document.getElementById(`file-upload-${group.script.id}`).click()}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Загрузить из файла
-                      </Button>
-                    </div>
-      
-                    <Textarea
-                      placeholder="Введите эталонные данные из ПМИ..."
-                      value={currentValue}
-                      onChange={(e) => {
-                        setProjectData(prev => {
-                          const newTasks = [...prev.tasks];
-                          
-                          // Применяем одинаковые эталонные данные ко всем хостам для этого скрипта
-                          group.hosts.forEach(host => {
-                            const task = newTasks[host.taskIndex];
-                            const system = task.systems[host.systemIndex];
-                            
-                            if (!system.reference_data) {
-                              system.reference_data = {};
-                            }
-                            
-                            system.reference_data[group.script.id] = e.target.value;
-                          });
-                          
-                          return { ...prev, tasks: newTasks };
-                        });
-                      }}
-                      rows={10}
-                      className="font-mono text-sm"
-                    />
+                    // Применяем ко всем хостам в группе
+                    group.hosts.forEach(host => {
+                      const task = newTasks[host.taskIndex];
+                      const system = task.systems[host.systemIndex];
+                      
+                      if (!system.reference_data) {
+                        system.reference_data = {};
+                      }
+                      
+                      system.reference_data[group.script.id] = content;
+                    });
+                    
+                    return { ...prev, tasks: newTasks };
+                  });
+                };
+                reader.readAsText(file);
+              };
+
+              const handleTextChange = (e) => {
+                setProjectData(prev => {
+                  const newTasks = [...prev.tasks];
+                  
+                  // Применяем ко всем хостам в группе
+                  group.hosts.forEach(host => {
+                    const task = newTasks[host.taskIndex];
+                    const system = task.systems[host.systemIndex];
+                    
+                    if (!system.reference_data) {
+                      system.reference_data = {};
+                    }
+                    
+                    system.reference_data[group.script.id] = e.target.value;
+                  });
+                  
+                  return { ...prev, tasks: newTasks };
+                });
+              };
+
+              return (
+                <div key={group.script.id} className="border rounded-lg p-4">
+                  <div className="mb-2">
+                    <p className="font-semibold text-lg">{group.script.name}</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      <strong>Применяется к {group.hosts.length} хосту(ам):</strong>{' '}
+                      {group.hosts.map((host, idx) => {
+                        const hostObj = getHostById(host.hostId);
+                        const systemObj = getSystemById(host.systemId);
+                        return (
+                          <span key={host.hostId}>
+                            {hostObj?.name} ({systemObj?.name})
+                            {idx < group.hosts.length - 1 ? ', ' : ''}
+                          </span>
+                        );
+                      })}
+                    </p>
                   </div>
-                );
-              });
-            })()}
-          </div>
-        </CardContent>
-      </Card>
+                  
+                  <div className="mb-3">
+                    <input
+                      type="file"
+                      id={`file-upload-${group.script.id}`}
+                      accept=".txt,.json,.xml,.csv,.log,.yaml,.yml,.conf,.config,.ini"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById(`file-upload-${group.script.id}`).click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Загрузить из файла
+                    </Button>
+                  </div>
+
+                  <Textarea
+                    placeholder={`Введите эталонные данные для ${group.script.name}...`}
+                    value={currentValue}
+                    onChange={handleTextChange}
+                    rows={8}
+                    className="font-mono text-sm"
+                  />
+                  
+                  {group.hosts.length > 1 && (
+                    <p className="text-xs text-blue-600 mt-2">
+                      ⓘ Эти данные будут применены ко всем {group.hosts.length} хостам
+                    </p>
+                  )}
+                </div>
+              );
+            });
+          })()}
+        </div>
+      </CardContent>
+    </Card>
     );
   };
 
@@ -618,37 +652,71 @@ export default function ProjectWizard({ onNavigate }) {
       <CardContent>
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            По умолчанию доступ к проекту есть у вас (создателя). Вы можете предоставить доступ другим пользователям.
+            По умолчанию доступ к проекту есть у вас (создателя) и у администраторов. Вы можете предоставить доступ другим пользователям.
           </p>
           
           <div className="space-y-2">
-            {users.filter(u => u.is_active).map((user) => (
-              <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                <Checkbox
-                  id={`user-${user.id}`}
-                  checked={projectData.accessUserIds.includes(user.id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setProjectData(prev => ({
-                        ...prev,
-                        accessUserIds: [...prev.accessUserIds, user.id]
-                      }));
-                    } else {
-                      setProjectData(prev => ({
-                        ...prev,
-                        accessUserIds: prev.accessUserIds.filter(id => id !== user.id)
-                      }));
-                    }
-                  }}
-                />
-                <div className="flex-1">
-                  <Label htmlFor={`user-${user.id}`} className="cursor-pointer font-medium">
-                    {user.full_name}
-                  </Label>
-                  <p className="text-sm text-gray-500">@{user.username}</p>
-                </div>
+            {/* Текущий пользователь (неснимаемый) */}
+            <div className="flex items-center space-x-3 p-3 border rounded-lg bg-gray-50">
+              <Checkbox
+                id="current-user"
+                checked={true}
+                disabled
+                className="opacity-50"
+              />
+              <div className="flex-1">
+                <Label htmlFor="current-user" className="font-medium">
+                  {currentUser?.full_name} (вы)
+                </Label>
+                <p className="text-sm text-gray-500">@{currentUser?.username}</p>
               </div>
-            ))}
+              <span className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-md">
+                Создатель
+              </span>
+            </div>
+
+            {/* Остальные пользователи (кроме admin и текущего) */}
+            {users
+              .filter(u => u.is_active && u.username !== 'admin' && u.id !== currentUser?.id)
+              .map((user) => (
+                <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                  <Checkbox
+                    id={`user-${user.id}`}
+                    checked={projectData.accessUserIds.includes(user.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setProjectData(prev => ({
+                          ...prev,
+                          accessUserIds: [...prev.accessUserIds, user.id]
+                        }));
+                      } else {
+                        setProjectData(prev => ({
+                          ...prev,
+                          accessUserIds: prev.accessUserIds.filter(id => id !== user.id)
+                        }));
+                      }
+                    }}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor={`user-${user.id}`} className="cursor-pointer font-medium">
+                      {user.full_name}
+                      {user.is_admin && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          Админ
+                        </Badge>
+                      )}
+                    </Label>
+                    <p className="text-sm text-gray-500">@{user.username}</p>
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          {/* Информация о администраторах */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              <strong>Администраторы</strong> имеют доступ ко всем проектам по умолчанию и не отображаются в этом списке.
+            </p>
           </div>
         </div>
       </CardContent>

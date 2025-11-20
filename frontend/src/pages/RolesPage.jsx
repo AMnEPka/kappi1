@@ -14,36 +14,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
 
-// Список всех доступных разрешений с описаниями
-const ALL_PERMISSIONS = {
-  'categories_manage': 'Управление категориями и системами',
-  'checks_create': 'Создание проверок',
-  'checks_edit_own': 'Редактирование своих проверок',
-  'checks_edit_all': 'Редактирование всех проверок',
-  'checks_delete_own': 'Удаление своих проверок',
-  'checks_delete_all': 'Удаление всех проверок',
-  'hosts_create': 'Создание хостов',
-  'hosts_edit_own': 'Редактирование своих хостов',
-  'hosts_edit_all': 'Редактирование всех хостов',
-  'hosts_delete_own': 'Удаление своих хостов',
-  'hosts_delete_all': 'Удаление всех хостов',
-  'users_manage': 'Управление пользователями',
-  'roles_manage': 'Управление ролями',
-  'results_view_all': 'Просмотр всех результатов',
-  'results_export_all': 'Экспорт всех результатов',
-  'projects_create': 'Создание проектов',
-  'projects_execute': 'Выполнение проектов',
-};
-
-// Группировка разрешений по категориям для лучшей читаемости
-const PERMISSION_GROUPS = {
-  'Категории и системы': ['categories_manage'],
-  'Проверки': ['checks_create', 'checks_edit_own', 'checks_edit_all', 'checks_delete_own', 'checks_delete_all'],
-  'Хосты': ['hosts_create', 'hosts_edit_own', 'hosts_edit_all', 'hosts_delete_own', 'hosts_delete_all'],
-  'Проекты': ['projects_create', 'projects_execute'],
-  'Результаты': ['results_view_all', 'results_export_all'],
-  'Администрирование': ['users_manage', 'roles_manage'],
-};
 
 export default function RolesPage() {
   const [roles, setRoles] = useState([]);
@@ -51,6 +21,11 @@ export default function RolesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
   const { hasPermission } = useAuth();
+  
+  const [permissionsData, setPermissionsData] = useState({
+    permissions: {},
+    groups: {}
+  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -59,10 +34,25 @@ export default function RolesPage() {
   });
 
   useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const response = await api.get('/api/permissions');
+        setPermissionsData(response.data);
+      } catch (error) {
+        console.error('Error fetching permissions:', error);
+        }
+    };
+    
+    fetchPermissions();
+  }, []); 
+  
+  const { permissions: ALL_PERMISSIONS, groups: PERMISSION_GROUPS } = permissionsData;
+
+  useEffect(() => {
     if (hasPermission('roles_manage')) {
       fetchRoles();
     }
-  }, []);
+  }, []);  
 
   const fetchRoles = async () => {
     try {

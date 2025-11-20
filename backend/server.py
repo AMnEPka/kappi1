@@ -66,6 +66,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ssh_runner")
 
+
+
 # Permissions list
 PERMISSIONS = {
     'categories_manage': 'Управление категориями и системами',
@@ -80,13 +82,59 @@ PERMISSIONS = {
     'hosts_delete_own': 'Удаление своих хостов',
     'hosts_delete_all': 'Удаление всех хостов',
     'users_manage': 'Управление пользователями',
+    'users_view': 'Просмотр списка пользователей',
     'roles_manage': 'Управление ролями',
     'results_view_all': 'Просмотр всех результатов',
     'results_export_all': 'Экспорт всех результатов',
     'projects_create': 'Создание проектов',
     'projects_execute': 'Выполнение проектов',
+    'scheduler_access': 'Доступ к планировщику заданий',
+    'logs_access': 'Доступ к логам'
 }
 
+# Группировка разрешений по категориям
+PERMISSION_GROUPS = {
+    'Категории и системы': ['categories_manage'],
+    'Проверки': [
+        'checks_create', 
+        'checks_edit_own', 
+        'checks_edit_all', 
+        'checks_delete_own', 
+        'checks_delete_all', 
+        'scheduler_access'
+    ],
+    'Хосты': [
+        'hosts_create', 
+        'hosts_edit_own', 
+        'hosts_edit_all', 
+        'hosts_delete_own', 
+        'hosts_delete_all'
+    ],
+    'Проекты': [
+        'projects_create', 
+        'projects_execute'
+    ],
+    'Результаты': [
+        'results_view_all', 
+        'results_export_all'
+    ],
+    'Администрирование': [
+        'roles_manage',
+        'logs_access'
+    ],
+    'Пользователи': [
+        'users_view',
+        'users_manage'
+    ],
+}
+
+@api_router.get("/permissions", response_model=Dict[str, Any])
+async def get_permissions_list():
+    """Get all available permissions with descriptions and groups"""
+    return {
+        "permissions": PERMISSIONS,
+        "groups": PERMISSION_GROUPS
+    }
 
 # Helper functions
 def encrypt_password(password: str) -> str:
@@ -609,6 +657,7 @@ async def _consume_streaming_response(streaming_response) -> Tuple[Optional[str]
                 if payload.get("type") == "complete":
                     session_id = payload.get("session_id")
                     final_status = payload.get("status")
+                    print(f"🔍 DEBUG: received status from streaming = '{final_status}'")
     if hasattr(body_iterator, "aclose"):
         await body_iterator.aclose()
     return session_id, final_status
@@ -661,7 +710,9 @@ async def _handle_due_scheduler_job(job_doc: dict) -> None:
     error_message = None
     try:
         session_id, final_status = await _execute_scheduler_job(job)
+        print(f"🔍 DEBUG: final_status from execute_project = '{final_status}'")
         run_status = "success" if final_status == "completed" else "failed"
+        print(f"🔍 DEBUG: setting run_status = '{run_status}'")
     except Exception as exc:
         logger.error(f"Scheduler job {job.id} failed: {str(exc)}")
         session_id = None
@@ -1505,13 +1556,21 @@ async def has_permission(user: User, permission: str) -> bool:
     permissions = await get_user_permissions(user)
     return permission in permissions
 
-async def require_permission(user: User, permission: str):
-    """Raise exception if user doesn't have permission"""
-    if not await has_permission(user, permission):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permission denied: {permission}"
-        )
+async def require_permission(user: User, *permissions: str):
+    """Raise exception if user doesn't have ANY of the specified permissions"""
+    if not permissions:
+        raise ValueError("At least one permission must be specified")
+    
+    # Проверяем есть ли ХОТЯ БЫ ОДНО из прав
+    for permission in permissions:
+        if await has_permission(user, permission):
+            return  # Есть хотя бы одно право - пропускаем
+    
+    # Если дошли сюда - нет ни одного из требуемых прав
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Permission denied. Requires any of: {', '.join(permissions)}"
+    )
 
 async def can_access_project(user: User, project_id: str) -> bool:
     """Check if user can access a project"""
@@ -3080,7 +3139,7 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
 @api_router.get("/users", response_model=List[UserResponse])
 async def get_users(current_user: User = Depends(get_current_user)):
     """Get all users (requires users_manage permission)"""
-    await require_permission(current_user, 'users_manage')
+    await require_permission(current_user, 'users_manage', 'users_view')
     
     users = await db.users.find().to_list(length=None)
     return [UserResponse(**user) for user in users]

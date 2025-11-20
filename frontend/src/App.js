@@ -1597,7 +1597,10 @@ function App() {
                     <Route path="/execute" element={<ExecutePage />} />
                     <Route path="/projects/new" element={<ProjectWizardWrapper />} />
                     <Route path="/projects/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
-                    <Route path="/projects/:projectId/results" element={<ProjectResultsPageWrapper />} />
+                    <Route 
+                      path="/projects/:projectId/results" 
+                      element={<ProjectResultsPageWrapper />}  // ← ОДИН маршрут
+                    />
                     <Route path="/history" element={<HistoryPage />} />
                     <Route path="/scheduler" element={<SchedulerPage />} />
                     <Route path="/logs" element={<LogsPage />} />

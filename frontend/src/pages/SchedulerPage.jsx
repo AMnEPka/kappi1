@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon } from "lucide-react";
+import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon, CheckCircle, XCircle, Loader2} from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 
 const JOB_TYPES = [
   { value: "one_time", label: "Одиночный запуск" },
@@ -19,6 +20,20 @@ const statusMap = {
   active: { label: "Активно", variant: "default" },
   paused: { label: "Пауза", variant: "secondary" },
   completed: { label: "Завершено", variant: "outline" },
+};
+
+const runStatusMap = {
+  running: { label: "Выполняется", showResults: false },
+  success: { label: "Успешно", showResults: true },
+  paused:  { label: "Пауза", showResults: false },
+  failed:  { label: "Ошибка", showResults: true }
+};
+
+const statusIcons = {
+  'running': <Loader2 className="h-3 w-3 animate-spin" />,
+  'success': <CheckCircle className="h-3 w-3" />,
+  'pause': <PauseCircle className="h-3 w-3" />,
+  'failed': <XCircle className="h-3 w-3" />
 };
 
 const formatDateTime = (value) => {
@@ -36,6 +51,7 @@ const toInputDateTime = (value) => {
 const SchedulerPage = () => {
   const { hasPermission, isAdmin } = useAuth();
   const canSchedule = isAdmin || hasPermission("projects_execute");
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -429,27 +445,63 @@ const SchedulerPage = () => {
                   {(runs[job.id] || []).length === 0 ? (
                     <p className="text-sm text-gray-500">Запусков пока не было</p>
                   ) : (
-                    (runs[job.id] || []).map((run) => (
-                      <div key={run.id} className="flex flex-col md:flex-row md:items-center md:justify-between py-2 border-b last:border-0">
-                        <div>
-                          <p className="font-medium">{formatDateTime(run.started_at)}</p>
-                          <p className="text-sm text-gray-500">Статус: {run.status}</p>
-                          {run.session_id && (
-                            <p className="text-xs text-gray-500">Session ID: {run.session_id}</p>
+                    (runs[job.id] || []).map((run) => {
+                      // Используем готовый маппинг из runStatusMap
+                      const statusInfo = runStatusMap[run.status] || { 
+                        label: run.status, 
+                        showResults: false 
+                      };
+
+                      // Маппинг для вариантов Badge
+                      const statusVariant = {
+                        'running': 'secondary',
+                        'success': 'default',
+                        'paused': 'secondary', 
+                        'failed': 'destructive'
+                      };
+
+                      return (
+                        <div key={run.id} className="flex flex-col md:flex-row md:items-center md:justify-between py-2 border-b last:border-0">
+                          <div className="flex-1">
+                            <p className="font-medium">{formatDateTime(run.started_at)}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge 
+                                variant={statusVariant[run.status] || 'secondary'} 
+                                className="flex items-center gap-1"
+                              >
+                                {statusIcons[run.status]}
+                                {statusInfo.label}
+                              </Badge>
+                              {run.finished_at && (
+                                <span className="text-xs text-gray-500">
+                                  Завершено: {formatDateTime(run.finished_at)}
+                                </span>
+                              )}
+                            </div>
+                            {run.session_id && (
+                              <p className="text-xs text-gray-500 mt-1">Session ID: {run.session_id}</p>
+                            )}
+                            {run.error && (
+                              <p className="text-xs text-red-500 mt-1">{run.error}</p>
+                            )}
+                          </div>
+                          
+                          {/* Кнопка "Перейти к результатам" показывается только для статусов где showResults = true */}
+                          {statusInfo.showResults && run.session_id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                navigate(`/projects/${job.project_id}/results?session=${run.session_id}&returnTo=scheduler`);
+                              }}
+                              className="whitespace-nowrap"
+                            >
+                              Перейти к результатам
+                            </Button>
                           )}
-                          {run.error && <p className="text-xs text-red-500">{run.error}</p>}
                         </div>
-                        {run.status !== "running" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(`/projects/${job.project_id}/results`, "_blank")}
-                          >
-                            Перейти к результатам
-                          </Button>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}
@@ -460,6 +512,8 @@ const SchedulerPage = () => {
     </div>
   );
 };
+
+
 
 export default SchedulerPage;
 
