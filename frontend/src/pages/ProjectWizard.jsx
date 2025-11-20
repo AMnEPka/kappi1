@@ -3,6 +3,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Upload } from 'lucide-react';
 import { Textarea } from "../components/ui/textarea";
 import { Checkbox } from "../components/ui/checkbox";
 import {
@@ -33,6 +34,7 @@ export default function ProjectWizard({ onNavigate }) {
   const [scripts, setScripts] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -483,48 +485,124 @@ export default function ProjectWizard({ onNavigate }) {
       <Card>
         <CardHeader>
           <CardTitle>Шаг 4: Эталонные данные</CardTitle>
-          <CardDescription>Введите эталонные данные для проверок</CardDescription>
+          <CardDescription>Введите эталонные данные для проверок (общие для всех хостов)</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {scriptsWithReferences.map((item, index) => {
-              const host = getHostById(item.hostId);
-              const system = getSystemById(item.systemId);
-              const currentValue = projectData.tasks[item.taskIndex]
-                .systems[item.systemIndex].reference_data?.[item.script.id] || '';
-
-              return (
-                <div key={index} className="border rounded-lg p-4">
-                  <div className="mb-2">
-                    <p className="font-semibold">{item.script.name}</p>
-                    <p className="text-sm text-gray-600">
-                      {host?.name} - {system?.name}
-                    </p>
-                  </div>
-                  <Textarea
-                    placeholder="Введите эталонные данные из ПМИ..."
-                    value={currentValue}
-                    onChange={(e) => {
-                      setProjectData(prev => {
-                        const newTasks = [...prev.tasks];
-                        const task = newTasks[item.taskIndex];
-                        const system = task.systems[item.systemIndex];
+            {(() => {
+              // Группируем скрипты по ID, чтобы избежать дублирования
+              const uniqueScripts = {};
+              scriptsWithReferences.forEach(item => {
+                if (!uniqueScripts[item.script.id]) {
+                  uniqueScripts[item.script.id] = {
+                    script: item.script,
+                    hosts: []
+                  };
+                }
+                uniqueScripts[item.script.id].hosts.push({
+                  hostId: item.hostId,
+                  systemId: item.systemId,
+                  taskIndex: item.taskIndex,
+                  systemIndex: item.systemIndex
+                });
+              });
+      
+              return Object.values(uniqueScripts).map((group, index) => {
+                const firstHost = group.hosts[0];
+                const currentValue = projectData.tasks[firstHost.taskIndex]
+                  .systems[firstHost.systemIndex].reference_data?.[group.script.id] || '';
+      
+                // Функция для загрузки файла
+                const handleFileUpload = (event) => {
+                  const file = event.target.files[0];
+                  if (!file) return;
+      
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                    const content = e.target.result;
+                    setProjectData(prev => {
+                      const newTasks = [...prev.tasks];
+                      
+                      // Применяем одинаковые эталонные данные ко всем хостам для этого скрипта
+                      group.hosts.forEach(host => {
+                        const task = newTasks[host.taskIndex];
+                        const system = task.systems[host.systemIndex];
                         
                         if (!system.reference_data) {
                           system.reference_data = {};
                         }
                         
-                        system.reference_data[item.script.id] = e.target.value;
-                        
-                        return { ...prev, tasks: newTasks };
+                        system.reference_data[group.script.id] = content;
                       });
-                    }}
-                    rows={10}
-                    className="font-mono text-sm"
-                  />
-                </div>
-              );
-            })}
+                      
+                      return { ...prev, tasks: newTasks };
+                    });
+                  };
+                  reader.readAsText(file);
+                };
+      
+                return (
+                  <div key={group.script.id} className="border rounded-lg p-4">
+                    <div className="mb-2">
+                      <p className="font-semibold">{group.script.name}</p>
+                      <p className="text-sm text-gray-600">
+                        Применяется к {group.hosts.length} хостам: {group.hosts.map(host => {
+                          const hostObj = getHostById(host.hostId);
+                          const systemObj = getSystemById(host.systemId);
+                          return `${hostObj?.name} (${systemObj?.name})`;
+                        }).join(', ')}
+                      </p>
+                    </div>
+                    
+                    {/* Кнопка загрузки файла */}
+                    <div className="mb-3">
+                      <input
+                        type="file"
+                        id={`file-upload-${group.script.id}`}
+                        accept=".txt,.json,.xml,.csv,.log"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => document.getElementById(`file-upload-${group.script.id}`).click()}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Загрузить из файла
+                      </Button>
+                    </div>
+      
+                    <Textarea
+                      placeholder="Введите эталонные данные из ПМИ..."
+                      value={currentValue}
+                      onChange={(e) => {
+                        setProjectData(prev => {
+                          const newTasks = [...prev.tasks];
+                          
+                          // Применяем одинаковые эталонные данные ко всем хостам для этого скрипта
+                          group.hosts.forEach(host => {
+                            const task = newTasks[host.taskIndex];
+                            const system = task.systems[host.systemIndex];
+                            
+                            if (!system.reference_data) {
+                              system.reference_data = {};
+                            }
+                            
+                            system.reference_data[group.script.id] = e.target.value;
+                          });
+                          
+                          return { ...prev, tasks: newTasks };
+                        });
+                      }}
+                      rows={10}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                );
+              });
+            })()}
           </div>
         </CardContent>
       </Card>
