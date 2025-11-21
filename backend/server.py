@@ -1,31 +1,31 @@
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Depends, status, Request
-from fastapi.responses import StreamingResponse, FileResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Depends, status, Request # pyright: ignore[reportMissingImports]
+from fastapi.responses import StreamingResponse, FileResponse # pyright: ignore[reportMissingImports]
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials # pyright: ignore[reportMissingImports]
+from dotenv import load_dotenv # pyright: ignore[reportMissingImports]
+from starlette.middleware.cors import CORSMiddleware # pyright: ignore[reportMissingImports]
+from motor.motor_asyncio import AsyncIOMotorClient # pyright: ignore[reportMissingImports]
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict # pyright: ignore[reportMissingImports]
 from typing import List, Optional, Dict, Any, Literal
 import uuid
 from datetime import datetime, timezone, timedelta, time
 import paramiko
-import winrm
+import winrm  # pyright: ignore[reportMissingImports]
 import asyncio
 from cryptography.fernet import Fernet
 import base64
 import json
 import contextlib
 import socket
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+from openpyxl import Workbook  # pyright: ignore[reportMissingModuleSource]
+from openpyxl.styles import Font, PatternFill, Border, Side, Alignment  # pyright: ignore[reportMissingModuleSource]
 from datetime import date
 import tempfile
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from typing import Tuple 
+from passlib.context import CryptContext # pyright: ignore[reportMissingModuleSource]
+from jose import JWTError, jwt # pyright: ignore[reportMissingModuleSource]
+from typing import Tuple  # pyright: ignore[reportMissingModuleSource]
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')

@@ -9,6 +9,7 @@ import { api } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon, CheckCircle, XCircle, Loader2} from "lucide-react";
 import { useNavigate } from 'react-router-dom';
+import DateTimePicker from '../components/ui/datetime-picker';
 
 const JOB_TYPES = [
   { value: "one_time", label: "Одиночный запуск" },
@@ -296,14 +297,13 @@ const SchedulerPage = () => {
             </div>
 
             {form.job_type === "one_time" && (
-              <div>
+              <div className="space-y-2"> {/* ← добавьте этот класс */}
                 <Label>Дата и время запуска</Label>
-                <Input
-                  type="datetime-local"
+                <div><DateTimePicker
                   value={form.run_at}
-                  onChange={(e) => setForm({ ...form, run_at: e.target.value })}
+                  onChange={(value) => setForm({ ...form, run_at: value })}
                   required
-                />
+                /></div>
               </div>
             )}
 
@@ -311,35 +311,45 @@ const SchedulerPage = () => {
               <div className="space-y-2">
                 <Label>Список запусков</Label>
                 {form.run_times.map((value, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      type="datetime-local"
-                      value={value}
-                      onChange={(e) => {
-                        const next = [...form.run_times];
-                        next[index] = e.target.value;
-                        setForm({ ...form, run_times: next });
-                      }}
-                      required
-                    />
-                    {form.run_times.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => {
-                          const next = form.run_times.filter((_, i) => i !== index);
-                          setForm({ ...form, run_times: next.length ? next : [""] });
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                  <div key={index} className="flex gap-2 items-center"> {/* ← изменено на items-center */}
+                    {/* Нумерация в кружке */}
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    <div className="flex items-center gap-2 flex-1">
+                      <div className="flex-1">
+                        <DateTimePicker
+                          value={value}
+                          onChange={(newValue) => {
+                            const next = [...form.run_times];
+                            next[index] = newValue;
+                            setForm({ ...form, run_times: next });
+                          }}
+                          required
+                        />
+                      </div>
+                      {form.run_times.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const next = form.run_times.filter((_, i) => i !== index);
+                            setForm({ ...form, run_times: next.length ? next : [""] });
+                          }}
+                          className="flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setForm({ ...form, run_times: [...form.run_times, ""] })}
+                  className="ml-8" /* ← увеличенный отступ для кружковой нумерации */
                 >
                   Добавить запуск
                 </Button>
@@ -347,23 +357,28 @@ const SchedulerPage = () => {
             )}
 
             {form.job_type === "recurring" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Время запуска (ежедневно)</Label>
-                  <Input
-                    type="time"
-                    value={form.recurrence_time}
-                    onChange={(e) => setForm({ ...form, recurrence_time: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label>Дата начала (опционально)</Label>
-                  <Input
-                    type="date"
-                    value={form.recurrence_start_date}
-                    onChange={(e) => setForm({ ...form, recurrence_start_date: e.target.value })}
-                  />
+              <div className="space-y-2">
+                <Label>Ежедневный запуск</Label>
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-sm">Время</Label>
+                    <Input
+                      type="time"
+                      value={form.recurrence_time}
+                      onChange={(e) => setForm({ ...form, recurrence_time: e.target.value })}
+                      required
+                      className="w-[200px]"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-sm">Дата начала (опционально)</Label>
+                    <Input
+                      type="date"
+                      value={form.recurrence_start_date}
+                      onChange={(e) => setForm({ ...form, recurrence_start_date: e.target.value })}
+                      className="w-[200px]"
+                    />
+                  </div>
                 </div>
               </div>
             )}
