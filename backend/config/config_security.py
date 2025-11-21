@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from cryptography.fernet import Fernet
 import base64
-from config.settings import (   # pyright: ignore[reportMissingImports]
+from config.config_settings import (   # pyright: ignore[reportMissingImports]
     JWT_SECRET_KEY,
     JWT_ALGORITHM,
     JWT_ACCESS_TOKEN_EXPIRE_HOURS,
