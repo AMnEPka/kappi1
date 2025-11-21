@@ -1,3 +1,15 @@
+from models.auth_models import *
+from models.audit_models import *
+from models.content_models import *
+from models.execution_models import *
+from models.models_init import *
+from models.project_models import *
+
+from config.config_database import *
+from config.config_init import *
+from config.config_security import *
+from config.config_settings import *
+
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Depends, status, Request # pyright: ignore[reportMissingImports]
 from fastapi.responses import StreamingResponse, FileResponse # pyright: ignore[reportMissingImports]
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials # pyright: ignore[reportMissingImports]
@@ -27,19 +39,7 @@ from passlib.context import CryptContext # pyright: ignore[reportMissingModuleSo
 from jose import JWTError, jwt # pyright: ignore[reportMissingModuleSource]
 from typing import Tuple  # pyright: ignore[reportMissingModuleSource]
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
 
-# Encryption key for passwords (in production, store securely)
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', Fernet.generate_key().decode())
-cipher_suite = Fernet(ENCRYPTION_KEY.encode())
-
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-SCHEDULER_POLL_SECONDS = int(os.environ.get("SCHEDULER_POLL_SECONDS", "30"))
 scheduler_task: Optional[asyncio.Task] = None
 
 # Create the main app without a prefix
@@ -59,75 +59,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # HTTP Bearer for JWT
 security = HTTPBearer()
 
-# Logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("ssh_runner")
-
-
-
-# Permissions list
-PERMISSIONS = {
-    'categories_manage': 'Управление категориями и системами',
-    'checks_create': 'Создание проверок',
-    'checks_edit_own': 'Редактирование своих проверок',
-    'checks_edit_all': 'Редактирование всех проверок',
-    'checks_delete_own': 'Удаление своих проверок',
-    'checks_delete_all': 'Удаление всех проверок',
-    'hosts_create': 'Создание хостов',
-    'hosts_edit_own': 'Редактирование своих хостов',
-    'hosts_edit_all': 'Редактирование всех хостов',
-    'hosts_delete_own': 'Удаление своих хостов',
-    'hosts_delete_all': 'Удаление всех хостов',
-    'users_manage': 'Управление пользователями',
-    'users_view': 'Просмотр списка пользователей',
-    'roles_manage': 'Управление ролями',
-    'results_view_all': 'Просмотр всех результатов',
-    'results_export_all': 'Экспорт всех результатов',
-    'projects_create': 'Создание проектов',
-    'projects_execute': 'Выполнение проектов',
-    'scheduler_access': 'Доступ к планировщику заданий',
-    'logs_access': 'Доступ к логам'
-}
-
-# Группировка разрешений по категориям
-PERMISSION_GROUPS = {
-    'Категории и системы': ['categories_manage'],
-    'Проверки': [
-        'checks_create', 
-        'checks_edit_own', 
-        'checks_edit_all', 
-        'checks_delete_own', 
-        'checks_delete_all', 
-        'scheduler_access'
-    ],
-    'Хосты': [
-        'hosts_create', 
-        'hosts_edit_own', 
-        'hosts_edit_all', 
-        'hosts_delete_own', 
-        'hosts_delete_all'
-    ],
-    'Проекты': [
-        'projects_create', 
-        'projects_execute'
-    ],
-    'Результаты': [
-        'results_view_all', 
-        'results_export_all'
-    ],
-    'Администрирование': [
-        'roles_manage',
-        'logs_access'
-    ],
-    'Пользователи': [
-        'users_view',
-        'users_manage'
-    ],
-}
-
 @api_router.get("/permissions", response_model=Dict[str, Any])
 async def get_permissions_list():
     """Get all available permissions with descriptions and groups"""
@@ -135,16 +66,6 @@ async def get_permissions_list():
         "permissions": PERMISSIONS,
         "groups": PERMISSION_GROUPS
     }
-
-# Helper functions
-def encrypt_password(password: str) -> str:
-    """Encrypt password for storage"""
-    return cipher_suite.encrypt(password.encode()).decode()
-
-def decrypt_password(encrypted_password: str) -> str:
-    """Decrypt password for use"""
-    return cipher_suite.decrypt(encrypted_password.encode()).decode()
-
 def prepare_for_mongo(data: dict) -> dict:
     """Prepare data for MongoDB storage"""
     prepared = data.copy()
@@ -171,7 +92,6 @@ def parse_from_mongo(item: dict) -> dict:
         ]
     return parsed
 
-
 async def _persist_audit_log(entry: Dict[str, Any]) -> None:
     try:
         doc = entry.copy()
@@ -180,7 +100,6 @@ async def _persist_audit_log(entry: Dict[str, Any]) -> None:
         await db.audit_logs.insert_one(doc)
     except Exception as e:
         logger.error("Failed to persist audit log: %s", str(e))
-
 
 def log_audit(event: str, *, user_id: Optional[str] = None, username: Optional[str] = None,
               details: Optional[Dict[str, Any]] = None, level: int = logging.INFO) -> None:
@@ -205,378 +124,6 @@ def log_audit(event: str, *, user_id: Optional[str] = None, username: Optional[s
         # No running loop (e.g., during startup). Persist synchronously.
         asyncio.run(_persist_audit_log(payload))
 
-
-
-
-# Auth helper functions
-def hash_password(password: str) -> str:
-    """Hash password for storage"""
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-# Models
-# Category Model
-class Category(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    icon: str = "📁"
-    description: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: Optional[str] = None
-
-class CategoryCreate(BaseModel):
-    name: str
-    icon: str = "📁"
-    description: Optional[str] = None
-
-class CategoryUpdate(BaseModel):
-    name: Optional[str] = None
-    icon: Optional[str] = None
-    description: Optional[str] = None
-
-# System Model
-class System(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    category_id: str
-    name: str
-    description: Optional[str] = None
-    os_type: str = "linux"  # "linux" or "windows"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: Optional[str] = None
-
-class SystemCreate(BaseModel):
-    category_id: str
-    name: str
-    description: Optional[str] = None
-    os_type: str = "linux"
-
-class SystemUpdate(BaseModel):
-    category_id: Optional[str] = None
-    name: Optional[str] = None
-    description: Optional[str] = None
-    os_type: Optional[str] = None
-
-class Host(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    hostname: str
-    port: int = 22
-    username: str
-    auth_type: str  # "password" or "key"
-    password: Optional[str] = None
-    ssh_key: Optional[str] = None
-    connection_type: str = "ssh"  # "ssh" for Linux, "winrm" for Windows, "k8s" for Kubernetes
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: Optional[str] = None
-
-class HostCreate(BaseModel):
-    name: str
-    hostname: str
-    port: int = 22
-    username: str
-    auth_type: str
-    password: Optional[str] = None
-    ssh_key: Optional[str] = None
-    connection_type: str = "ssh"
-
-class HostUpdate(BaseModel):
-    name: Optional[str] = None
-    hostname: Optional[str] = None
-    port: Optional[int] = None
-    username: Optional[str] = None
-    auth_type: Optional[str] = None
-    password: Optional[str] = None
-    ssh_key: Optional[str] = None
-    connection_type: Optional[str] = None
-
-class Script(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    system_id: str  # ОБЯЗАТЕЛЬНАЯ связь с системой
-    name: str
-    description: Optional[str] = None
-    content: str  # Команда (короткая, 1-2 строки)
-    processor_script: Optional[str] = None  # Скрипт-обработчик результатов
-    has_reference_files: bool = False  # Есть ли эталонные файлы
-    test_methodology: Optional[str] = None  # Описание методики испытания
-    success_criteria: Optional[str] = None  # Критерий успешного прохождения испытания
-    order: int = 0  # Порядок отображения
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: Optional[str] = None
-
-class ScriptCreate(BaseModel):
-    system_id: str
-    name: str
-    description: Optional[str] = None
-    content: str
-    processor_script: Optional[str] = None
-    has_reference_files: bool = False
-    test_methodology: Optional[str] = None
-    success_criteria: Optional[str] = None
-    order: int = 0
-
-class ScriptUpdate(BaseModel):
-    system_id: Optional[str] = None
-    name: Optional[str] = None
-    description: Optional[str] = None
-    content: Optional[str] = None
-    processor_script: Optional[str] = None
-    has_reference_files: Optional[bool] = None
-    test_methodology: Optional[str] = None
-    success_criteria: Optional[str] = None
-    order: Optional[int] = None
-
-# Project Models
-class Project(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    description: Optional[str] = None
-    status: str = "draft"  # draft, running, completed, failed
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    created_by: Optional[str] = None
-    creator_username: Optional[str] = None
-    creator_full_name: Optional[str] = None
-
-class ProjectCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-class ProjectUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[str] = None
-
-# Project Task Models
-class ProjectTask(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    project_id: str
-    host_id: str
-    system_id: str
-    script_ids: List[str]
-    reference_data: Optional[dict] = Field(default_factory=dict)  # script_id -> reference text
-    status: str = "pending"  # pending, running, completed, failed
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class ProjectTaskCreate(BaseModel):
-    host_id: str
-    system_id: str
-    script_ids: List[str]
-    reference_data: Optional[dict] = Field(default_factory=dict)
-
-class ProjectTaskUpdate(BaseModel):
-    script_ids: Optional[List[str]] = None
-    reference_data: Optional[dict] = None
-    status: Optional[str] = None
-
-class ExecutionResult(BaseModel):
-    host_id: str
-    host_name: str
-    success: bool
-    output: str
-    error: Optional[str] = None
-    check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-# Updated Execution Model
-class Execution(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    project_id: Optional[str] = None  # Link to project
-    project_task_id: Optional[str] = None  # Link to task
-    execution_session_id: Optional[str] = None  # NEW: Group executions by session (each project run)
-    host_id: str
-    system_id: str
-    script_id: str
-    script_name: str
-    success: bool
-    output: str
-    error: Optional[str] = None
-    check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
-    executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    executed_by: Optional[str] = None
-
-class SchedulerJob(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    project_id: str
-    job_type: Literal["one_time", "multi_run", "recurring"]
-    status: Literal["active", "paused", "completed"] = "active"
-    next_run_at: Optional[datetime] = None
-    run_times: List[datetime] = Field(default_factory=list)
-    schedule_config: Dict[str, Any] = Field(default_factory=dict)
-    remaining_runs: Optional[int] = None
-    created_by: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_run_at: Optional[datetime] = None
-    last_run_status: Optional[str] = None
-
-class SchedulerJobCreate(BaseModel):
-    name: str
-    project_id: str
-    job_type: Literal["one_time", "multi_run", "recurring"]
-    run_at: Optional[datetime] = None
-    run_times: Optional[List[datetime]] = None
-    recurrence_time: Optional[str] = None  # HH:MM format
-    recurrence_start_date: Optional[date] = None  # yyyy-mm-dd
-
-class SchedulerJobUpdate(BaseModel):
-    name: Optional[str] = None
-    run_at: Optional[datetime] = None
-    run_times: Optional[List[datetime]] = None
-    recurrence_time: Optional[str] = None
-    recurrence_start_date: Optional[date] = None
-    status: Optional[Literal["active", "paused"]] = None
-
-class SchedulerRun(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    job_id: str
-    project_id: str
-    session_id: Optional[str] = None
-    status: Literal["running", "success", "failed"] = "running"
-    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    finished_at: Optional[datetime] = None
-    error: Optional[str] = None
-    launched_by_user: Optional[str] = None
-
-class AuditLog(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    event: str
-    level: str = "INFO"
-    user_id: Optional[str] = None
-    username: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class ExecuteProjectRequest(BaseModel):
-    """Request to execute a project"""
-    project_id: str
-
-class ExecuteRequest(BaseModel):
-    """Legacy request to execute a single script on multiple hosts"""
-    script_id: str
-    host_ids: List[str]
-
-
-# Auth Models
-class User(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    username: str
-    full_name: str
-    password_hash: str
-    is_active: bool = True
-    is_admin: bool = False
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: Optional[str] = None
-
-class UserCreate(BaseModel):
-    username: str
-    full_name: str
-    password: str
-    is_admin: bool = False
-
-class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
-    is_active: Optional[bool] = None
-    is_admin: Optional[bool] = None
-
-class UserResponse(BaseModel):
-    """User response without password hash"""
-    id: str
-    username: str
-    full_name: str
-    is_active: bool
-    is_admin: bool
-    created_at: datetime
-    created_by: Optional[str] = None
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str
-    user: UserResponse
-
-class Role(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    permissions: List[str]
-    description: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: Optional[str] = None
-
-class RoleCreate(BaseModel):
-    name: str
-    permissions: List[str]
-    description: Optional[str] = None
-
-class RoleUpdate(BaseModel):
-    name: Optional[str] = None
-    permissions: Optional[List[str]] = None
-    description: Optional[str] = None
-
-class UserRole(BaseModel):
-    """Many-to-many relationship between users and roles"""
-    model_config = ConfigDict(extra="ignore")
-    
-    user_id: str
-    role_id: str
-
-class ProjectAccess(BaseModel):
-    """Access control for projects"""
-    model_config = ConfigDict(extra="ignore")
-    
-    project_id: str
-    user_id: str
-    granted_by: str
-    granted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class PasswordResetRequest(BaseModel):
-    new_password: str
-
-
-#scheduler
 def _parse_datetime_param(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
     if not value:
         return None
