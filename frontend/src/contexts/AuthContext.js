@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+
 import api from '../config/api';
 
 const AuthContext = createContext(null);
@@ -70,8 +71,18 @@ export const AuthProvider = ({ children }) => {
 	const login = async (username, password) => {
 		try {
 			console.log('🔍 Login started with API URL:', api.defaults.baseURL);
-			console.log('🔍 Making request to:', `${api.defaults.baseURL}/api/auth/login`);
-			
+	
+      // Проверка доступности сервера
+      try {
+        const healthCheck = await axios.get('http://localhost:8001/health', { timeout: 5000 });
+        console.log('✅ Server is available:', healthCheck.status);
+      } catch (healthError) {
+        console.error('❌ Server is not available:', healthError.message);
+        throw new Error('Сервер не доступен. Проверьте запущен ли бэкенд.');
+      }
+
+      console.log('🔍 Making login request to:', `${API_URL}/api/auth/login`); 
+
 			const response = await api.post('/api/auth/login', {
 				username,
 				password

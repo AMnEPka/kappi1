@@ -1,44 +1,29 @@
-from models.auth_models import *
-from models.audit_models import *
-from models.content_models import *
-from models.execution_models import *
-from models.models_init import *
-from models.project_models import *
-
-from config.config_database import *
-from config.config_init import *
-from config.config_security import *
-from config.config_settings import *
-
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Depends, status, Request # pyright: ignore[reportMissingImports]
 from fastapi.responses import StreamingResponse, FileResponse # pyright: ignore[reportMissingImports]
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials # pyright: ignore[reportMissingImports]
-from dotenv import load_dotenv # pyright: ignore[reportMissingImports]
 from starlette.middleware.cors import CORSMiddleware # pyright: ignore[reportMissingImports]
 from motor.motor_asyncio import AsyncIOMotorClient # pyright: ignore[reportMissingImports]
+import asyncio, logging, json
 import os
-import logging
-from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict # pyright: ignore[reportMissingImports]
-from typing import List, Optional, Dict, Any, Literal
 import uuid
-from datetime import datetime, timezone, timedelta, time
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone, timedelta, time, date
 import paramiko
 import winrm  # pyright: ignore[reportMissingImports]
-import asyncio
-from cryptography.fernet import Fernet
-import base64
-import json
 import contextlib
 import socket
 from openpyxl import Workbook  # pyright: ignore[reportMissingModuleSource]
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment  # pyright: ignore[reportMissingModuleSource]
-from datetime import date
 import tempfile
-from passlib.context import CryptContext # pyright: ignore[reportMissingModuleSource]
 from jose import JWTError, jwt # pyright: ignore[reportMissingModuleSource]
 from typing import Tuple  # pyright: ignore[reportMissingModuleSource]
 
+from config.config_init import *
+from models.models_init import *
+
+mongo_url = os.environ['MONGO_URL']
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ['DB_NAME']]
 
 scheduler_task: Optional[asyncio.Task] = None
 
@@ -52,12 +37,6 @@ api_router = APIRouter(prefix="/api")
 SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production-please-use-strong-random-key')
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# HTTP Bearer for JWT
-security = HTTPBearer()
 
 @api_router.get("/permissions", response_model=Dict[str, Any])
 async def get_permissions_list():

@@ -4,7 +4,7 @@ Configuration module initialization and centralized imports
 """
 
 # Import settings
-from config.settings import (  # pyright: ignore[reportMissingImports]
+from config.config_settings import ( 
     ROOT_DIR,
     MONGO_URL,
     DB_NAME,
@@ -18,17 +18,8 @@ from config.settings import (  # pyright: ignore[reportMissingImports]
     PERMISSION_GROUPS
 )
 
-# Import database
-from config.database import ( # pyright: ignore[reportMissingImports]
-    connect_to_mongo,
-    close_mongo_connection,
-    get_db,
-    db,
-    client
-)
-
 # Import security
-from config.security import ( # pyright: ignore[reportMissingImports]
+from config.config_security import ( # pyright: ignore[reportMissingImports]
     pwd_context,
     hash_password,
     verify_password,
@@ -52,13 +43,6 @@ __all__ = [
     "logger",
     "PERMISSIONS",
     "PERMISSION_GROUPS",
-    
-    # Database
-    "connect_to_mongo",
-    "close_mongo_connection",
-    "get_db",
-    "db",
-    "client",
     
     # Security
     "pwd_context",
