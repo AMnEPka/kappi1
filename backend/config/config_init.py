@@ -2,7 +2,6 @@
 config/__init__.py
 Configuration module initialization and centralized imports
 """
-
 # Import settings
 from config.config_settings import ( 
     ROOT_DIR,
@@ -30,6 +29,11 @@ from config.config_security import ( # pyright: ignore[reportMissingImports]
     decrypt_password
 )
 
+from config.config_database import (
+    client,
+    db
+)
+
 __all__ = [
     # Settings
     "ROOT_DIR",
@@ -52,5 +56,9 @@ __all__ = [
     "create_access_token",
     "decode_token",
     "encrypt_password",
-    "decrypt_password"
+    "decrypt_password",
+
+    #DB
+    "db",
+    "client"
 ]

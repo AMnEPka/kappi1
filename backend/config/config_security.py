@@ -23,11 +23,9 @@ from config.config_settings import (   # pyright: ignore[reportMissingImports]
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-
 def hash_password(password: str) -> str:
     """Hash password for storage"""
     return pwd_context.hash(password)
-
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against hash"""
@@ -39,7 +37,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 security = HTTPBearer()
 
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create JWT access token"""
     to_encode = data.copy()
@@ -50,7 +47,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
-
 
 def decode_token(token: str) -> dict:
     """Decode JWT token and return payload"""
@@ -68,15 +64,12 @@ def _get_cipher_suite():
         key = key.encode()
     return Fernet(key)
 
-
 cipher_suite = _get_cipher_suite()
-
 
 def encrypt_password(password: str) -> str:
     """Encrypt password for storage in database"""
     encrypted = cipher_suite.encrypt(password.encode())
     return encrypted.decode()
-
 
 def decrypt_password(encrypted_password: str) -> str:
     """Decrypt password for use"""
