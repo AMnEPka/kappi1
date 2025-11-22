@@ -8,7 +8,7 @@ import os
 import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta, time, date
-import paramiko
+import paramiko  # pyright: ignore[reportMissingModuleSource]
 import winrm  # pyright: ignore[reportMissingImports]
 import contextlib
 import socket
@@ -21,8 +21,6 @@ from typing import Tuple  # pyright: ignore[reportMissingModuleSource]
 from config.config_init import *
 from models.models_init import *
 from services.services_init import *
-
-
 
 scheduler_task: Optional[asyncio.Task] = None
 
@@ -217,7 +215,7 @@ async def _execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Opti
         raise RuntimeError("Creator of scheduler job not found")
     scheduler_user = User(**user_doc)
     log_audit(
-        "launched_using_scheduler",
+        "24",
         user_id=scheduler_user.id,
         username=scheduler_user.username,
         details={"project_id": job.project_id, "scheduler_job_id": job.id}
@@ -285,7 +283,7 @@ async def login(login_data: LoginRequest, request: Request):
     user_doc = await db.users.find_one({"username": login_data.username})
     if not user_doc:
         log_audit(
-            "user_login_failed",
+            "2",
             username=login_data.username,
             details={"reason": "user_not_found", "ip": client_ip}
         )
@@ -299,7 +297,7 @@ async def login(login_data: LoginRequest, request: Request):
     # Verify password
     if not verify_password(login_data.password, user.password_hash):
         log_audit(
-            "user_login_failed",
+            "2",
             user_id=user.id,
             username=user.username,
             details={"reason": "invalid_password", "ip": client_ip}
@@ -311,7 +309,7 @@ async def login(login_data: LoginRequest, request: Request):
     
     if not user.is_active:
         log_audit(
-            "user_login_failed",
+            "2",
             user_id=user.id,
             username=user.username,
             details={"reason": "inactive_user", "ip": client_ip}
@@ -333,7 +331,7 @@ async def login(login_data: LoginRequest, request: Request):
     )
     
     log_audit(
-        "user_login_success",
+        "1",
         user_id=user.id,
         username=user.username,
         details={"ip": client_ip}
@@ -384,7 +382,7 @@ async def create_host(host_input: HostCreate, current_user: User = Depends(get_c
     await db.hosts.insert_one(doc)
     
     log_audit(
-        "host_created",
+        "15",
         user_id=current_user.id,
         username=current_user.username,
         details={"host_id": host_obj.id, "host_name": host_obj.name}
@@ -471,7 +469,7 @@ async def update_host(host_id: str, host_update: HostUpdate, current_user: User 
     updated_host = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     
     log_audit(
-        "host_updated",
+        "16",
         user_id=current_user.id,
         username=current_user.username,
         details={"host_id": host_id, "updated_fields": list(update_data.keys())}
@@ -664,7 +662,7 @@ async def create_script(system_id: str, script_input: ScriptCreate, current_user
     await db.scripts.insert_one(doc)
     
     log_audit(
-        "check_created",
+        "18",
         user_id=current_user.id,
         username=current_user.username,
         details={"script_id": script_obj.id, "script_name": script_obj.name}
@@ -790,7 +788,7 @@ async def update_script(script_id: str, script_update: ScriptUpdate, current_use
     updated_script = await db.scripts.find_one({"id": script_id}, {"_id": 0})
     
     log_audit(
-        "check_updated",
+        "19",
         user_id=current_user.id,
         username=current_user.username,
         details={"script_id": script_id, "updated_fields": list(update_data.keys())}
@@ -827,7 +825,7 @@ async def create_project(project_input: ProjectCreate, current_user: User = Depe
     await db.projects.insert_one(doc)
     
     log_audit(
-        "project_created",
+        "21",
         user_id=current_user.id,
         username=current_user.username,
         details={"project_id": project_obj.id, "project_name": project_obj.name}
@@ -1136,7 +1134,7 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
         raise HTTPException(status_code=403, detail="Access denied to this project")
     
     log_audit(
-        "project_execution_started",
+        "23",
         user_id=current_user.id,
         username=current_user.username,
         details={"project_id": project_id}
@@ -1478,7 +1476,7 @@ async def get_project_executions(project_id: str, current_user: User = Depends(g
     ).sort("executed_at", -1).to_list(1000)
     
     log_audit(
-        "project_results_viewed",
+        "25",
         user_id=current_user.id,
         username=current_user.username,
         details={"project_id": project_id, "scope": "project"}
@@ -1659,7 +1657,7 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
             raise HTTPException(status_code=403, detail="Access denied to this project")
     
     log_audit(
-        "project_results_exported",
+        "26",
         user_id=current_user.id,
         username=current_user.username,
         details={"project_id": project_id, "session_id": session_id}
