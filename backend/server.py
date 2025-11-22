@@ -413,7 +413,12 @@ async def create_host(host_input: HostCreate, current_user: User = Depends(get_c
         "15",
         user_id=current_user.id,
         username=current_user.username,
-        details={"host_id": host_obj.id, "host_name": host_obj.name, "ip_address": ip_address_value}
+        details={
+            "host_id": host_obj.id, 
+            "host_name": host_obj.name, 
+            "ip_address": ip_address_value,
+            "updated_by": current_user.username
+        }
     )
     return host_obj
 
@@ -469,12 +474,14 @@ async def test_host_connection(host_id: str):
 async def update_host(host_id: str, host_update: HostUpdate, current_user: User = Depends(get_current_user)):
     """Update host (requires hosts_edit_own or hosts_edit_all permission)"""
     # Check if host exists and get owner
-    host = await db.hosts.find_one({"id": host_id})
-    if not host:
+    host_doc = await db.hosts.find_one({"id": host_id})
+    if not host_doc:
         raise HTTPException(status_code=404, detail="Хост не найден")
     
+    host = Host(**host_doc)
+    
     # Check permissions
-    is_owner = host.get('created_by') == current_user.id
+    is_owner = host.created_by == current_user.id
     if is_owner:
         await require_permission(current_user, 'hosts_edit_own')
     else:
@@ -496,12 +503,18 @@ async def update_host(host_id: str, host_update: HostUpdate, current_user: User 
     
     updated_host = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     
+    # Логирование редактирования хоста
     log_audit(
-        "16",
+        "16",  # Редактирование хоста
         user_id=current_user.id,
         username=current_user.username,
-        details={"host_id": host_id, "updated_fields": list(update_data.keys())}
+        details={
+            "host_id": host_id,
+            "host_name": host.name,
+            "ip_address": host.hostname
+        }
     )
+    
     return Host(**parse_from_mongo(updated_host))
 
 @api_router.delete("/hosts/{host_id}")
@@ -520,6 +533,19 @@ async def delete_host(host_id: str, current_user: User = Depends(get_current_use
         await require_permission(current_user, 'hosts_delete_all')
     
     result = await db.hosts.delete_one({"id": host_id})
+    
+    # Логирование удаления хоста
+    log_audit(
+        "17",  # Удаление хоста
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "host_name": host.get('name'),
+            "hostname": host.get('hostname'),
+            "deleted_by": current_user.username
+        }
+    )
+    
     return {"message": "Хост удален"}
 
 
@@ -2274,7 +2300,6 @@ async def get_permissions(current_user: User = Depends(get_current_user)):
     """Get all available permissions"""
     return PERMISSIONS
 
-
 # API Routes - Project Access Management
 @api_router.get("/projects/{project_id}/users")
 async def get_project_users(project_id: str, current_user: User = Depends(get_current_user)):
@@ -2393,11 +2418,8 @@ async def revoke_project_access(project_id: str, user_id: str, current_user: Use
     )
     
     return {"message": "Access revoked successfully"}
-
 # Include the router in the main app
 app.include_router(api_router)
-
-
 # Минимальная рабочая CORS конфигурация
 app.add_middleware(
     CORSMiddleware,
@@ -2410,7 +2432,6 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     return {"status": "healthy"}
-
 
 @app.on_event("startup")
 async def startup_db_init():

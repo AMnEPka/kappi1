@@ -73,16 +73,6 @@ const formatEventDetails = (eventNumber, details) => {
   
   try {
     const detailsObj = typeof details === 'string' ? JSON.parse(details) : details;
-
-    // ВРЕМЕННО: выводим в консоль для отладки
-    console.log('🔍 Event Details Debug:', {
-      eventNumber,
-      details,
-      detailsObj,
-      type: typeof details,
-      isString: typeof details === 'string',
-      parsedType: typeof detailsObj
-    });
     
     switch(eventNumber) {
       case "1": // Успешный вход
@@ -126,10 +116,16 @@ const formatEventDetails = (eventNumber, details) => {
 Затронуто пользователей: ${detailsObj.affected_users_count}`;
               
       case "15": // Создание хоста
-        return `Название: ${detailsObj.host_name}\nАдрес: ${detailsObj.ip_address}`;
+        return `Название: ${detailsObj.host_name}
+Адрес: ${detailsObj.ip_address}`;
         
       case "16": // Редактирование хоста
-        return `Хост: ${detailsObj.host_name}\nИзмененные поля: ${detailsObj.changed_fields?.join(', ') || 'не указаны'}\nПредыдущие значения: ${detailsObj.old_values ? JSON.stringify(detailsObj.old_values) : 'не сохранены'}`;
+        return `Название: ${detailsObj.host_name}
+Адрес: ${detailsObj.ip_address}`;
+
+      case "17": // Удаление хоста
+        return `Хост: ${detailsObj.host_name}
+Адрес: ${detailsObj.hostname}`;
         
       case "21": // Создание проекта
         return `Название: ${detailsObj.project_name}\nОписание: ${detailsObj.description || 'не указано'}\nКоличество проверок: ${detailsObj.checks_count || 0}`;
@@ -310,7 +306,7 @@ const LogsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Журнал событий</h1>
-          <p className="text-sm text-gray-500">Отслеживание действий пользователей и системы</p>
+          <p className="text-sm text-gray-500">Отслеживание действий пользователей в системе</p>
         </div>
       </div>
   
