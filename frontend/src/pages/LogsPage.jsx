@@ -82,11 +82,11 @@ const formatEventDetails = (eventNumber, details) => {
     
     switch(eventNumber) {
       case "1": // Успешный вход
-        return `IP-адрес: ${detailsObj.ip_address || 'неизвестно'}\nБраузер: ${detailsObj.user_agent || 'неизвестно'}\nВремя входа: ${detailsObj.login_time || new Date().toLocaleString()}`;
-        
+        return `IP-адрес: ${detailsObj.ip_address || 'неизвестно'}\nБраузер: ${detailsObj.user_agent || 'неизвестно'}`;
+    
       case "2": // Неудачный вход
-        return `IP-адрес: ${detailsObj.ip_address || 'неизвестно'}\nПричина: ${detailsObj.reason || 'неверные учетные данные'}\nПопытка: ${detailsObj.attempt_time || new Date().toLocaleString()}`;
-        
+        return `IP-адрес: ${detailsObj.ip_address || 'неизвестно'}\nБраузер: ${detailsObj.user_agent || 'неизвестно'}\nПричина: ${detailsObj.reason || 'неверные учетные данные'}`;       
+
       case "3": // Создание пользователя
         return `Логин: ${detailsObj.username}\nРоль: ${detailsObj.role || 'пользователь'}\nEmail: ${detailsObj.email || 'не указан'}`;
         
@@ -365,8 +365,8 @@ const LogsPage = () => {
                 <TableRow key={log.id}>
                   <TableCell className="whitespace-nowrap">{formatDate(log.created_at)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {log.event.replace(/_/g, " ")}
+                    <Badge variant="outline">
+                      {EVENT_OPTIONS.find(option => option.value === log.event)?.label || log.event}
                     </Badge>
                   </TableCell>
                   <TableCell>

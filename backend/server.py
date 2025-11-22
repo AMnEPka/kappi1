@@ -277,7 +277,18 @@ async def scheduler_worker():
 @api_router.post("/auth/login", response_model=LoginResponse)
 async def login(login_data: LoginRequest, request: Request):
     """Login and get JWT token"""
+    # Получаем IP клиента
     client_ip = request.client.host if request.client else None
+    
+    # Получаем User-Agent (информация о браузере/устройстве)
+    user_agent = request.headers.get("user-agent")
+    
+    # Получаем дополнительные заголовки
+    forwarded_for = request.headers.get("x-forwarded-for")
+    real_ip = request.headers.get("x-real-ip")
+    
+    # Используем цепочку приоритетов для IP
+    final_ip = forwarded_for or real_ip or client_ip
     
     # Find user
     user_doc = await db.users.find_one({"username": login_data.username})
@@ -285,7 +296,11 @@ async def login(login_data: LoginRequest, request: Request):
         log_audit(
             "2",
             username=login_data.username,
-            details={"reason": "user_not_found", "ip": client_ip}
+            details={
+                "reason": "user_not_found", 
+                "ip_address": final_ip,
+                "user_agent": user_agent
+            }
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -300,7 +315,11 @@ async def login(login_data: LoginRequest, request: Request):
             "2",
             user_id=user.id,
             username=user.username,
-            details={"reason": "invalid_password", "ip": client_ip}
+            details={
+                "reason": "invalid_password", 
+                "ip_address": final_ip,
+                "user_agent": user_agent
+            }
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -312,7 +331,11 @@ async def login(login_data: LoginRequest, request: Request):
             "2",
             user_id=user.id,
             username=user.username,
-            details={"reason": "inactive_user", "ip": client_ip}
+            details={
+                "reason": "inactive_user", 
+                "ip_address": final_ip,
+                "user_agent": user_agent
+            }
         )
         raise HTTPException(status_code=400, detail="Inactive user")
     
@@ -334,7 +357,10 @@ async def login(login_data: LoginRequest, request: Request):
         "1",
         user_id=user.id,
         username=user.username,
-        details={"ip": client_ip}
+        details={
+            "ip_address": final_ip,
+            "user_agent": user_agent
+        }
     )
     
     return LoginResponse(
