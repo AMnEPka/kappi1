@@ -8,14 +8,10 @@ import os
 import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta, time, date
-import paramiko  # pyright: ignore[reportMissingModuleSource]
-import winrm  # pyright: ignore[reportMissingImports]
 import contextlib
-import socket
 from openpyxl import Workbook  # pyright: ignore[reportMissingModuleSource]
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment  # pyright: ignore[reportMissingModuleSource]
 import tempfile
-from jose import JWTError, jwt # pyright: ignore[reportMissingModuleSource]
 from typing import Tuple  # pyright: ignore[reportMissingModuleSource]
 
 from config.config_init import *
