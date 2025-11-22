@@ -133,37 +133,75 @@ const CategoriesPage = () => {
                       Выбрать
                     </Button>
                     
-                    {isIconPickerOpen && (
-                      <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-3">
-                        <div className="grid grid-cols-8 gap-1 mb-2">
-                          {['🐧', '🗄️', '💻', '🖥️', '🔒', '🌐', '⚡', '📊', '🔍', '📁', '📋'].map((icon) => (
-                            <button
-                              key={icon}
-                              type="button"
-                              className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-lg"
-                              onClick={() => {
-                                setFormData({...formData, icon});
-                                setIsIconPickerOpen(false);
-                              }}
-                            >
-                              {icon}
-                            </button>
-                          ))}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setFormData({...formData, icon: ''});
-                            setIsIconPickerOpen(false);
-                          }}
-                          className="w-full text-xs"
-                        >
-                          Очистить
-                        </Button>
+                  {isIconPickerOpen && (
+                    <div className="absolute top-full right-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-3">
+                      <div className="grid grid-cols-8 gap-1 mb-2">
+                        {[
+                          // Emoji иконки
+                          { type: 'emoji', value: '🐧', name: 'Linux' },
+                          { type: 'emoji', value: '🗄️', name: 'Сервер' },
+                          { type: 'emoji', value: '💻', name: 'Ноутбук' },
+                          { type: 'emoji', value: '🖥️', name: 'Компьютер' },
+                          { type: 'emoji', value: '🔒', name: 'Безопасность' },
+                          { type: 'emoji', value: '🌐', name: 'Сеть' },
+                          { type: 'emoji', value: '📊', name: 'Мониторинг' },
+
+                          // PNG иконки
+                          { type: 'png', value: './icons/windows.png', name: 'Windows' },
+                          { type: 'png', value: './icons/k8s.png', name: 'Kubernetes' },
+
+                          // Дополнительные emoji
+                          { type: 'emoji', value: '🐳', name: 'Docker' },
+                          { type: 'emoji', value: '☁️', name: 'Облако' },
+                          { type: 'emoji', value: '🚀', name: 'Запуск' },
+                          { type: 'emoji', value: '🔧', name: 'Настройка' },
+                        ].map((icon) => (
+                          <button
+                            key={icon.type === 'emoji' ? icon.value : icon.value}
+                            type="button"
+                            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-lg"
+                            onClick={() => {
+                              // Сохраняем тип и значение иконки
+                              setFormData({
+                                ...formData, 
+                                icon: icon.type === 'emoji' ? icon.value : icon.value,
+                                iconType: icon.type
+                              });
+                              setIsIconPickerOpen(false);
+                            }}
+                            title={icon.name}
+                          >
+                            {icon.type === 'emoji' ? (
+                              <span className="text-lg">{icon.value}</span>
+                            ) : (
+                              <img 
+                                src={icon.value} 
+                                alt={icon.name}
+                                className="w-5 h-5 object-contain"
+                                onError={(e) => {
+                                  // Fallback если изображение не загрузилось
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'block';
+                                }}
+                              />
+                            )}
+                          </button>
+                        ))}
                       </div>
-                    )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFormData({...formData, icon: '', iconType: ''});
+                          setIsIconPickerOpen(false);
+                        }}
+                        className="w-full text-xs"
+                      >
+                        Очистить
+                      </Button>
+                    </div>
+                  )}
                   </div>
                 </div>
               </div>

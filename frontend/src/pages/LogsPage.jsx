@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -52,7 +52,7 @@ const LogsPage = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedEvents, setSelectedEvents] = useState([]);
-  const [limit, setLimit] = useState(200);
+  const [limit, setLimit] = useState(100);
 
   const activeEventLabels = useMemo(() => {
     if (!selectedEvents.length) return "Все события";
@@ -86,11 +86,31 @@ const LogsPage = () => {
     }
   };
 
+  // Обработчики изменений с дебаунсом
+  const handleDateChange = (setter) => (e) => {
+    setter(e.target.value);
+  };
+
+  const handleLimitChange = (e) => {
+    setLimit(Number(e.target.value));
+  };  
+
   useEffect(() => {
-    if (isAdmin) {
-      fetchLogs();
-    }
-  }, [isAdmin]);
+    if (!isAdmin) return;
+  
+    let isMounted = true;
+    
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        fetchLogs();
+      }
+    }, 300);
+  
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [isAdmin, startDate, endDate, limit, selectedEvents]);
 
   const handleReset = () => {
     setStartDate("");
@@ -117,31 +137,38 @@ const LogsPage = () => {
           <h1 className="text-3xl font-bold">Журнал событий</h1>
           <p className="text-sm text-gray-500">Отслеживание действий пользователей и системы</p>
         </div>
-        <div className="flex gap-2">
+      </div>
+  
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div>
+              <CardTitle>Фильтры</CardTitle>
+              <CardDescription>Фильтры применяются автоматически</CardDescription>
+            </div>
+          </div>
           <Button variant="outline" onClick={handleReset} disabled={loading}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            Сбросить
+            Сбросить все фильтры
           </Button>
-          <Button onClick={fetchLogs} disabled={loading}>
-            <Filter className="h-4 w-4 mr-2" />
-            Применить
-          </Button>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Фильтры</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-600">Дата от</label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <Input 
+                type="date" 
+                value={startDate} 
+                onChange={handleDateChange(setStartDate)} 
+              />
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Дата до</label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <Input 
+                type="date" 
+                value={endDate} 
+                onChange={handleDateChange(setEndDate)} 
+              />
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Количество записей</label>
@@ -150,11 +177,11 @@ const LogsPage = () => {
                 min={1}
                 max={500}
                 value={limit}
-                onChange={(e) => setLimit(Number(e.target.value))}
+                onChange={handleLimitChange}
               />
             </div>
           </div>
-
+  
           <div>
             <label className="text-sm font-medium text-gray-600">Типы событий</label>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -174,11 +201,19 @@ const LogsPage = () => {
           </div>
         </CardContent>
       </Card>
-
+  
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Последние события</CardTitle>
-          <Badge variant="outline">{logs.length} записей</Badge>
+          <div className="flex items-center gap-2">
+            {loading && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Загрузка...
+              </div>
+            )}
+            <Badge variant="outline">{logs.length} записей</Badge>
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
@@ -191,7 +226,7 @@ const LogsPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {logs.length === 0 && (
+              {logs.length === 0 && !loading && (
                 <TableRow>
                   <TableCell colSpan={4} className="py-8 text-center text-gray-500">
                     События не найдены
