@@ -2307,6 +2307,12 @@ async def grant_project_access(project_id: str, user_id: str, current_user: User
     if project.get('created_by') != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only project creator or admin can grant access")
     
+    # Get user info for logging
+    user_doc = await db.users.find_one({"id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    user = User(**user_doc)
+    
     # Check if access already exists
     existing = await db.project_access.find_one({
         "project_id": project_id,
@@ -2326,6 +2332,22 @@ async def grant_project_access(project_id: str, user_id: str, current_user: User
     doc = prepare_for_mongo(access.model_dump())
     await db.project_access.insert_one(doc)
     
+    # Логирование предоставления доступа к проекту
+    log_audit(
+        "27",  # Предоставлен доступ к проекту
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "project_id": project_id,
+            "project_name": project.get('name', 'Неизвестно'),
+            "target_user_id": user_id,
+            "target_username": user.username,
+            "target_full_name": user.full_name,
+            "access_granted_by": current_user.username,
+            "action": "grant_project_access"
+        }
+    )
+    
     return {"message": "Access granted successfully"}
 
 @api_router.delete("/projects/{project_id}/users/{user_id}")
@@ -2339,6 +2361,12 @@ async def revoke_project_access(project_id: str, user_id: str, current_user: Use
     if project.get('created_by') != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only project creator or admin can revoke access")
     
+    # Get user info for logging
+    user_doc = await db.users.find_one({"id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    user = User(**user_doc)
+    
     # Revoke access
     result = await db.project_access.delete_one({
         "project_id": project_id,
@@ -2348,10 +2376,23 @@ async def revoke_project_access(project_id: str, user_id: str, current_user: Use
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Access record not found")
     
+    # Логирование отзыва доступа к проекту
+    log_audit(
+        "28",  # Отозван доступ к проекту
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "project_id": project_id,
+            "project_name": project.get('name', 'Неизвестно'),
+            "target_user_id": user_id,
+            "target_username": user.username,
+            "target_full_name": user.full_name,
+            "access_revoked_by": current_user.username,
+            "action": "revoke_project_access"
+        }
+    )
+    
     return {"message": "Access revoked successfully"}
-
-
-
 
 # Include the router in the main app
 app.include_router(api_router)

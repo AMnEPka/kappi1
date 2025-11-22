@@ -48,7 +48,11 @@ const EVENT_OPTIONS = [
   { value: "23", label: "Запуск проекта" },
   { value: "24", label: "Запуск проекта планировщиком" },
   { value: "25", label: "Просмотр результатов проекта" },
-  { value: "26", label: "Экспорт результатов проекта" },
+  { value: "26", label: "Экспорт результатов проекта" },      
+  { value: "27", label: "Предоставлен доступ к проекту" },
+  { value: "28", label: "Отозван доступ к проекту" },
+
+
 ];
 
 const formatDate = (value) => {
@@ -141,6 +145,18 @@ const formatEventDetails = (eventNumber, details) => {
         
       case "26": // Экспорт результатов проекта
         return `Проект: ${detailsObj.project_name || detailsObj.project_id}\nСессия: ${detailsObj.session_id}\nФормат: ${detailsObj.format || 'Excel'}\nЭкспортировано: ${detailsObj.exported_by}\nВремя: ${detailsObj.exported_at || new Date().toLocaleString()}`;
+
+      case "27": // Предоставлен доступ к проекту
+        return `Проект: ${detailsObj.project_name}
+Пользователь: ${detailsObj.target_username}
+ФИО: ${detailsObj.target_full_name}
+Кем предоставлен доступ: ${detailsObj.access_granted_by}`;
+      
+      case "28": // Отозван доступ к проекту
+        return `Проект: ${detailsObj.project_name}
+Пользователь: ${detailsObj.target_username}
+ФИО: ${detailsObj.target_full_name}
+Кем отозван доступ: ${detailsObj.access_revoked_by}`;        
         
       default:
         // Для остальных событий показываем читаемый JSON
