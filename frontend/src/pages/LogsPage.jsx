@@ -64,6 +64,85 @@ const formatDate = (value) => {
   });
 };
 
+const formatEventDetails = (eventNumber, details) => {
+  if (!details) return "-";
+  
+  try {
+    const detailsObj = typeof details === 'string' ? JSON.parse(details) : details;
+
+    // ВРЕМЕННО: выводим в консоль для отладки
+    console.log('🔍 Event Details Debug:', {
+      eventNumber,
+      details,
+      detailsObj,
+      type: typeof details,
+      isString: typeof details === 'string',
+      parsedType: typeof detailsObj
+    });
+    
+    switch(eventNumber) {
+      case "1": // Успешный вход
+        return `IP-адрес: ${detailsObj.ip_address || 'неизвестно'}\nБраузер: ${detailsObj.user_agent || 'неизвестно'}\nВремя входа: ${detailsObj.login_time || new Date().toLocaleString()}`;
+        
+      case "2": // Неудачный вход
+        return `IP-адрес: ${detailsObj.ip_address || 'неизвестно'}\nПричина: ${detailsObj.reason || 'неверные учетные данные'}\nПопытка: ${detailsObj.attempt_time || new Date().toLocaleString()}`;
+        
+      case "3": // Создание пользователя
+        return `Логин: ${detailsObj.username}\nРоль: ${detailsObj.role || 'пользователь'}\nEmail: ${detailsObj.email || 'не указан'}`;
+        
+      case "15": // Создание хоста
+        return `Название: ${detailsObj.host_name}\nАдрес: ${detailsObj.ip_address}`;
+        
+      case "16": // Редактирование хоста
+        return `Хост: ${detailsObj.host_name}\nИзмененные поля: ${detailsObj.changed_fields?.join(', ') || 'не указаны'}\nПредыдущие значения: ${detailsObj.old_values ? JSON.stringify(detailsObj.old_values) : 'не сохранены'}`;
+        
+      case "21": // Создание проекта
+        return `Название: ${detailsObj.project_name}\nОписание: ${detailsObj.description || 'не указано'}\nКоличество проверок: ${detailsObj.checks_count || 0}`;
+        
+      case "23": // Запуск проекта
+        return `Проект: ${detailsObj.project_name || detailsObj.project_id}\nСессия: ${detailsObj.session_id}\nХостов: ${detailsObj.hosts_count || 'неизвестно'}\nПользователь: ${detailsObj.executed_by || 'система'}`;
+        
+      case "24": // Запуск проекта планировщиком
+        return `ID проекта: ${detailsObj.project_id}\nID задания планировщика: ${detailsObj.scheduler_job_id}\nСессия: ${detailsObj.session_id}\nОбласть: ${detailsObj.scope || 'не указана'}`;
+        
+      case "25": // Просмотр результатов проекта
+        return `Проект: ${detailsObj.project_name || detailsObj.project_id}\nСессия: ${detailsObj.session_id}\nПользователь: ${detailsObj.viewed_by}\nВремя просмотра: ${detailsObj.viewed_at || new Date().toLocaleString()}`;
+        
+      case "26": // Экспорт результатов проекта
+        return `Проект: ${detailsObj.project_name || detailsObj.project_id}\nСессия: ${detailsObj.session_id}\nФормат: ${detailsObj.format || 'Excel'}\nЭкспортировано: ${detailsObj.exported_by}\nВремя: ${detailsObj.exported_at || new Date().toLocaleString()}`;
+        
+      default:
+        // Для остальных событий показываем читаемый JSON
+        return Object.entries(detailsObj)
+          .map(([key, value]) => {
+            const fieldNames = {
+              'project_id': 'ID проекта',
+              'project_name': 'Название проекта',
+              'session_id': 'ID сессии', 
+              'host_id': 'ID хоста',
+              'host_name': 'Название хоста',
+              'hostname': 'Адрес хоста',
+              'scheduler_job_id': 'ID задания планировщика',
+              'scope': 'Область',
+              'username': 'Логин',
+              'role': 'Роль',
+              'email': 'Email',
+              'ip_address': 'IP-адрес',
+              'user_agent': 'Браузер',
+              'port': 'Порт',
+              'description': 'Описание'
+            };
+            
+            const fieldName = fieldNames[key] || key;
+            return `${fieldName}: ${value}`;
+          })
+          .join('\n');
+    }
+  } catch (error) {
+    return typeof details === 'string' ? details : JSON.stringify(details);
+  }
+};
+
 const renderDetails = (details, eventNumber) => {
   // eventNumber приходит как цифра "1", "3" и т.д.
   const eventOption = EVENT_OPTIONS.find(opt => opt.value === eventNumber);
@@ -298,9 +377,9 @@ const LogsPage = () => {
                   </TableCell>
 
                   <TableCell>
-                    <pre className="text-xs bg-gray-50 rounded-md p-2 max-w-xl overflow-x-auto whitespace-pre-wrap">
-                      {renderDetails(log.details, log.event)}
-                    </pre>
+                    <div className="text-xs text-gray-700 whitespace-pre-wrap">
+                      {formatEventDetails(log.event, log.details)}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

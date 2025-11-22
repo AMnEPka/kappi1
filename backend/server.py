@@ -381,11 +381,13 @@ async def create_host(host_input: HostCreate, current_user: User = Depends(get_c
     
     await db.hosts.insert_one(doc)
     
+    ip_address_value = host_obj.hostname if host_obj.hostname else "не указан"
+
     log_audit(
         "15",
         user_id=current_user.id,
         username=current_user.username,
-        details={"host_id": host_obj.id, "host_name": host_obj.name}
+        details={"host_id": host_obj.id, "host_name": host_obj.name, "ip_address": ip_address_value}
     )
     return host_obj
 
