@@ -405,8 +405,8 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Password Reset Dialog */}
-      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+     {/* Password Reset Dialog */}
+     <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Сброс пароля</DialogTitle>

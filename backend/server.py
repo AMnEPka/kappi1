@@ -1877,6 +1877,20 @@ async def create_user(user_input: UserCreate, current_user: User = Depends(get_c
     doc = prepare_for_mongo(user.model_dump())
     await db.users.insert_one(doc)
     
+    # Логирование создания пользователя
+    log_audit(
+        "3",  # Создание пользователя
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "new_user_id": str(user.id),
+            "username": user_input.username,
+            "target_full_name": user_input.full_name,
+            "new_is_admin": user_input.is_admin,
+            "created_by": current_user.username
+        }
+    )
+    
     return UserResponse(**user.model_dump())
 
 @api_router.put("/users/{user_id}", response_model=UserResponse)
@@ -1889,10 +1903,37 @@ async def update_user(user_id: str, user_update: UserUpdate, current_user: User 
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
     
+    old_user = User(**user_doc)
+    
+    # Подготовка данных для логирования изменений
+    changed_fields = {}
+    update_data = {}
+    
+    for field, new_value in user_update.model_dump().items():
+        if new_value is not None:
+            old_value = getattr(old_user, field, None)
+            if old_value != new_value:
+                changed_fields[field] = {
+                    "old": old_value,
+                    "new": new_value
+                }
+                update_data[field] = new_value
+    
     # Update fields
-    update_data = {k: v for k, v in user_update.model_dump().items() if v is not None}
     if update_data:
         await db.users.update_one({"id": user_id}, {"$set": update_data})
+    
+    # Логирование обновления пользователя
+    if changed_fields:
+        log_audit(
+            "4",  # Редактирование пользователя
+            user_id=current_user.id,
+            username=current_user.username,
+            details={
+                "username": old_user.username,
+                "target_full_name": old_user.full_name
+            }
+        )
     
     # Return updated user
     updated_doc = await db.users.find_one({"id": user_id})
@@ -1907,25 +1948,57 @@ async def delete_user(user_id: str, current_user: User = Depends(get_current_use
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     
+    # Find user to delete for logging
+    user_to_delete_doc = await db.users.find_one({"id": user_id})
+    if not user_to_delete_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user_to_delete = User(**user_to_delete_doc)
+    
     # Find admin user
     admin_user = await db.users.find_one({"is_admin": True})
     if not admin_user:
         raise HTTPException(status_code=500, detail="No admin user found")
     admin_id = admin_user['id']
     
+    # Подсчет данных для перепривязки (для логирования)
+    stats = {
+        "categories_reassigned": 0,
+        "systems_reassigned": 0,
+        "scripts_reassigned": 0,
+        "hosts_reassigned": 0,
+        "projects_reassigned": 0,
+        "executions_reassigned": 0,
+        "roles_removed": 0,
+        "project_access_removed": 0
+    }
+    
     # Reassign all data to admin
-    await db.categories.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
-    await db.systems.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
-    await db.scripts.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
-    await db.hosts.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
-    await db.projects.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
-    await db.executions.update_many({"executed_by": user_id}, {"$set": {"executed_by": admin_id}})
+    categories_result = await db.categories.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    stats["categories_reassigned"] = categories_result.modified_count
+    
+    systems_result = await db.systems.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    stats["systems_reassigned"] = systems_result.modified_count
+    
+    scripts_result = await db.scripts.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    stats["scripts_reassigned"] = scripts_result.modified_count
+    
+    hosts_result = await db.hosts.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    stats["hosts_reassigned"] = hosts_result.modified_count
+    
+    projects_result = await db.projects.update_many({"created_by": user_id}, {"$set": {"created_by": admin_id}})
+    stats["projects_reassigned"] = projects_result.modified_count
+    
+    executions_result = await db.executions.update_many({"executed_by": user_id}, {"$set": {"executed_by": admin_id}})
+    stats["executions_reassigned"] = executions_result.modified_count
     
     # Delete user roles
-    await db.user_roles.delete_many({"user_id": user_id})
+    roles_result = await db.user_roles.delete_many({"user_id": user_id})
+    stats["roles_removed"] = roles_result.deleted_count
     
     # Delete project access
-    await db.project_access.delete_many({"user_id": user_id})
+    access_result = await db.project_access.delete_many({"user_id": user_id})
+    stats["project_access_removed"] = access_result.deleted_count
     
     # Delete user
     result = await db.users.delete_one({"id": user_id})
@@ -1933,12 +2006,42 @@ async def delete_user(user_id: str, current_user: User = Depends(get_current_use
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Логирование удаления пользователя
+    log_audit(
+        "5",  # Удаление пользователя
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "deleted_user_id": user_id,
+            "username": user_to_delete.username,
+            "full_name": user_to_delete.full_name,
+            "is_admin": user_to_delete.is_admin,
+            "reassigned_to_admin": admin_user['username'],
+            "data_reassignment_stats": stats,
+            "total_objects_reassigned": sum([
+                stats["categories_reassigned"],
+                stats["systems_reassigned"], 
+                stats["scripts_reassigned"],
+                stats["hosts_reassigned"],
+                stats["projects_reassigned"],
+                stats["executions_reassigned"]
+            ])
+        }
+    )
+    
     return {"message": "User deleted and data reassigned to admin"}
 
 @api_router.put("/users/{user_id}/password")
 async def reset_user_password(user_id: str, password_data: PasswordResetRequest, current_user: User = Depends(get_current_user)):
     """Reset user password (requires users_manage permission)"""
     await require_permission(current_user, 'users_manage')
+    
+    # Find user for logging
+    user_doc = await db.users.find_one({"id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user = User(**user_doc)
     
     # Hash new password
     new_hash = hash_password(password_data.new_password)
@@ -1951,6 +2054,18 @@ async def reset_user_password(user_id: str, password_data: PasswordResetRequest,
     
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Логирование сброса пароля
+    log_audit(
+        "4",  # Редактирование пользователя (или можно создать отдельное событие для сброса пароля)
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "target_username": user.username,
+            "target_full_name": user.full_name,
+            "changed_fields": "Был изменен пароль"
+        }
+    )
     
     return {"message": "Password updated successfully"}
 
@@ -1975,6 +2090,17 @@ async def assign_user_roles(user_id: str, role_ids: List[str], current_user: Use
     """Assign roles to user (requires users_manage permission)"""
     await require_permission(current_user, 'users_manage')
     
+    # Find user for logging
+    user_doc = await db.users.find_one({"id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user = User(**user_doc)
+    
+    # Get current roles for comparison
+    current_roles_docs = await db.user_roles.find({"user_id": user_id}).to_list(None)
+    current_role_ids = [doc["role_id"] for doc in current_roles_docs]
+    
     # Delete existing roles
     await db.user_roles.delete_many({"user_id": user_id})
     
@@ -1984,6 +2110,20 @@ async def assign_user_roles(user_id: str, role_ids: List[str], current_user: Use
             "user_id": user_id,
             "role_id": role_id
         })
+    
+    # Логирование обновления ролей пользователя
+    log_audit(
+        "4",  # Редактирование пользователя
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "username": user.username,
+            "target_full_name": user.full_name,
+            "changed_fields": "Ролевая модель изменена",
+            "old_roles_count": len(current_role_ids),
+            "new_roles_count": len(role_ids)
+        }
+    )
     
     return {"message": "Roles assigned successfully"}
 

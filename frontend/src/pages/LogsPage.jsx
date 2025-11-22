@@ -82,13 +82,30 @@ const formatEventDetails = (eventNumber, details) => {
     
     switch(eventNumber) {
       case "1": // Успешный вход
-        return `IP-адрес: ${detailsObj.ip_address || 'неизвестно'}\nБраузер: ${detailsObj.user_agent || 'неизвестно'}`;
+        return `IP-адрес: ${detailsObj.ip_address || 'Неизвестно'}
+Браузер: ${detailsObj.user_agent || 'Неизвестно'}`;
     
       case "2": // Неудачный вход
-        return `IP-адрес: ${detailsObj.ip_address || 'неизвестно'}\nБраузер: ${detailsObj.user_agent || 'неизвестно'}\nПричина: ${detailsObj.reason || 'неверные учетные данные'}`;       
+        return `IP-адрес: ${detailsObj.ip_address || 'Неизвестно'}
+Браузер: ${detailsObj.user_agent || 'Неизвестно'}
+Причина: ${detailsObj.reason || 'Не определено'}`;       
 
       case "3": // Создание пользователя
-        return `Логин: ${detailsObj.username}\nРоль: ${detailsObj.role || 'пользователь'}\nEmail: ${detailsObj.email || 'не указан'}`;
+        return `Логин: ${detailsObj.username}
+ФИО: ${detailsObj.target_full_name || 'ФИО'}`;
+
+      case "4": // Редактирование пользователя
+        return `Логин: ${detailsObj.username}\nФИО: ${detailsObj.target_full_name || 'ФИО'}
+Измененные поля: ${detailsObj.changed_fields || 'нет'}
+Было ролей: ${detailsObj.old_roles_count}
+Стало ролей: ${detailsObj.new_roles_count}`;
+        
+      case "5": // Удаление пользователя
+        return `Удаленный пользователь: ${detailsObj.username}
+ФИО: ${detailsObj.full_name}
+Администратор: ${detailsObj.is_admin ? 'Да' : 'Нет'}
+Данные перепривязаны на: ${detailsObj.reassigned_to_admin}
+Всего объектов перепривязано: ${detailsObj.total_objects_reassigned || 0}`;  
         
       case "15": // Создание хоста
         return `Название: ${detailsObj.host_name}\nАдрес: ${detailsObj.ip_address}`;
