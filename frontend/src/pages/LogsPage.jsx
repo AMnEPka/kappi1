@@ -106,7 +106,21 @@ const formatEventDetails = (eventNumber, details) => {
 Администратор: ${detailsObj.is_admin ? 'Да' : 'Нет'}
 Данные перепривязаны на: ${detailsObj.reassigned_to_admin}
 Всего объектов перепривязано: ${detailsObj.total_objects_reassigned || 0}`;  
-        
+
+      case "6": // Создание роли
+        return `Роль: ${detailsObj.role_name}
+Прав: ${detailsObj.permissions_ratio}`;
+
+      case "7": // Редактирование роли
+        return `Роль: ${detailsObj.role_name}
+Прав было: ${detailsObj.old_permissions_ratio}
+Прав стало: ${detailsObj.new_permissions_ratio}`;
+
+      case "8": // Удаление роли
+        return `Роль: ${detailsObj.role_name}
+Прав в роли: ${detailsObj.permissions_count}
+Затронуто пользователей: ${detailsObj.affected_users_count}`;
+              
       case "15": // Создание хоста
         return `Название: ${detailsObj.host_name}\nАдрес: ${detailsObj.ip_address}`;
         
