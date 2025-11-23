@@ -670,6 +670,19 @@ async def create_system(category_id: str, system_input: SystemCreate, current_us
     doc = prepare_for_mongo(system_obj.model_dump())
     
     await db.systems.insert_one(doc)
+    
+    # Логирование создания системы
+    log_audit(
+        "12",  # Создание системы
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "system_name": system_input.name,
+            "category_name": category.get('name'),
+            "created_by": current_user.username
+        }
+    )
+    
     return system_obj
 
 @api_router.get("/categories/{category_id}/systems", response_model=List[System])
@@ -705,6 +718,11 @@ async def update_system(system_id: str, system_update: SystemUpdate, current_use
     if not update_data:
         raise HTTPException(status_code=400, detail="Нет данных для обновления")
     
+    # Get current system data for logging
+    current_system = await db.systems.find_one({"id": system_id})
+    if not current_system:
+        raise HTTPException(status_code=404, detail="Система не найдена")
+    
     # If category_id is being updated, verify it exists
     if 'category_id' in update_data:
         category = await db.categories.find_one({"id": update_data['category_id']})
@@ -719,22 +737,53 @@ async def update_system(system_id: str, system_update: SystemUpdate, current_use
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Система не найдена")
     
+    # Логирование редактирования системы
+    log_audit(
+        "13",  # Редактирование системы
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "system_name": current_system.get('name'),
+            "category_name": category.get('name')
+        }
+    )
+    
     updated_system = await db.systems.find_one({"id": system_id}, {"_id": 0})
     return System(**parse_from_mongo(updated_system))
 
 @api_router.delete("/systems/{system_id}")
 async def delete_system(system_id: str, current_user: User = Depends(get_current_user)):
-    """Delete system and all scripts (requires categories_manage permission)"""
+    """Delete system (requires categories_manage permission)"""
     await require_permission(current_user, 'categories_manage')
+
+    # Check if system exists
+    system = await db.systems.find_one({"id": system_id})
+    if not system:
+        raise HTTPException(status_code=404, detail="Система не найдена")
     
-    # Delete all scripts in system
-    await db.scripts.delete_many({"system_id": system_id})
+    # Check if there are related checks
+    related_checks = await db.scripts.find_one({"system_id": system_id})
+    if related_checks:
+        raise HTTPException(
+            status_code=400, 
+            detail="Невозможно удалить систему: существуют связанные проверки"
+        )
     
     result = await db.systems.delete_one({"id": system_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Система не найдена")
-    return {"message": "Система и связанные проверки удалены"}
-
+    
+    # Логирование удаления системы
+    log_audit(
+        "14",  # Удаление системы
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "system_name": system.get('name')
+        }
+    )
+    
+    return {"message": "Система удалена"}
 
 # API Routes - Scripts
 @api_router.post("/systems/{system_id}/scripts", response_model=Script)
@@ -752,11 +801,16 @@ async def create_script(system_id: str, script_input: ScriptCreate, current_user
     
     await db.scripts.insert_one(doc)
     
+    # Логирование создания проверки
     log_audit(
         "18",
         user_id=current_user.id,
         username=current_user.username,
-        details={"script_id": script_obj.id, "script_name": script_obj.name}
+        details={
+            "script_name": script_obj.name,
+            "system_name": system.get('name'),
+            "category_name": system.get('category_name')
+        }
     )
     return script_obj
 
@@ -846,10 +900,29 @@ async def create_script_alt(script_input: ScriptCreate, current_user: User = Dep
         if not system:
             raise HTTPException(status_code=404, detail="Система не найдена")
     
+    # Get category name
+    category_name = ""
+    if system.get('category_id'):
+        category = await db.categories.find_one({"id": system['category_id']})
+        if category:
+            category_name = category.get('name', '')
+    
     script_obj = Script(**script_input.model_dump(), created_by=current_user.id)
     doc = prepare_for_mongo(script_obj.model_dump())
     
     await db.scripts.insert_one(doc)
+
+    log_audit(
+        "18",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "script_name": script_obj.name,
+            "system_name": system.get('name'),
+            "category_name": category_name
+        }
+    )
+
     return script_obj
 
 @api_router.put("/scripts/{script_id}", response_model=Script)
@@ -871,6 +944,19 @@ async def update_script(script_id: str, script_update: ScriptUpdate, current_use
     if not update_data:
         raise HTTPException(status_code=400, detail="Нет данных для обновления")
     
+    # Get system and category names for logging
+    system_name = ""
+    category_name = ""
+    if script.get('system_id'):
+        system = await db.systems.find_one({"id": script['system_id']})
+        if system:
+            system_name = system.get('name', '')
+            # Get category name
+            if system.get('category_id'):
+                category = await db.categories.find_one({"id": system['category_id']})
+                if category:
+                    category_name = category.get('name', '')
+    
     result = await db.scripts.update_one(
         {"id": script_id},
         {"$set": update_data}
@@ -882,7 +968,11 @@ async def update_script(script_id: str, script_update: ScriptUpdate, current_use
         "19",
         user_id=current_user.id,
         username=current_user.username,
-        details={"script_id": script_id, "updated_fields": list(update_data.keys())}
+        details={
+            "script_name": script.get('name'),
+            "system_name": system_name,
+            "category_name": category_name
+        }
     )
     return Script(**parse_from_mongo(updated_script))
 
@@ -900,7 +990,32 @@ async def delete_script(script_id: str, current_user: User = Depends(get_current
     else:
         await require_permission(current_user, 'checks_delete_all')
     
+    # Get system and category names for logging
+    system_name = ""
+    category_name = ""
+    if script.get('system_id'):
+        system = await db.systems.find_one({"id": script['system_id']})
+        if system:
+            system_name = system.get('name', '')
+            # Get category name
+            if system.get('category_id'):
+                category = await db.categories.find_one({"id": system['category_id']})
+                if category:
+                    category_name = category.get('name', '')
+    
     result = await db.scripts.delete_one({"id": script_id})
+    
+    log_audit(
+        "20",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "script_name": script.get('name'),
+            "system_name": system_name,
+            "category_name": category_name
+        }
+    )
+    
     return {"message": "Скрипт удален"}
 
 

@@ -924,12 +924,9 @@ const ScriptsPage = () => {
         ) : (
       <div className="overflow-hidden">
         <table className="w-full border-collapse table-fixed">
-          <colgroup>
-            <col className="w-[25%]" /> {/* Название */}
-            <col className="w-[20%]" /> {/* Категория */}
-            <col className="w-[40%]" /> {/* Описание */}
-            <col className="w-[15%]" /> {/* Действия */}
-          </colgroup>
+        <colgroup>
+          <col className="w-[25%]"/><col className="w-[20%]"/><col className="w-[40%]"/><col className="w-[15%]"/>
+        </colgroup>
           <thead>
             <tr className="border-b border-slate-200">
               <th className="text-left py-1 px-4 text-slate-600 font-medium">Название</th>

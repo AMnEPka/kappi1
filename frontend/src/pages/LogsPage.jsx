@@ -121,6 +121,17 @@ const formatEventDetails = (eventNumber, details) => {
 
       case "11": // Удаление категории
         return `Категория: ${detailsObj.category_name}`;
+
+      case "12": // Создание системы
+        return `Система: ${detailsObj.system_name}
+Родительская категория: ${detailsObj.category_name}`;        
+
+      case "13": // Редактирование системы
+        return `Система: ${detailsObj.system_name}
+Родительская категория: ${detailsObj.category_name}`;  
+
+      case "14": // Удаление системы
+        return `Система: ${detailsObj.system_name}`;
               
       case "15": // Создание хоста
         return `Название: ${detailsObj.host_name}
@@ -134,6 +145,21 @@ const formatEventDetails = (eventNumber, details) => {
         return `Хост: ${detailsObj.host_name}
 Адрес: ${detailsObj.hostname}`;
         
+      case "18": // Создание проверки
+        return `Название: ${detailsObj.script_name}
+Система: ${detailsObj.system_name}
+Категория: ${detailsObj.category_name}`;
+
+      case "19": // Редактирование проверки
+        return `Название: ${detailsObj.script_name}
+Система: ${detailsObj.system_name}
+Категория: ${detailsObj.category_name}`;
+
+      case "20": // Удаление проверки
+          return `Проверка: ${detailsObj.script_name}
+Система: ${detailsObj.system_name}
+Категория: ${detailsObj.category_name}`;
+
       case "21": // Создание проекта
         return `Название: ${detailsObj.project_name}\nОписание: ${detailsObj.description || 'не указано'}\nКоличество проверок: ${detailsObj.checks_count || 0}`;
         

@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  console.log('🔍 useAuth context:', context); // ← добавить эту строку
+  //console.log('🔍 useAuth context:', context); 
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
