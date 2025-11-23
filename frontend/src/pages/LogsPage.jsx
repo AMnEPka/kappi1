@@ -51,8 +51,6 @@ const EVENT_OPTIONS = [
   { value: "26", label: "Экспорт результатов проекта" },      
   { value: "27", label: "Предоставлен доступ к проекту" },
   { value: "28", label: "Отозван доступ к проекту" },
-
-
 ];
 
 const formatDate = (value) => {
@@ -114,6 +112,15 @@ const formatEventDetails = (eventNumber, details) => {
         return `Роль: ${detailsObj.role_name}
 Прав в роли: ${detailsObj.permissions_count}
 Затронуто пользователей: ${detailsObj.affected_users_count}`;
+
+      case "9": // Создание категории
+        return `Категория: ${detailsObj.category_name}`;
+
+      case "10": // Редактирование категории
+        return `Категория: ${detailsObj.category_name}`;
+
+      case "11": // Удаление категории
+        return `Категория: ${detailsObj.category_name}`;
               
       case "15": // Создание хоста
         return `Название: ${detailsObj.host_name}

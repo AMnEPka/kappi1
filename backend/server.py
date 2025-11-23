@@ -555,6 +555,17 @@ async def create_category(category_input: CategoryCreate, current_user: User = D
     doc = prepare_for_mongo(category_obj.model_dump())
     
     await db.categories.insert_one(doc)
+    
+    # Логирование создания категории
+    log_audit(
+        "9",  # Создание категории
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "category_name": category_input.name
+        }
+    )
+    
     return category_obj
 
 @api_router.get("/categories", response_model=List[Category])
@@ -576,6 +587,11 @@ async def update_category(category_id: str, category_update: CategoryUpdate, cur
     """Update category (requires categories_manage permission)"""
     await require_permission(current_user, 'categories_manage')
     
+    # Находим текущую категорию для логирования
+    current_cat = await db.categories.find_one({"id": category_id})
+    if not current_cat:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    
     update_data = category_update.model_dump(exclude_unset=True)
     
     if not update_data:
@@ -589,29 +605,54 @@ async def update_category(category_id: str, category_update: CategoryUpdate, cur
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Категория не найдена")
     
+    # Логирование обновления категории
+    log_audit(
+        "10",  # Редактирование категории
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "category_name": current_cat.get('name')
+        }
+    )
+    
     updated_cat = await db.categories.find_one({"id": category_id}, {"_id": 0})
     return Category(**parse_from_mongo(updated_cat))
 
 @api_router.delete("/categories/{category_id}")
 async def delete_category(category_id: str, current_user: User = Depends(get_current_user)):
-    """Delete category and cascade to systems and scripts (requires categories_manage permission)"""
+    """Delete category (requires categories_manage permission)"""
     await require_permission(current_user, 'categories_manage')
     
-    # Delete all systems in category
-    systems = await db.systems.find({"category_id": category_id}).to_list(1000)
-    for system in systems:
-        # Delete all scripts in system
-        await db.scripts.delete_many({"system_id": system['id']})
+    # Находим категорию для логирования
+    category = await db.categories.find_one({"id": category_id})
+    if not category:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
     
-    # Delete all systems
-    await db.systems.delete_many({"category_id": category_id})
+    # Проверяем связанные системы
+    systems_count = await db.systems.count_documents({"category_id": category_id})
+    if systems_count > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Невозможно удалить категорию. С ней связано {systems_count} систем. Сначала удалите или переместите системы."
+        )
     
     # Delete category
     result = await db.categories.delete_one({"id": category_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Категория не найдена")
     
-    return {"message": "Категория и связанные объекты удалены"}
+    # Логирование удаления категории
+    log_audit(
+        "11",  # Удаление категории
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "category_name": category.get('name'),
+            "deleted_by": current_user.username
+        }
+    )
+    
+    return {"message": "Категория удалена"}
 
 
 # API Routes - Systems
