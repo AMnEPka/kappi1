@@ -22,24 +22,6 @@ const logout = () => {
     window.location.href = '/login';
   };
 
-const getBackendUrl = () => {
-  // Для продакшена или если задана переменная окружения
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return process.env.REACT_APP_BACKEND_URL;
-  }
-  
-  // Для разработки - используем тот же хост, где работает фронтенд
-  const currentHost = window.location.hostname;
-  const currentPort = window.location.port;
-  
-  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
-    return 'http://localhost:8001';
-  } else {
-    // Для доступа с других устройств в сети
-    return `http://${currentHost}:8001`;
-  }
-};
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [permissions, setPermissions] = useState([]);
