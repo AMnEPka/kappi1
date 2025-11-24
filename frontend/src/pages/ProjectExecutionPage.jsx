@@ -5,7 +5,6 @@ import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
-import axios from 'axios';
 import { api } from '../config/api';
 
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
@@ -195,12 +194,17 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       };
 
       eventSource.onerror = (error) => {
-        console.error('SSE error:', error);
         eventSource.close();
         setExecuting(false);
         
         if (logs.length === 0) {
           toast.error("Не удалось подключиться к серверу");
+                    
+          // Используем api вместо fetch
+          api.get(`/api/projects/${projectId}/execution-failed`)
+            .catch(logError => {
+              console.error('Failed to log execution failure:', logError);
+            });
         }
       };
 

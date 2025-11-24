@@ -210,12 +210,18 @@ async def _execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Opti
     if not user_doc:
         raise RuntimeError("Creator of scheduler job not found")
     scheduler_user = User(**user_doc)
+
+    # Получаем имя проекта
+    project_doc = await db.projects.find_one({"id": job.project_id})
+    project_name = project_doc.get('name') if project_doc else "Неизвестный проект"    
     
     log_audit(
         "24",
         user_id=scheduler_user.id,
         username=scheduler_user.username,
-        details={"project_id": job.project_id, "scheduler_job_id": job.name}
+        details={
+            "project_name": project_name, 
+            "scheduler_job_name": job.name}
     )
     
     response = await execute_project(job.project_id, current_user=scheduler_user, skip_audit_log=True)  
@@ -1480,12 +1486,18 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
         raise HTTPException(status_code=403, detail="Access denied to this project")
     
     if not skip_audit_log:
-        log_audit(
-            "23",
-            user_id=current_user.id,
-            username=current_user.username,
-            details={"project_id": project_id}
-        )
+        # Получаем имя проекта
+        project_doc = await db.projects.find_one({"id": project_id})
+        project_name = project_doc.get('name') if project_doc else "Неизвестный проект"
+        
+    log_audit(
+        "23",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "project_name": project_name
+        }
+    )
     
     async def event_generator():
         try:
@@ -1771,6 +1783,31 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
             "X-Accel-Buffering": "no"
         }
     )
+
+@api_router.get("/projects/{project_id}/execution-failed")  # ← ИЗМЕНИТЬ POST НА GET
+async def log_failed_execution(
+    project_id: str, 
+    current_user: User = Depends(get_current_user)
+):
+    """Log failed project execution attempts"""
+    project = await db.projects.find_one({"id": project_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найдена")
+    
+    project_name = project.get('name', 'Неизвестный проект')
+    
+    log_audit(
+        "34",  # Неуспешный запуск проекта
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "project_id": project_id,
+            "project_name": project_name,
+            "failure_reason": "SSE connection failed"  
+        }
+    )
+    
+    return {"message": "Failure logged"}
 
 
 @api_router.get("/audit/logs", response_model=List[AuditLog])

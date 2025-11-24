@@ -54,7 +54,8 @@ const EVENT_OPTIONS = [
   { value: "29", label: "Создание задания планировщика" },
   { value: "30", label: "Редактирование задания планировщика" },
   { value: "31", label: "Задание планировщика приостановлено" },
-  { value: "32", label: "Задание планировщика возобновлено" }
+  { value: "32", label: "Задание планировщика возобновлено" },
+  { value: "34", label: "Неуспешный запуск проекта" }
 ];
 
 const formatDate = (value) => {
@@ -215,6 +216,10 @@ const formatEventDetails = (eventNumber, details) => {
           return `Задание: ${detailsObj.job_name}
 Проект: ${detailsObj.project_name}
 Тип запуска: ${detailsObj.job_type_label}`;
+
+      case "34": // Неуспешный запуск проекта
+          return `Проект: ${detailsObj.project_name}
+Причина: ${detailsObj.failure_reason}`;
         
       default:
         // Для остальных событий показываем читаемый JSON
