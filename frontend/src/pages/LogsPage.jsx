@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { RefreshCw, ShieldAlert } from "lucide-react";
+import { RefreshCw, ShieldAlert, ChevronDown  } from "lucide-react";
 import { api } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -333,6 +333,28 @@ const LogsPage = () => {
     setLimit(Number(e.target.value));
   };  
 
+  const CollapsibleDetails = ({ details }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    
+    return (
+      <div>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="p-1 hover:bg-gray-200 rounded transition-colors"
+          title={isExpanded ? "Свернуть" : "Развернуть"}
+        >
+          <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </button>
+        
+        {isExpanded && (
+          <div className="absolute mt-1 p-2 bg-white border rounded shadow-lg z-10 max-w-md text-xs whitespace-pre-wrap">
+            {details}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
   
@@ -457,39 +479,40 @@ const LogsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Дата</TableHead>
-                <TableHead>Событие</TableHead>
-                <TableHead>Пользователь</TableHead>
-                <TableHead>Детали</TableHead>
+                <TableHead className="py-1 px-2">Дата</TableHead>
+                <TableHead className="py-1 px-2">Событие</TableHead>
+                <TableHead className="py-1 px-2">Пользователь</TableHead>
+                <TableHead className="py-1 px-2 w-20">Детали</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {logs.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-gray-500">
+                  <TableCell colSpan={4} className="py-3 text-center text-gray-500 text-sm">
                     События не найдены
                   </TableCell>
                 </TableRow>
               )}
-              {logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="whitespace-nowrap">{formatDate(log.created_at)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
+              {logs.map((log, index) => (
+                <TableRow 
+                  key={log.id} 
+                  className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                >
+                  <TableCell className="py-1 px-2 text-xs whitespace-nowrap">
+                    {formatDate(log.created_at)}
+                  </TableCell>
+                  <TableCell className="py-1 px-2">
+                    <Badge variant="outline" className="text-xs px-1 py-0">
                       {EVENT_OPTIONS.find(option => option.value === log.event)?.label || log.event}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{log.username || "Система"}</span>
-{/*}                      <span className="text-xs text-gray-500">{log.user_id || "-"}</span> */}
-                    </div>
+                  <TableCell className="py-1 px-2 text-xs">
+                    {log.username || "Система"}
                   </TableCell>
-
-                  <TableCell>
-                    <div className="text-xs text-gray-700 whitespace-pre-wrap">
-                      {formatEventDetails(log.event, log.details)}
-                    </div>
+                  <TableCell className="py-1 px-2">
+                    <CollapsibleDetails 
+                      details={formatEventDetails(log.event, log.details)}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
