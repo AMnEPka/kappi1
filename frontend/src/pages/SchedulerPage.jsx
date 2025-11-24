@@ -135,7 +135,8 @@ const SchedulerPage = () => {
     try {
       const payload = {
         name: form.name,
-        project_id: form.project_id,
+        // project_id включаем только при создании, при редактировании не меняем
+        ...(editingJob ? {} : { project_id: form.project_id }),
         job_type: form.job_type,
       };
 
@@ -202,15 +203,28 @@ const SchedulerPage = () => {
 
   const handleEdit = (job) => {
     setEditingJob(job);
-    setForm({
+    
+    // Базовые поля
+    const baseForm = {
       name: job.name,
       project_id: job.project_id,
       job_type: job.job_type,
-      run_at: job.next_run_at ? toInputDateTime(job.next_run_at) : "",
-      run_times: (job.run_times || []).map((value) => toInputDateTime(value)),
-      recurrence_time: job.schedule_config?.recurrence_time || "10:00",
-      recurrence_start_date: job.schedule_config?.recurrence_start_date || "",
-    });
+    };
+  
+    // Поля в зависимости от типа задания
+    if (job.job_type === "one_time") {
+      // Для одиночного запуска - используем run_at из данных задания
+      baseForm.run_at = job.run_at ? toInputDateTime(job.run_at) : "";
+    } else if (job.job_type === "multi_run") {
+      // Для множественного запуска - используем run_times из данных задания
+      baseForm.run_times = (job.run_times || []).map((value) => toInputDateTime(value));
+    } else if (job.job_type === "recurring") {
+      // Для ежедневного - используем данные из schedule_config
+      baseForm.recurrence_time = job.schedule_config?.recurrence_time || "10:00";
+      baseForm.recurrence_start_date = job.schedule_config?.recurrence_start_date || "";
+    }
+  
+    setForm(baseForm);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -264,19 +278,34 @@ const SchedulerPage = () => {
               </div>
               <div>
                 <Label>Проект</Label>
-                <select
-                  className="w-full h-10 border rounded px-3"
-                  value={form.project_id}
-                  onChange={(e) => setForm({ ...form, project_id: e.target.value })}
-                  required
-                >
-                  <option value="">Выберите проект</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
+                {editingJob ? (
+                  // При редактировании показываем заблокированное поле
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={projects.find(p => p.id === form.project_id)?.name || form.project_id}
+                      disabled
+                      className="bg-gray-100"
+                    />
+                    <Badge variant="secondary" className="whitespace-nowrap">
+                      Нельзя изменить
+                    </Badge>
+                  </div>
+                ) : (
+                  // При создании - обычный выбор
+                  <select
+                    className="w-full h-10 border rounded px-3"
+                    value={form.project_id}
+                    onChange={(e) => setForm({ ...form, project_id: e.target.value })}
+                    required
+                  >
+                    <option value="">Выберите проект</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 

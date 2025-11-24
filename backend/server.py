@@ -1305,7 +1305,7 @@ async def update_scheduler_job(job_id: str, job_update: SchedulerJobUpdate, curr
         username=current_user.username,
         details={
             "job_name": job.name,
-            "project_name": job.project_id,
+            "project_name": project_name,
             "job_type": job.job_type,
             "job_type_label": _get_job_type_label(job.job_type),
             "updated_fields": updated_fields
