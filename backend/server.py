@@ -210,13 +210,15 @@ async def _execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Opti
     if not user_doc:
         raise RuntimeError("Creator of scheduler job not found")
     scheduler_user = User(**user_doc)
+    
     log_audit(
         "24",
         user_id=scheduler_user.id,
         username=scheduler_user.username,
-        details={"project_id": job.project_id, "scheduler_job_id": job.id}
+        details={"project_id": job.project_id, "scheduler_job_id": job.name}
     )
-    response = await execute_project(job.project_id, current_user=scheduler_user)  # type: ignore[arg-type]
+    
+    response = await execute_project(job.project_id, current_user=scheduler_user, skip_audit_log=True)  
     session_id, final_status = await _consume_streaming_response(response)
     return session_id, final_status
 
@@ -1034,7 +1036,10 @@ async def create_project(project_input: ProjectCreate, current_user: User = Depe
         "21",
         user_id=current_user.id,
         username=current_user.username,
-        details={"project_id": project_obj.id, "project_name": project_obj.name}
+        details={
+            "project_name": project_obj.name,
+            "project_description": project_obj.description
+            }
     )
     return project_obj
 
@@ -1112,19 +1117,27 @@ async def delete_project(project_id: str, current_user: User = Depends(get_curre
     if project.get('created_by') != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only project creator or admin can delete")
     
-    # Delete associated tasks
-    await db.project_tasks.delete_many({"project_id": project_id})
-    
-    # Delete project access records
-    await db.project_access.delete_many({"project_id": project_id})
-    
-    # Delete associated executions
-    await db.executions.delete_many({"project_id": project_id})
-    
+    # Check if project has executions
+    executions_count = await db.executions.count_documents({"project_id": project_id})
+    if executions_count > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="Невозможно удалить проект: существуют запуски проекта"
+        )
+   
     # Delete project
     result = await db.projects.delete_one({"id": project_id})
+    
+    log_audit(
+        "22",  # Удаление проекта
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "project_name": project.get('name')
+        }
+    )
+    
     return {"message": "Проект удален"}
-
 
 # Scheduler API
 @api_router.get("/scheduler/jobs", response_model=List[SchedulerJob])
@@ -1141,6 +1154,10 @@ async def _ensure_project_access(current_user: User, project_id: str):
 async def create_scheduler_job(job_input: SchedulerJobCreate, current_user: User = Depends(get_current_user)):
     await require_permission(current_user, 'projects_execute')
     await _ensure_project_access(current_user, job_input.project_id)
+    
+    # Get project name for logging
+    project = await db.projects.find_one({"id": job_input.project_id})
+    project_name = project.get('name') if project else "Неизвестный проект"
     
     job = SchedulerJob(
         name=job_input.name,
@@ -1174,7 +1191,29 @@ async def create_scheduler_job(job_input: SchedulerJobCreate, current_user: User
         raise HTTPException(status_code=400, detail="Неверный тип задания")
     doc = prepare_for_mongo(job.model_dump())
     await db.scheduler_jobs.insert_one(doc)
+    
+    # Логирование создания задания планировщика
+    log_audit(
+        "29",  # Создание задания планировщика
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "job_name": job_input.name,
+            "project_name": project_name,
+            "job_type_label": _get_job_type_label(job_input.job_type)
+        }
+    )
+    
     return job
+
+def _get_job_type_label(job_type: str) -> str:
+    """Get Russian label for job type"""
+    labels = {
+        "one_time": "Одиночный",
+        "multi_run": "Множественный", 
+        "recurring": "Ежедневный"
+    }
+    return labels.get(job_type, job_type)
 
 async def _get_scheduler_job(job_id: str, current_user: User) -> SchedulerJob:
     job_doc = await db.scheduler_jobs.find_one({"id": job_id}, {"_id": 0})
@@ -1188,67 +1227,168 @@ async def _get_scheduler_job(job_id: str, current_user: User) -> SchedulerJob:
 async def update_scheduler_job(job_id: str, job_update: SchedulerJobUpdate, current_user: User = Depends(get_current_user)):
     await require_permission(current_user, 'projects_execute')
     job = await _get_scheduler_job(job_id, current_user)
+    
+    # Get project name for logging
+    project = await db.projects.find_one({"id": job.project_id})
+    project_name = project.get('name') if project else "Неизвестный проект"
+
+    # ДЕБАГ: вывести все поля проекта
+    print("=== DEBUG PROJECT FIELDS ===")
+    print(f"Project ID: {job.project_id}")
+    if project:
+        print("All project fields:")
+        for key, value in project.items():
+            print(f"  {key}: {value}")
+    else:
+        print("Project not found!")
+    print("===========================")    
+    
     changed = False
+    updated_fields = []
     now = datetime.now(timezone.utc)
+    
     if job_update.name:
         job.name = job_update.name
         changed = True
+        updated_fields.append("название")
+    
     if job.job_type == "one_time" and job_update.run_at:
         job.next_run_at = job_update.run_at if job_update.run_at.tzinfo else job_update.run_at.replace(tzinfo=timezone.utc)
         job.status = "active"
         changed = True
+        updated_fields.append("время запуска")
+    
     if job.job_type == "multi_run" and job_update.run_times:
         job.run_times = _normalize_run_times(job_update.run_times)
         job.remaining_runs = len(job.run_times)
         job.next_run_at = job.run_times[0] if job.run_times else None
         job.status = "active" if job.run_times else "completed"
         changed = True
+        updated_fields.append("расписание запусков")
+    
     if job.job_type == "recurring":
         recurrence_changed = False
         if job_update.recurrence_time:
             job.schedule_config["recurrence_time"] = job_update.recurrence_time
             recurrence_changed = True
+            updated_fields.append("время повторения")
         if job_update.recurrence_start_date:
             job.schedule_config["recurrence_start_date"] = job_update.recurrence_start_date.isoformat()
             recurrence_changed = True
+            updated_fields.append("дата начала")
         if recurrence_changed:
             job.next_run_at = _next_daily_occurrence(job.schedule_config, reference=now, initial=True)
             changed = True
+    
     if job_update.status in {"active", "paused"}:
         job.status = job_update.status
+        status_label = "активен" if job_update.status == "active" else "приостановлен"
         if job.status == "active" and job.job_type == "recurring":
             job.next_run_at = job.next_run_at or _next_daily_occurrence(job.schedule_config, reference=now, initial=True)
         changed = True
+        updated_fields.append(f"статус ({status_label})")
+    
     job.updated_at = now
+    
     if not changed:
         return job
+    
     await db.scheduler_jobs.update_one(
         {"id": job.id},
         {"$set": prepare_for_mongo(job.model_dump())}
     )
+    
+    # Логирование обновления задания планировщика
+    log_audit(
+        "30",  # Редактирование задания планировщика
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "job_name": job.name,
+            "project_name": job.project_id,
+            "job_type": job.job_type,
+            "job_type_label": _get_job_type_label(job.job_type),
+            "updated_fields": updated_fields
+        }
+    )
+    
     return job
 
 @api_router.post("/scheduler/jobs/{job_id}/pause")
 async def pause_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
     job = await _get_scheduler_job(job_id, current_user)
+    
+    # Get project name for logging
+    project = await db.projects.find_one({"id": job.project_id})
+    project_name = project.get('name') if project else "Неизвестный проект"
+    
     await db.scheduler_jobs.update_one({"id": job.id}, {"$set": {"status": "paused", "updated_at": datetime.now(timezone.utc).isoformat()}})
+    
+    # Логирование приостановки задания планировщика
+    log_audit(
+        "31",  # Задание планировщика приостановлено
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "job_name": job.name,
+            "project_name": project_name,
+            "job_type_label": _get_job_type_label(job.job_type)
+        }
+    )
+    
     return {"message": "Задание приостановлено"}
 
 @api_router.post("/scheduler/jobs/{job_id}/resume")
 async def resume_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
     job = await _get_scheduler_job(job_id, current_user)
+    
+    # Get project name for logging
+    project = await db.projects.find_one({"id": job.project_id})
+    project_name = project.get('name') if project else "Неизвестный проект"
+    
     next_run = _calculate_next_run(job, initial=True)
     await db.scheduler_jobs.update_one(
         {"id": job.id},
         {"$set": {"status": "active", "next_run_at": next_run.isoformat() if next_run else None, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
+    
+    # Логирование возобновления задания планировщика
+    log_audit(
+        "32",  # Задание планировщика возобновлено
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "job_name": job.name,
+            "project_name": project_name,
+            "job_type_label": _get_job_type_label(job.job_type)
+        }
+    )
+    
     return {"message": "Задание возобновлено"}
 
 @api_router.delete("/scheduler/jobs/{job_id}")
 async def delete_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
     job = await _get_scheduler_job(job_id, current_user)
+    
+    # Get project name for logging
+    project = await db.projects.find_one({"id": job.project_id})
+    project_name = project.get('name') if project else "Неизвестный проект"
+    
     await db.scheduler_jobs.delete_one({"id": job.id})
     await db.scheduler_runs.delete_many({"job_id": job.id})
+    
+    # Логирование удаления задания планировщика
+    log_audit(
+        "33",  # Удаление задания планировщика
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "job_name": job.name,
+            "project_name": project_name,
+            "job_type_label": _get_job_type_label(job.job_type)
+        }
+    )
+    
     return {"message": "Задание удалено"}
 
 @api_router.get("/scheduler/jobs/{job_id}/runs", response_model=List[SchedulerRun])
@@ -1328,7 +1468,7 @@ async def delete_project_task(project_id: str, task_id: str, current_user: User 
 
 # Project Execution with Real-time Updates (SSE)
 @api_router.get("/projects/{project_id}/execute")
-async def execute_project(project_id: str, current_user: User = Depends(get_current_user)):
+async def execute_project(project_id: str, current_user: User = Depends(get_current_user), skip_audit_log: bool = False):
     """Execute project with real-time updates via Server-Sent Events (requires projects_execute permission and access to project)"""
     
     # Check permission
@@ -1339,12 +1479,13 @@ async def execute_project(project_id: str, current_user: User = Depends(get_curr
     if not await can_access_project(current_user, project_id):
         raise HTTPException(status_code=403, detail="Access denied to this project")
     
-    log_audit(
-        "23",
-        user_id=current_user.id,
-        username=current_user.username,
-        details={"project_id": project_id}
-    )
+    if not skip_audit_log:
+        log_audit(
+            "23",
+            user_id=current_user.id,
+            username=current_user.username,
+            details={"project_id": project_id}
+        )
     
     async def event_generator():
         try:

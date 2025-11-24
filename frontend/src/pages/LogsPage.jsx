@@ -51,6 +51,10 @@ const EVENT_OPTIONS = [
   { value: "26", label: "Экспорт результатов проекта" },      
   { value: "27", label: "Предоставлен доступ к проекту" },
   { value: "28", label: "Отозван доступ к проекту" },
+  { value: "29", label: "Создание задания планировщика" },
+  { value: "30", label: "Редактирование задания планировщика" },
+  { value: "31", label: "Задание планировщика приостановлено" },
+  { value: "32", label: "Задание планировщика возобновлено" }
 ];
 
 const formatDate = (value) => {
@@ -161,14 +165,19 @@ const formatEventDetails = (eventNumber, details) => {
 Категория: ${detailsObj.category_name}`;
 
       case "21": // Создание проекта
-        return `Название: ${detailsObj.project_name}\nОписание: ${detailsObj.description || 'не указано'}\nКоличество проверок: ${detailsObj.checks_count || 0}`;
+        return `Название: ${detailsObj.project_name}
+Описание: ${detailsObj.project_description || 'Не указано'}`;
+
+      case "22": // Удаление проекта
+        return `Название: ${detailsObj.project_name}`;
         
       case "23": // Запуск проекта
-        return `Проект: ${detailsObj.project_name || detailsObj.project_id}\nСессия: ${detailsObj.session_id}\nХостов: ${detailsObj.hosts_count || 'неизвестно'}\nПользователь: ${detailsObj.executed_by || 'система'}`;
-        
+        return `Проект: ${detailsObj.project_name}`;
+    
       case "24": // Запуск проекта планировщиком
-        return `ID проекта: ${detailsObj.project_id}\nID задания планировщика: ${detailsObj.scheduler_job_id}\nСессия: ${detailsObj.session_id}\nОбласть: ${detailsObj.scope || 'не указана'}`;
-        
+          return `Проект: ${detailsObj.project_name}
+Задание планировщика: ${detailsObj.scheduler_job_name}`; 
+
       case "25": // Просмотр результатов проекта
         return `Проект: ${detailsObj.project_name || detailsObj.project_id}\nСессия: ${detailsObj.session_id}\nПользователь: ${detailsObj.viewed_by}\nВремя просмотра: ${detailsObj.viewed_at || new Date().toLocaleString()}`;
         
@@ -186,6 +195,26 @@ const formatEventDetails = (eventNumber, details) => {
 Пользователь: ${detailsObj.target_username}
 ФИО: ${detailsObj.target_full_name}
 Кем отозван доступ: ${detailsObj.access_revoked_by}`;        
+
+      case "29": // Создание задания планировщика
+          return `Задание: ${detailsObj.job_name}
+Проект: ${detailsObj.project_name}
+Тип запуска: ${detailsObj.job_type_label}`;
+
+      case "30": // Редактирование задания планировщика
+          return `Задание: ${detailsObj.job_name}
+Проект: ${detailsObj.project_name}
+Тип запуска: ${detailsObj.job_type_label}`;
+
+      case "31": // Задание планировщика приостановлено
+          return `Задание: ${detailsObj.job_name}
+Проект: ${detailsObj.project_name}
+Тип запуска: ${detailsObj.job_type_label}`;
+
+      case "32": // Задание планировщика возобновлено
+          return `Задание: ${detailsObj.job_name}
+Проект: ${detailsObj.project_name}
+Тип запуска: ${detailsObj.job_type_label}`;
         
       default:
         // Для остальных событий показываем читаемый JSON
