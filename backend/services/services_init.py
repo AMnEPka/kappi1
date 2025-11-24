@@ -15,6 +15,7 @@ from services.services_helpers import (
 # Auth
 from services.services_auth import (
     get_current_user,
+    get_current_user_from_token,
     get_user_permissions,
     has_permission,
     require_permission,
