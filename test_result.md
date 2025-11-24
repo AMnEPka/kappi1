@@ -210,9 +210,9 @@ frontend:
     implemented: true
     working: true
     file: "/app/frontend/src/pages/ProjectExecutionPage.jsx"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
@@ -220,6 +220,12 @@ frontend:
       - working: true
         agent: "testing"
         comment: "✅ TESTED: Project execution page loads correctly at /projects/:id/execute route. Shows proper loading state when project doesn't exist. Page structure is correct with back button, project title area, stats cards, and logs section. Ready for real project execution testing once projects can be created."
+      - working: false
+        agent: "user"
+        comment: "❌ ISSUE: SSE connection to /api/projects/{id}/execute returns 404. EventSource uses relative URL '/api/projects/{id}/execute' which doesn't route correctly to backend."
+      - working: true
+        agent: "main"
+        comment: "✅ FIXED: 1) Updated api.js to use REACT_APP_BACKEND_URL from .env instead of hardcoded port 8001. 2) Updated ProjectExecutionPage to pass full backend URL and auth token as query parameter to EventSource. 3) Added get_current_user_from_token() function to handle token-based auth for SSE (EventSource doesn't support custom headers). 4) Modified /api/projects/{id}/execute endpoint to accept token via query parameter. SSE should now connect properly."
   
   - task: "Project results page"
     implemented: true
