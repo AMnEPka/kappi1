@@ -4,11 +4,45 @@ Authentication and authorization services
 """
 
 from typing import List, Optional
-from fastapi import HTTPException, Depends, status  # pyright: ignore[reportMissingImports]
+from fastapi import HTTPException, Depends, status, Query  # pyright: ignore[reportMissingImports]
 from fastapi.security import HTTPAuthorizationCredentials # pyright: ignore[reportMissingImports]
 
 from config.config_init import security, decode_token, logger, db
 from models.models_init import User
+
+async def get_current_user_from_token(token: str) -> User:
+    """
+    Get current user from JWT token string (for query parameter auth in SSE)
+    """
+    try:
+        payload = decode_token(token)
+        user_id: str = payload.get("sub")
+        
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Get user from database
+        user_doc = await db.users.find_one({"id": user_id})
+        if not user_doc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        return User(**user_doc)
+        
+    except Exception as e:
+        logger.error(f"Authentication error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
     """
