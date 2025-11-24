@@ -135,7 +135,8 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       // Connect to SSE for real-time updates (EventSource uses GET by default)
       // The backend endpoint will start execution when first connected
       const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-      const eventSource = new EventSource(`${backendUrl}/api/projects/${projectId}/execute`);
+      const token = localStorage.getItem('token');
+      const eventSource = new EventSource(`${backendUrl}/api/projects/${projectId}/execute?token=${token}`);
       eventSourceRef.current = eventSource;
 
       eventSource.onmessage = (event) => {
