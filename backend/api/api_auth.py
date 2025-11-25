@@ -3,8 +3,9 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Request
 
 from config.config_init import db
+from config.config_security import verify_password, create_access_token
 from models.auth_models import User, UserResponse, LoginRequest, LoginResponse
-from services.services_auth import verify_password, create_access_token, get_current_user, get_user_permissions
+from services.services_auth import get_current_user, get_user_permissions
 from utils.audit_utils import log_audit
 
 router = APIRouter()
