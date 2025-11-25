@@ -299,19 +299,43 @@ const LogsPage = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedEvents, setSelectedEvents] = useState([]);
+  const [excludedEvents, setExcludedEvents] = useState([]);
   const [limit, setLimit] = useState(100);
   const [isExpanded, setIsExpanded] = useState(null);
 
   const activeEventLabels = useMemo(() => {
-    if (!selectedEvents.length) return "Все события";
-    return EVENT_OPTIONS
-      .filter((opt) => selectedEvents.includes(opt.value))
-      .map((opt) => opt.label)
-      .join(", ");
-  }, [selectedEvents]);
+    if (selectedEvents.length > 0) {
+      const selected = EVENT_OPTIONS
+        .filter((opt) => selectedEvents.includes(opt.value))
+        .map((opt) => opt.label)
+        .join(", ");
+      return `Выбрано: ${selected}`;
+    }
+    if (excludedEvents.length > 0) {
+      const excluded = EVENT_OPTIONS
+        .filter((opt) => excludedEvents.includes(opt.value))
+        .map((opt) => opt.label)
+        .join(", ");
+      return `Все события кроме: ${excluded}`;
+    }
+    return "Все события";
+  }, [selectedEvents, excludedEvents]);
 
   const toggleEvent = (value) => {
+    // Remove from excluded if present
+    setExcludedEvents((prev) => prev.filter((item) => item !== value));
+    // Toggle in selected
     setSelectedEvents((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+    );
+  };
+
+  const toggleExcludeEvent = (value, e) => {
+    e.stopPropagation();
+    // Remove from selected if present
+    setSelectedEvents((prev) => prev.filter((item) => item !== value));
+    // Toggle in excluded
+    setExcludedEvents((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
     );
   };
