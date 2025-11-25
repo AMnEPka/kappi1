@@ -10,6 +10,7 @@ from .api_auth import router as auth_router
 from .api_hosts import router as hosts_router
 from .api_categories import router as categories_router
 from .api_scripts import router as scripts_router
+from .api_projects import router as projects_router
 
 # Create main API router with /api prefix
 api_router = APIRouter(prefix="/api")
@@ -19,5 +20,6 @@ api_router.include_router(auth_router, tags=["auth"])
 api_router.include_router(hosts_router, tags=["hosts"])
 api_router.include_router(categories_router, tags=["categories"])
 api_router.include_router(scripts_router, tags=["scripts"])
+api_router.include_router(projects_router, tags=["projects"])
 
 __all__ = ['api_router']
