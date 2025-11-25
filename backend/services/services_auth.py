@@ -44,10 +44,18 @@ async def get_current_user_from_token(token: str) -> User:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> User:
     """
     Dependency to get current user from JWT token
     """
+    # Handle case when no credentials provided (auto_error=False in security)
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     try:
         token = credentials.credentials
         payload = decode_token(token)
@@ -71,6 +79,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         
         return User(**user_doc)
         
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error(f"Authentication error: {str(e)}")
         raise HTTPException(
