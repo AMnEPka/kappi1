@@ -19,7 +19,7 @@ from models.models_init import *
 from services.services_init import *
 from utils.db_utils import prepare_for_mongo, parse_from_mongo
 from utils.audit_utils import log_audit, _persist_audit_log
-from scheduler.scheduler_utils import parse_datetime_param as _parse_datetime_param, calculate_next_run as _calculate_next_run, normalize_run_times as _normalize_run_times
+from scheduler.scheduler_utils import parse_datetime_param as _parse_datetime_param, calculate_next_run as _calculate_next_run, normalize_run_times as _normalize_run_times, next_daily_occurrence as _next_daily_occurrence
 from scheduler.scheduler_worker import scheduler_worker
 from api import api_router as auth_api_router
 
