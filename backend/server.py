@@ -1821,6 +1821,7 @@ async def get_audit_logs(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     event_types: Optional[str] = None,
+    excluded_event_types: Optional[str] = None,
     limit: int = 200,
     current_user: User = Depends(get_current_user)
 ):
@@ -1841,10 +1842,16 @@ async def get_audit_logs(
     if created_filter:
         query["created_at"] = created_filter
     
+    # Handle event type filtering
     if event_types:
         events = [event.strip() for event in event_types.split(",") if event.strip()]
         if events:
             query["event"] = {"$in": events}
+    elif excluded_event_types:
+        # Only apply exclusion if no specific events are selected
+        excluded_events = [event.strip() for event in excluded_event_types.split(",") if event.strip()]
+        if excluded_events:
+            query["event"] = {"$nin": excluded_events}
     
     limit = max(1, min(limit, 500))
     
