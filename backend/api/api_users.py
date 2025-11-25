@@ -5,7 +5,7 @@ from typing import List
 
 from config.config_init import db
 from config.config_security import hash_password
-from models.auth_models import User, UserResponse, UserCreate, UserUpdate, Role, RoleCreate, RoleUpdate, PasswordChangeRequest
+from models.auth_models import User, UserResponse, UserCreate, UserUpdate, Role, RoleCreate, RoleUpdate, PasswordResetRequest
 from services.services_auth import get_current_user, require_permission
 from utils.db_utils import prepare_for_mongo
 from utils.audit_utils import log_audit
@@ -169,7 +169,7 @@ async def delete_user(user_id: str, current_user: User = Depends(get_current_use
 
 
 @router.put("/users/{user_id}/password")
-async def change_user_password(user_id: str, password_data: PasswordChangeRequest, current_user: User = Depends(get_current_user)):
+async def change_user_password(user_id: str, password_data: PasswordResetRequest, current_user: User = Depends(get_current_user)):
     """Change user password (requires users_manage permission)"""
     await require_permission(current_user, 'users_manage')
     
