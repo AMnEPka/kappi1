@@ -1478,7 +1478,7 @@ const Layout = ({ children }) => {
 
           {/* Выпадающее меню справа */}
           <div className="relative group">
-            <button className="flex items-center justify-center text-white hover:bg-white hover:text-black h-12 w-12 rounded-md transition-colors">
+            <button className="flex items-center justify-center text-black hover:bg-white hover:text-black h-12 w-12 rounded-md transition-colors">
               <Menu className="h-8 w-8" />
             </button>
             <div className="absolute right-0 top-full mt-1 w-56 bg-white border-2 border-gray-300 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
