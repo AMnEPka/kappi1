@@ -2426,8 +2426,10 @@ async def revoke_project_access(project_id: str, user_id: str, current_user: Use
     )
     
     return {"message": "Access revoked successfully"}
-# Include the router in the main app
-app.include_router(api_router)
+
+# Include the routers in the main app
+app.include_router(auth_api_router)  # Auth routes from api/ package
+app.include_router(api_router)  # Remaining routes
 # Минимальная рабочая CORS конфигурация
 app.add_middleware(
     CORSMiddleware,
