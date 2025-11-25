@@ -275,6 +275,19 @@ recent_changes:
   - Projects filtering works correctly: users see only their projects + granted access + curators see all
   - Execute button hidden for users without projects_execute permission
 
+frontend:
+  - task: "Logs page event filtering with exclusion functionality"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/LogsPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented new exclusion functionality for logs page. Added minus icons to event type buttons that allow excluding categories from display. Users can now click minus icon to exclude events (button turns red) or click button name to select events (button turns blue). Status text shows 'Все события кроме: ...' for exclusions and 'Выбрано: ...' for selections."
+
 agent_communication:
   - agent: "main"
     message: "Phase 2 implementation complete. Backend has SSE-based project execution with one SSH connection per host. Frontend has 4-page flow: Projects list -> Wizard -> Execution monitor -> Results. Ready for backend testing."
@@ -288,3 +301,5 @@ agent_communication:
     message: "🔒 RBAC UI PERMISSIONS: Implemented granular permission checks for UI buttons. 1) Access button visible only to admins 2) Edit/Delete buttons for hosts shown only if user has corresponding permissions (hosts_edit_all/own, hosts_delete_all/own) 3) Edit/Delete buttons for scripts shown only if user has corresponding permissions (checks_edit_all/own, checks_delete_all/own) 4) Ownership checks implemented - users can edit/delete only their own resources unless they have _all permissions. This provides proper UI-level access control matching backend permissions."
   - agent: "main"
     message: "🔧 SSE ROUTING FIX: Fixed 404 error on project execution. Root cause: 1) api.js was using hardcoded port 8001 2) EventSource was using relative URL 3) EventSource doesn't support Authorization headers. Solution: 1) Updated api.js and ProjectExecutionPage to use dynamic URL based on window.location (works from localhost and any host in local network) 2) Modified SSE endpoint to accept token via query parameter 3) Added get_current_user_from_token() auth function for SSE 4) Removed unused getBackendUrl() function from AuthContext. Now works: localhost:3000 → localhost:8001, 192.168.1.x:3000 → 192.168.1.x:8001. In production, REACT_APP_BACKEND_URL from .env takes precedence."
+  - agent: "main"
+    message: "📝 LOGS PAGE ENHANCEMENT: Added new event exclusion functionality to logs page. Each event type button now has a minus icon that allows users to exclude specific event categories from display. When exclusion is active, buttons turn red and status shows 'Все события кроме: [excluded events]'. Users can switch between inclusion (blue buttons, 'Выбрано: [selected events]') and exclusion modes. Reset button clears all filters. Ready for testing."
