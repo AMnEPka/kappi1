@@ -17,6 +17,8 @@ from typing import Tuple  # pyright: ignore[reportMissingModuleSource]
 from config.config_init import *
 from models.models_init import *
 from services.services_init import *
+from utils.db_utils import prepare_for_mongo, parse_from_mongo
+from utils.audit_utils import log_audit, _persist_audit_log
 
 scheduler_task: Optional[asyncio.Task] = None
 
@@ -38,63 +40,6 @@ async def get_permissions_list():
         "permissions": PERMISSIONS,
         "groups": PERMISSION_GROUPS
     }
-def prepare_for_mongo(data: dict) -> dict:
-    """Prepare data for MongoDB storage"""
-    prepared = data.copy()
-    for field in ["created_at", "updated_at", "executed_at", "next_run_at", "last_run_at", "started_at", "finished_at"]:
-        if isinstance(prepared.get(field), datetime):
-            prepared[field] = prepared[field].isoformat()
-    if isinstance(prepared.get("run_times"), list):
-        prepared["run_times"] = [
-            value.isoformat() if isinstance(value, datetime) else value
-            for value in prepared["run_times"]
-        ]
-    return prepared
-
-def parse_from_mongo(item: dict) -> dict:
-    """Parse data from MongoDB"""
-    parsed = item.copy()
-    for field in ["created_at", "updated_at", "executed_at", "next_run_at", "last_run_at", "started_at", "finished_at"]:
-        if isinstance(parsed.get(field), str):
-            parsed[field] = datetime.fromisoformat(parsed[field])
-    if isinstance(parsed.get("run_times"), list):
-        parsed["run_times"] = [
-            datetime.fromisoformat(value) if isinstance(value, str) else value
-            for value in parsed["run_times"]
-        ]
-    return parsed
-
-async def _persist_audit_log(entry: Dict[str, Any]) -> None:
-    try:
-        doc = entry.copy()
-        doc["id"] = str(uuid.uuid4())
-        doc["created_at"] = datetime.now(timezone.utc).isoformat()
-        await db.audit_logs.insert_one(doc)
-    except Exception as e:
-        logger.error("Failed to persist audit log: %s", str(e))
-
-def log_audit(event: str, *, user_id: Optional[str] = None, username: Optional[str] = None,
-              details: Optional[Dict[str, Any]] = None, level: int = logging.INFO) -> None:
-    """Structured audit logging helper"""
-    payload: Dict[str, Any] = {
-        "event": event,
-        "level": logging.getLevelName(level)
-    }
-    if user_id:
-        payload["user_id"] = user_id
-    if username:
-        payload["username"] = username
-    if details:
-        payload["details"] = details
-    
-    logger.log(level, "[AUDIT] %s", json.dumps(payload, ensure_ascii=False, default=str))
-    
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(_persist_audit_log(payload))
-    except RuntimeError:
-        # No running loop (e.g., during startup). Persist synchronously.
-        asyncio.run(_persist_audit_log(payload))
 
 def _parse_datetime_param(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
     if not value:
