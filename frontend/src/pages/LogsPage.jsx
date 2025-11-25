@@ -346,7 +346,11 @@ const LogsPage = () => {
       const params = { limit };
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
-      if (selectedEvents.length) params.event_types = selectedEvents.join(",");
+      if (selectedEvents.length) {
+        params.event_types = selectedEvents.join(",");
+      } else if (excludedEvents.length) {
+        params.excluded_event_types = excludedEvents.join(",");
+      }
 
       const response = await api.get("/api/audit/logs", { params });
       setLogs(response.data);
