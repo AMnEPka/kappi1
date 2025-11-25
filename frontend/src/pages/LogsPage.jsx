@@ -51,11 +51,14 @@ const EVENT_OPTIONS = [
   { value: "26", label: "Экспорт результатов проекта" },      
   { value: "27", label: "Предоставлен доступ к проекту" },
   { value: "28", label: "Отозван доступ к проекту" },
+  { value: "34", label: "Неуспешный запуск проекта" },   // наверное никогда не возникнет, тестово
+
+    // Планировщик
   { value: "29", label: "Создание задания планировщика" },
   { value: "30", label: "Редактирование задания планировщика" },
   { value: "31", label: "Задание планировщика приостановлено" },
   { value: "32", label: "Задание планировщика возобновлено" },
-  { value: "34", label: "Неуспешный запуск проекта" }
+  { value: "33", label: "Задание планировщика удалено" }
 ];
 
 const formatDate = (value) => {
@@ -180,10 +183,11 @@ const formatEventDetails = (eventNumber, details) => {
 Задание планировщика: ${detailsObj.scheduler_job_name}`; 
 
       case "25": // Просмотр результатов проекта
-        return `Проект: ${detailsObj.project_name || detailsObj.project_id}\nСессия: ${detailsObj.session_id}\nПользователь: ${detailsObj.viewed_by}\nВремя просмотра: ${detailsObj.viewed_at || new Date().toLocaleString()}`;
+        return `Проект: ${detailsObj.project_name}`;
         
-      case "26": // Экспорт результатов проекта
-        return `Проект: ${detailsObj.project_name || detailsObj.project_id}\nСессия: ${detailsObj.session_id}\nФормат: ${detailsObj.format || 'Excel'}\nЭкспортировано: ${detailsObj.exported_by}\nВремя: ${detailsObj.exported_at || new Date().toLocaleString()}`;
+      case "26": // Запуск проекта планировщиком
+        return `Проект: ${detailsObj.project_name}
+Имя файла: ${detailsObj.project_filename}`; 
 
       case "27": // Предоставлен доступ к проекту
         return `Проект: ${detailsObj.project_name}
@@ -198,27 +202,32 @@ const formatEventDetails = (eventNumber, details) => {
 Кем отозван доступ: ${detailsObj.access_revoked_by}`;        
 
       case "29": // Создание задания планировщика
-          return `Задание: ${detailsObj.job_name}
+        return `Задание: ${detailsObj.job_name}
 Проект: ${detailsObj.project_name}
 Тип запуска: ${detailsObj.job_type_label}`;
 
       case "30": // Редактирование задания планировщика
-          return `Задание: ${detailsObj.job_name}
+        return `Задание: ${detailsObj.job_name}
 Проект: ${detailsObj.project_name}
 Тип запуска: ${detailsObj.job_type_label}`;
 
       case "31": // Задание планировщика приостановлено
-          return `Задание: ${detailsObj.job_name}
+        return `Задание: ${detailsObj.job_name}
 Проект: ${detailsObj.project_name}
 Тип запуска: ${detailsObj.job_type_label}`;
 
       case "32": // Задание планировщика возобновлено
-          return `Задание: ${detailsObj.job_name}
+        return `Задание: ${detailsObj.job_name}
+Проект: ${detailsObj.project_name}
+Тип запуска: ${detailsObj.job_type_label}`;
+
+      case "33": // Задание планировщика удалено
+        return `Задание: ${detailsObj.job_name}
 Проект: ${detailsObj.project_name}
 Тип запуска: ${detailsObj.job_type_label}`;
 
       case "34": // Неуспешный запуск проекта
-          return `Проект: ${detailsObj.project_name}
+        return `Проект: ${detailsObj.project_name}
 Причина: ${detailsObj.failure_reason}`;
         
       default:
@@ -291,6 +300,7 @@ const LogsPage = () => {
   const [endDate, setEndDate] = useState("");
   const [selectedEvents, setSelectedEvents] = useState([]);
   const [limit, setLimit] = useState(100);
+  const [isExpanded, setIsExpanded] = useState(null);
 
   const activeEventLabels = useMemo(() => {
     if (!selectedEvents.length) return "Все события";
@@ -479,40 +489,39 @@ const LogsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="py-1 px-2">Дата</TableHead>
-                <TableHead className="py-1 px-2">Событие</TableHead>
-                <TableHead className="py-1 px-2">Пользователь</TableHead>
-                <TableHead className="py-1 px-2 w-20">Детали</TableHead>
+                <TableHead>Дата</TableHead>
+                <TableHead>Событие</TableHead>
+                <TableHead>Пользователь</TableHead>
+                <TableHead>Детали</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {logs.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-3 text-center text-gray-500 text-sm">
+                  <TableCell colSpan={4} className="py-8 text-center text-gray-500">
                     События не найдены
                   </TableCell>
                 </TableRow>
               )}
-              {logs.map((log, index) => (
-                <TableRow 
-                  key={log.id} 
-                  className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                >
-                  <TableCell className="py-1 px-2 text-xs whitespace-nowrap">
-                    {formatDate(log.created_at)}
-                  </TableCell>
-                  <TableCell className="py-1 px-2">
-                    <Badge variant="outline" className="text-xs px-1 py-0">
+              {logs.map((log) => (
+                <TableRow key={log.id}>
+                  <TableCell className="whitespace-nowrap">{formatDate(log.created_at)}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
                       {EVENT_OPTIONS.find(option => option.value === log.event)?.label || log.event}
                     </Badge>
                   </TableCell>
-                  <TableCell className="py-1 px-2 text-xs">
-                    {log.username || "Система"}
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{log.username || "Система"}</span>
+{/*}                      <span className="text-xs text-gray-500">{log.user_id || "-"}</span> */}
+                    </div>
                   </TableCell>
-                  <TableCell className="py-1 px-2">
-                    <CollapsibleDetails 
-                      details={formatEventDetails(log.event, log.details)}
-                    />
+
+                  <TableCell>
+                    <div className="text-xs text-gray-700 whitespace-pre-wrap">
+                      {formatEventDetails(log.event, log.details)}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

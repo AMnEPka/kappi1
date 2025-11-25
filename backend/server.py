@@ -1809,7 +1809,7 @@ async def log_failed_execution(
         details={
             "project_id": project_id,
             "project_name": project_name,
-            "failure_reason": "SSE connection failed"  
+            "failure_reason": "SSH connection failed"  
         }
     )
     
@@ -1865,11 +1865,13 @@ async def get_project_executions(project_id: str, current_user: User = Depends(g
         {"_id": 0}
     ).sort("executed_at", -1).to_list(1000)
     
-    log_audit(
-        "25",
+    log_audit( 
+        "25", # просмотр результатов проекта
         user_id=current_user.id,
         username=current_user.username,
-        details={"project_id": project_id, "scope": "project"}
+        details={
+            "project_name": project_id
+            }
     )
     
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
@@ -1950,13 +1952,19 @@ async def get_session_executions(project_id: str, session_id: str, current_user:
         {"project_id": project_id, "execution_session_id": session_id},
         {"_id": 0}
     ).sort("executed_at", 1).to_list(1000)
+
+        # Получаем имя проекта
+    project_doc = await db.projects.find_one({"id": project_id})
+    project_name = project_doc.get('name') if project_doc else "Неизвестный проект"    
     
-    log_audit(
-        "project_results_viewed",
-        user_id=current_user.id,
-        username=current_user.username,
-        details={"project_id": project_id, "session_id": session_id, "scope": "session"}
-    )
+    # log_audit( 
+    #     "25", # просмотр результатов проекта
+    #     user_id=current_user.id,
+    #     username=current_user.username,
+    #     details={
+    #         "project_name": project_id
+    #         }
+    # )
     
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
@@ -2044,19 +2052,16 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
     # Check if user can export all results or has access to project
     if not await has_permission(current_user, 'results_export_all'):
         if not await can_access_project(current_user, project_id):
-            raise HTTPException(status_code=403, detail="Access denied to this project")
-    
-    log_audit(
-        "26",
-        user_id=current_user.id,
-        username=current_user.username,
-        details={"project_id": project_id, "session_id": session_id}
-    )
+            raise HTTPException(status_code=403, detail="Access denied to this project")    
     
     # Get project info
     project = await db.projects.find_one({"id": project_id}, {"_id": 0})
     if not project:
         raise HTTPException(status_code=404, detail="Проект не найден")
+
+            # Получаем имя проекта
+    project_doc = await db.projects.find_one({"id": project_id})
+    project_name = project_doc.get('name') if project_doc else "Неизвестный проект"    
     
     # Get executions for this session
     executions = await db.executions.find(
@@ -2197,10 +2202,19 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
     with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
         wb.save(tmp_file.name)
         tmp_file_path = tmp_file.name
-    
+
     # Generate filename
     filename = f"Протокол_испытаний_{date.today().strftime('%d%m%Y')}.xlsx"
-    
+
+    log_audit(
+        "26",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={
+            "project_name": project_name, 
+            "project_filename": filename}
+    )
+
     return FileResponse(
         path=tmp_file_path,
         filename=filename,
