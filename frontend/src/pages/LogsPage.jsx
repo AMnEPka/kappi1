@@ -414,6 +414,7 @@ const LogsPage = () => {
     setStartDate("");
     setEndDate("");
     setSelectedEvents([]);
+    setExcludedEvents([]);
     fetchLogs();
   };
 
