@@ -322,9 +322,8 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                   
                   {/* Контент с вертикальным скроллом */}
                   <div className="flex-1 overflow-y-auto p-6">
-                    <div className="mb-6">
+                    <div className="mb-6" align="center">
                       <h3 className="text-lg font-semibold mb-2">Сравнение запусков проекта</h3>
-                      <Label>Количество запусков для сравнения:</Label>
                       <Select 
                         value={comparisonMode} 
                         onValueChange={(value) => setComparisonMode(value)}
