@@ -17,7 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { ChevronLeft, CheckCircle, XCircle, Eye, Download } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { ChevronLeft, CheckCircle, XCircle, Eye, Download, BarChart3, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
 
@@ -33,6 +34,8 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [hosts, setHosts] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonMode, setComparisonMode] = useState("last2");  
   
 
   useEffect(() => {
@@ -54,6 +57,19 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       navigate('/projects'); // или путь к списку проектов
     }
   };
+
+  const getComparisonSessions = () => {
+    switch (comparisonMode) {
+      case "last2":
+        return sessions.slice(0, 2);
+      case "last5":
+        return sessions.slice(0, 5);
+      case "all":
+        return sessions;
+      default:
+        return sessions.slice(0, 5);
+    }
+  };  
 
   // эффект для обработки параметра URL
   useEffect(() => {
@@ -280,7 +296,143 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                 <Download className="mr-2 h-4 w-4" />
                 Экспорт в Excel
               </Button>
+              <Button
+                onClick={() => setShowComparison(!showComparison)}
+                variant={showComparison ? "default" : "outline"}
+              >
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Сравнение запусков
+              </Button>
             </div>
+
+            {/* Модальное окно сравнения */}
+            {showComparison && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+                  {/* Крестик закрытия над формой */}
+                  <div className="flex justify-end p-1">
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => setShowComparison(false)}
+                      className="h-8 w-8 rounded-full bg-white border shadow-sm hover:bg-gray-50"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Контент с вертикальным скроллом */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold mb-2">Сравнение запусков проекта</h3>
+                      <Label>Количество запусков для сравнения:</Label>
+                      <Select 
+                        value={comparisonMode} 
+                        onValueChange={(value) => setComparisonMode(value)}
+                      >
+                        <SelectTrigger className="w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="last2">2 последних запуска</SelectItem>
+                          <SelectItem value="last5">5 последних запусков</SelectItem>
+                          <SelectItem value="all">Все запуски</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Гистограмма по статусам */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium">Распределение по статусам</h4>
+                      <div className="space-y-2">
+                        {getComparisonSessions().map((session, index) => (
+                          <div key={session.session_id} className="flex items-center gap-4 p-2 bg-gray-50 rounded">
+                            {/* Дата слева */}
+                            <div className="w-48 text-sm font-medium text-gray-700 whitespace-nowrap">
+                              {formatDate(session.executed_at)}
+                            </div>
+                            
+                            {/* График по центру */}
+                            <div className="flex-1 min-w-0"> {/* Добавлено min-w-0 чтобы предотвратить переполнение */}
+                              <div className="flex h-6 bg-gray-200 rounded overflow-hidden">
+                                <div 
+                                  className="bg-green-600 transition-all flex items-center justify-center"
+                                  style={{ width: `${(session.passed_count / session.total_checks) * 100}%` }}
+                                  title={`Выполнено: ${session.passed_count}`}
+                                >
+                                  {session.passed_count > 0 && (
+                                    <span className="text-white text-xs font-medium">
+                                      {session.passed_count}
+                                    </span>
+                                  )}
+                                </div>
+                                <div 
+                                  className="bg-yellow-600 transition-all flex items-center justify-center"
+                                  style={{ width: `${(session.failed_count / session.total_checks) * 100}%` }}
+                                  title={`Не выполнено: ${session.failed_count}`}
+                                >
+                                  {session.failed_count > 0 && (
+                                    <span className="text-white text-xs font-medium">
+                                      {session.failed_count}
+                                    </span>
+                                  )}
+                                </div>
+                                <div 
+                                  className="bg-blue-600 transition-all flex items-center justify-center"
+                                  style={{ width: `${(session.operator_count / session.total_checks) * 100}%` }}
+                                  title={`Оператор: ${session.operator_count}`}
+                                >
+                                  {session.operator_count > 0 && (
+                                    <span className="text-white text-xs font-medium">
+                                      {session.operator_count}
+                                    </span>
+                                  )}
+                                </div>
+                                <div 
+                                  className="bg-red-600 transition-all flex items-center justify-center"
+                                  style={{ width: `${(session.error_count / session.total_checks) * 100}%` }}
+                                  title={`Ошибки: ${session.error_count}`}
+                                >
+                                  {session.error_count > 0 && (
+                                    <span className="text-white text-xs font-medium">
+                                      {session.error_count}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Общее количество справа */}
+                            <div className="w-20 text-sm font-medium text-gray-700 text-right whitespace-nowrap">
+                              {session.total_checks}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Легенда */}
+                    <div className="flex gap-6 justify-center mt-6 text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-600 rounded"></div>
+                        <span>Выполнено</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-yellow-600 rounded"></div>
+                        <span>Не выполнено</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-blue-600 rounded"></div>
+                        <span>Оператор</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-600 rounded"></div>
+                        <span>Ошибки</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
