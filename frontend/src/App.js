@@ -1387,42 +1387,44 @@ const Layout = ({ children }) => {
   
   return (
 <div className="min-h-screen bg-gray-50">
-  {/* Первая строка шапки */}
-  <nav>
-    <div className="container mx-auto px-4">
-      <div className="flex items-center justify-between h-16 bg-white border-b border-gray-200"> {/* Переносим фон и границу сюда */}
-        <Link to="/" className="flex items-center gap-3">
-          <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
-          <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
-        </Link>
-        
-        {/* Блок пользователя и выхода */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <User className="h-4 w-4 text-gray-500" />
-            <span className="text-gray-700 font-medium">{user?.full_name}</span>
-            {user?.is_admin && (
-              <Badge className="bg-yellow-400 text-white text-xs border-0">Админ</Badge>
-            )}
+  {/* Первая строка шапки - фиксированная */}
+  <nav className="sticky top-0 z-50">
+    <div className="bg-white border-b border-gray-200"> {/* Фон и граница здесь */}
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          <Link to="/" className="flex items-center gap-3">
+            <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
+            <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
+          </Link>
+          
+          {/* Блок пользователя и выхода */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <User className="h-4 w-4 text-gray-500" />
+              <span className="text-gray-700 font-medium">{user?.full_name}</span>
+              {user?.is_admin && (
+                <Badge className="bg-yellow-400 text-white text-xs border-0">adm</Badge>
+              )}
+            </div>
+            <Button 
+              className="bg-yellow-400 hover:bg-white text-black"
+              size="sm"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              Выйти
+            </Button>
           </div>
-          <Button 
-            className="bg-yellow-400 hover:bg-white text-black"
-            size="sm"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4 mr-1" />
-            Выйти
-          </Button>
         </div>
       </div>
     </div>
   </nav>
 
-  {/* Вторая строка шапки - навигация */}
-  <div className="w-full">
-    <div className="container mx-auto px-4">
-      <div className="bg-yellow-400 rounded-b-lg shadow-md"> {/* Желтый фон здесь */}
-        <div className="flex items-center justify-between h-12 px-4">
+  {/* Вторая строка шапки - навигация - тоже фиксированная */}
+  <div className="sticky top-16 z-40">
+    <div className="bg-yellow-400 shadow-md rounded-b-lg"> {/* Фон и скругления здесь */}
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-12">
           {/* Основные пункты меню слева */}
           <div className="flex items-center gap-1">
             <Link to="/">
@@ -1482,17 +1484,6 @@ const Layout = ({ children }) => {
               <Menu className="h-8 w-8" />
             </button>
             <div className="absolute right-0 top-full mt-1 w-56 bg-white border-2 border-gray-300 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-              {/* <Link to="/execute">
-                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
-                  <Play className="mr-3 h-5 w-5" /> Единичный запуск
-                </div>
-              </Link>
-              <Link to="/history">
-                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
-                  <History className="mr-3 h-5 w-5" /> История
-                </div>
-              </Link> */}
-              
               <Link to="/admin">
                 <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
                   <Settings className="mr-3 h-5 w-5" /> Админ-панель
@@ -1517,9 +1508,10 @@ const Layout = ({ children }) => {
     </div>
   </div>
 
-  <main className="container mx-auto px-4 py-8">
+  {/* Основной контент - добавляем отступ сверху равный высоте обеих шапок */}
+  <div className="container mx-auto px-4 pt-28">
     {children}
-  </main>
+  </div>
 </div>
   );
 };
