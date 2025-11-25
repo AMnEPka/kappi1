@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { RefreshCw, ShieldAlert, ChevronDown  } from "lucide-react";
+import { RefreshCw, ShieldAlert, ChevronDown, Minus  } from "lucide-react";
 import { api } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
 
