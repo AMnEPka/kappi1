@@ -245,42 +245,103 @@ async def execute_command(host: Host, command: str) -> ExecutionResult:
         )
 
 
-async def execute_check_with_processor(
-    host: Host,
-    command: str,
-    processor_script: Optional[str] = None,
-    reference_data: Optional[str] = None
-) -> ExecutionResult:
-    """
-    Execute check command and process results with optional processor script
-    """
-    result = await execute_command(host, command)
+async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, reference_data: Optional[str] = None) -> ExecutionResult:
+    """Execute check command and process results with optional reference data"""
+    # Step 1: Execute the main command
+    main_result = await execute_command(host, command)
     
-    if not result.success or not processor_script:
-        return result
+    if not processor_script:
+        # No processor - return as is
+        return main_result
     
-    # Execute processor script if provided
+    if not main_result.success:
+        # Main command failed - return error
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output=main_result.output,
+            error=main_result.error
+        )
+    
+    # Step 2: Run processor script LOCALLY with main command output as input
     try:
         loop = asyncio.get_event_loop()
-        success, output, error = await loop.run_in_executor(
-            None, _ssh_connect_and_execute, host, processor_script
+        
+        # Execute processor script LOCALLY on our server
+        # This avoids command line length limits and doesn't require write permissions on remote hosts
+        import subprocess
+        import os
+        
+        # Set environment variables for the local process
+        env = os.environ.copy()
+        env['CHECK_OUTPUT'] = main_result.output
+        env['ETALON_INPUT'] = reference_data or ''
+        
+        print(f"[DEBUG] Executing processor script locally, output size: {len(main_result.output)} bytes")
+        
+        # Execute processor script locally using bash
+        # User should write processor scripts in bash regardless of target OS
+        result = subprocess.run(
+            ['bash', '-c', processor_script],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30
         )
         
-        # Set check_status based on processor output
-        if success:
-            if "PASSED" in output.upper() or "OK" in output.upper():
-                result.check_status = "Пройдена"
-            elif "FAILED" in output.upper():
-                result.check_status = "Не пройдена"
+        print(f"[DEBUG] Local processor execution completed, return code: {result.returncode}")
+        
+        # Create processor result from local execution
+        processor_result = type('obj', (object,), {
+            'output': result.stdout,
+            'error': result.stderr if result.returncode != 0 else None,
+            'success': result.returncode == 0
+        })()
+        
+        # Parse processor output to determine check result
+        output = processor_result.output.strip()
+        check_status = None
+        
+        # Look for status keywords
+        for line in output.split('\n'):
+            line_stripped = line.strip()
+            line_lower = line_stripped.lower()
+            
+            if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
+                check_status = 'Пройдена'
+                break
+            elif 'не пройдена' in line_lower:
+                check_status = 'Не пройдена'
+                break
+            elif 'оператор' in line_lower:
+                check_status = 'Оператор'
+                break            
             else:
-                result.check_status = "Оператор"
-        else:
-            result.check_status = "Ошибка"
+                check_status = 'Ошибка'
+                break
+
+        
+        # Build result message - only command output and final status
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Вывод обработчика ===\n{output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
+        
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=(check_status == 'Пройдена'),
+            output=result_output,
+            error=processor_result.error if processor_result.error else None,
+            check_status=check_status
+        )
+        
     except Exception as e:
-        result.check_status = "Ошибка"
-        result.error = str(e)
-    
-    return result
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output=main_result.output,
+            error=f"Ошибка обработчика: {str(e)}"
+        )
 
 # Keep for backward compatibility
 def _check_ssh_login_original(host: Host) -> tuple[bool, str]:

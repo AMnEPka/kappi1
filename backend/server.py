@@ -298,6 +298,9 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                         
                         # Use processor if available
                         result = await execute_check_with_processor(host, script.content, script.processor_script, reference_data)
+
+                        print(f"=== DEBUG SCRIPT RESULT: ===")
+                        print(f"Script ID: {result}")
                         
                         scripts_completed += 1
                         yield f"data: {json.dumps({'type': 'script_progress', 'host_name': host.name, 'completed': scripts_completed, 'total': len(scripts)})}\n\n"

@@ -277,7 +277,7 @@ async def grant_project_access(project_id: str, user_id: str, current_user: User
     await db.project_access.insert_one(access_doc)
     
     log_audit(
-        "23",
+        "27",
         user_id=current_user.id,
         username=current_user.username,
         details={
@@ -309,7 +309,7 @@ async def revoke_project_access(project_id: str, user_id: str, current_user: Use
     target_user = await db.users.find_one({"id": user_id})
     
     log_audit(
-        "23",
+        "28",
         user_id=current_user.id,
         username=current_user.username,
         details={
