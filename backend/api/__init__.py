@@ -8,8 +8,8 @@ from fastapi import APIRouter
 
 from .api_auth import router as auth_router
 
-# Create main API router
-api_router = APIRouter()
+# Create main API router with /api prefix
+api_router = APIRouter(prefix="/api")
 
 # Include sub-routers
 api_router.include_router(auth_router, tags=["auth"])
