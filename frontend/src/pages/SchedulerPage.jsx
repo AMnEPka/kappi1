@@ -62,7 +62,7 @@ const SchedulerPage = () => {
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState(5000); // 5 секунд  
+  const [refreshInterval, setRefreshInterval] = useState(3000); // 3 секунды
   const [form, setForm] = useState({
     name: "",
     project_id: "",
