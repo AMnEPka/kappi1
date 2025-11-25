@@ -408,7 +408,7 @@ const LogsPage = () => {
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [isAdmin, startDate, endDate, limit, selectedEvents]);
+  }, [isAdmin, startDate, endDate, limit, selectedEvents, excludedEvents]);
 
   const handleReset = () => {
     setStartDate("");
