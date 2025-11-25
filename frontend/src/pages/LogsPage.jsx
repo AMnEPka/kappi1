@@ -484,19 +484,35 @@ const LogsPage = () => {
           <div>
             <label className="text-sm font-medium text-gray-600">Типы событий</label>
             <div className="mt-2 flex flex-wrap gap-2">
-            {EVENT_OPTIONS.map((option) => (
-              <Button
-                key={option.value}
-                type="button"
-                variant={selectedEvents.includes(option.value) ? "default" : "outline"}
-                onClick={() => toggleEvent(option.value)}
-                className="text-sm"
-              >
-                {option.label}
-              </Button>
-            ))}
+            {EVENT_OPTIONS.map((option) => {
+              const isSelected = selectedEvents.includes(option.value);
+              const isExcluded = excludedEvents.includes(option.value);
+              
+              return (
+                <div key={option.value} className="relative inline-flex">
+                  <Button
+                    type="button"
+                    variant={isSelected ? "default" : isExcluded ? "destructive" : "outline"}
+                    onClick={() => toggleEvent(option.value)}
+                    className={`text-sm pr-8 ${isExcluded ? 'opacity-70' : ''}`}
+                  >
+                    {option.label}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={(e) => toggleExcludeEvent(option.value, e)}
+                    className={`absolute right-0 top-0 bottom-0 px-2 flex items-center justify-center hover:bg-black/10 rounded-r transition-colors ${
+                      isExcluded ? 'text-white' : 'text-gray-600'
+                    }`}
+                    title={isExcluded ? "Убрать исключение" : "Исключить событие"}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
             </div>
-            <p className="text-xs text-gray-500 mt-2">Выбрано: {activeEventLabels}</p>
+            <p className="text-xs text-gray-500 mt-2">{activeEventLabels}</p>
           </div>
         </CardContent>
       </Card>
