@@ -301,7 +301,6 @@ const LogsPage = () => {
   const [selectedEvents, setSelectedEvents] = useState([]);
   const [excludedEvents, setExcludedEvents] = useState([]);
   const [limit, setLimit] = useState(100);
-  const [isExpanded, setIsExpanded] = useState(null);
 
   const activeEventLabels = useMemo(() => {
     if (selectedEvents.length > 0) {

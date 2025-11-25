@@ -21,6 +21,8 @@ const statusMap = {
   active: { label: "Активно", variant: "default" },
   paused: { label: "Пауза", variant: "secondary" },
   completed: { label: "Завершено", variant: "outline" },
+  running: { label: "Выполняется", variant: "default" }, 
+  failed: { label: "Ошибка", variant: "destructive" },   
 };
 
 const runStatusMap = {
@@ -59,6 +61,8 @@ const SchedulerPage = () => {
   const [runs, setRuns] = useState({});
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(5000); // 5 секунд  
   const [form, setForm] = useState({
     name: "",
     project_id: "",
@@ -75,6 +79,16 @@ const SchedulerPage = () => {
       fetchProjects();
     }
   }, [canSchedule]);
+
+  useEffect(() => {
+    if (!autoRefresh || !canSchedule) return;
+
+    const interval = setInterval(() => {
+      fetchJobs(); // Обновляем список заданий
+    }, refreshInterval);
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, refreshInterval, canSchedule]);  
 
   const fetchJobs = async () => {
     try {
@@ -428,10 +442,22 @@ const SchedulerPage = () => {
 
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Запланированные задания</h2>
-        <Button variant="outline" onClick={fetchJobs}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Обновить
-        </Button>
+        <div className="flex gap-2">
+          {/* Переключатель автообновления */}
+          <Button 
+            variant={autoRefresh ? "default" : "outline"} 
+            size="sm"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+            {autoRefresh ? 'Автообновление статуса выполнения' : 'Включить автообновление'}
+          </Button>
+          
+          <Button variant="outline" size="sm" onClick={fetchJobs}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Обновить
+          </Button>
+        </div>
       </div>
 
       {jobs.length === 0 ? (
@@ -444,20 +470,24 @@ const SchedulerPage = () => {
       ) : (
         jobs.map((job) => (
           <Card key={job.id}>
-            <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+           <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <CardTitle>{job.name}</CardTitle>
                 <p className="text-sm text-gray-500">{projectName(job.project_id)}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge variant={statusMap[job.status]?.variant || "secondary"}>
+                  {/* Анимация для выполняющегося задания */}
+                  {job.status === "running" && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                   {statusMap[job.status]?.label || job.status}
                 </Badge>
                 <Badge variant="outline">
                   {JOB_TYPES.find((type) => type.value === job.job_type)?.label || job.job_type}
                 </Badge>
                 {job.next_run_at && (
-                  <Badge variant="outline">Следующий запуск: {formatDateTime(job.next_run_at)}</Badge>
+                  <Badge variant="outline">
+                    Следующий запуск: {formatDateTime(job.next_run_at)}
+                  </Badge>
                 )}
               </div>
             </CardHeader>
