@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta, time
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
 
-from models.project_models import SchedulerJob
+from models.execution_models import SchedulerJob
 
 
 def parse_datetime_param(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:

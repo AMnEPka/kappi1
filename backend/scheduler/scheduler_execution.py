@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Tuple, Optional, Dict, Any
 
 from config.config_init import db, logger
-from models.project_models import SchedulerJob, SchedulerRun
+from models.execution_models import SchedulerJob, SchedulerRun
 from models.auth_models import User
 from utils.db_utils import prepare_for_mongo, parse_from_mongo
 from utils.audit_utils import log_audit
