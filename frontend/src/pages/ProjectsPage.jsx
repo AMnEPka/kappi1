@@ -170,8 +170,8 @@ const fetchProjectUsers = async (projectId) => {
   const canExecuteProjects = hasPermission('projects_execute');
 
   return (
-    <div className="p-6">
-  <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+  <div className="flex justify-between items-center">
     <div>
       <h1 className="text-3xl font-bold">Проекты</h1>
       <p className="text-gray-600 mt-1">
