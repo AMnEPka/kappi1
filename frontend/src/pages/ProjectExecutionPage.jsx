@@ -57,7 +57,8 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       setHosts(hostsRes.data);
       setSystems(systemsRes.data);
       setScripts(scriptsRes.data);
-      setProjectUsers(usersRes.data);
+      // Ensure projectUsers is always an array
+      setProjectUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
       
       // Initialize edited tasks
       const tasksMap = {};
