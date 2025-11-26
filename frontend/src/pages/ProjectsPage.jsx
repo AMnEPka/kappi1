@@ -116,8 +116,9 @@ const fetchProjectUsers = async (projectId) => {
       
       // Refresh project users list
       const response = await api.get(`/api/projects/${selectedProject.id}/users`);
-      // Ensure projectUsers is always an array
-      setProjectUsers(Array.isArray(response.data) ? response.data : []);
+      // Ensure projectUsers is always an array (backend returns {users: [...]})
+      const users = response.data?.users || response.data;
+      setProjectUsers(Array.isArray(users) ? users : []);
     } catch (error) {
       console.error('Error granting access:', error);
       toast.error(error.response?.data?.detail || "Не удалось предоставить доступ");
@@ -131,8 +132,9 @@ const fetchProjectUsers = async (projectId) => {
       
       // Refresh project users list
       const response = await api.get(`/api/projects/${selectedProject.id}/users`);
-      // Ensure projectUsers is always an array
-      setProjectUsers(Array.isArray(response.data) ? response.data : []);
+      // Ensure projectUsers is always an array (backend returns {users: [...]})
+      const users = response.data?.users || response.data;
+      setProjectUsers(Array.isArray(users) ? users : []);
     } catch (error) {
       console.error('Error revoking access:', error);
       toast.error(error.response?.data?.detail || "Не удалось отозвать доступ");
