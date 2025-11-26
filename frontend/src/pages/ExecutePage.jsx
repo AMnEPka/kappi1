@@ -142,7 +142,7 @@ export default function ExecutePage() {
       </div>
     </div>
   );
-};
+}
 
 // History Page
 const HistoryPage = () => {

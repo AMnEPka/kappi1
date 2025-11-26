@@ -621,7 +621,7 @@ export default function ScriptsPage() {
       </div>
     </div>
   );
-};
+}
 
 // Execute Page
 const ExecutePage = () => {

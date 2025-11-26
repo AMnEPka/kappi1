@@ -177,7 +177,7 @@ export default function HistoryPage() {
       </div>
     </div>
   );
-};
+}
 
 // Main Layout
 const Layout = ({ children }) => {
