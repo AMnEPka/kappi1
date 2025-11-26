@@ -1503,7 +1503,6 @@ const Layout = ({ children }) => {
         </div>
       </div>
     </div>
-  </div>
 
   <div className="max-w-7xl mx-auto px-6 py-6">
     {children}
