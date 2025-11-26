@@ -54,6 +54,37 @@ export default function ProjectsPage({ onNavigate }) {
     }
   };
 
+// В функции загрузки пользователей проекта
+const fetchProjectUsers = async (projectId) => {
+  try {
+    // Получаем явно предоставленный доступ
+    const accessResponse = await api.get(`/api/projects/${projectId}/users`);
+    const explicitAccess = accessResponse.data;
+    
+    // Получаем создателя проекта
+    const projectResponse = await api.get(`/api/projects/${projectId}`);
+    const project = projectResponse.data;
+    const creatorId = project.created_by;
+    
+    // Получаем информацию о создателе
+    const creatorResponse = await api.get(`/api/users/${creatorId}`);
+    const creator = creatorResponse.data;
+    
+    // Объединяем создателя и пользователей с явным доступом
+    const allProjectUsers = [creator, ...explicitAccess];
+    
+    // Убираем дубликаты на случай если создатель уже в списке доступа
+    const uniqueUsers = allProjectUsers.filter((user, index, self) => 
+      index === self.findIndex(u => u.id === user.id)
+    );
+    
+    setProjectUsers(uniqueUsers);
+  } catch (error) {
+    console.error('Error fetching project users:', error);
+    setProjectUsers([]);
+  }
+};
+
   const openAccessDialog = async (project) => {
     setSelectedProject(project);
     setAccessDialogOpen(true);
@@ -284,18 +315,27 @@ export default function ProjectsPage({ onNavigate }) {
                   <div className="space-y-2">
                     {projectUsers.map((projectUser) => (
                       <div key={projectUser.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{projectUser.full_name}</p>
-                          <p className="text-sm text-gray-500">@{projectUser.username}</p>
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <p className="font-medium">{projectUser.full_name}</p>
+                            <p className="text-sm text-gray-500">@{projectUser.username}</p>
+                          </div>
+                          {projectUser.id === selectedProject?.created_by && (
+                            <Badge variant="outline" className="text-xs">
+                              Создатель
+                            </Badge>
+                          )}
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleRevokeAccess(projectUser.id)}
-                        >
-                          <UserMinus className="mr-1 h-3 w-3" />
-                          Отозвать
-                        </Button>
+                        {projectUser.id !== selectedProject?.created_by && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRevokeAccess(projectUser.id)}
+                          >
+                            <UserMinus className="mr-1 h-3 w-3" />
+                            Отозвать
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -308,12 +348,21 @@ export default function ProjectsPage({ onNavigate }) {
                   <UserPlus className="mr-2 h-4 w-4" />
                   Предоставить доступ
                 </h3>
-                {allUsers.filter(u => !projectUsers.find(pu => pu.id === u.id)).length === 0 ? (
-                  <p className="text-sm text-gray-500">Все пользователи уже имеют доступ</p>
+                {allUsers
+                  .filter(u => 
+                    // Исключаем пользователей которые уже имеют доступ
+                    !projectUsers.find(pu => pu.id === u.id) && 
+                    // Исключаем администраторов
+                    !u.is_admin
+                  ).length === 0 ? (
+                  <p className="text-sm text-gray-500">Нет пользователей для предоставления доступа</p>
                 ) : (
                   <div className="space-y-2">
                     {allUsers
-                      .filter(u => !projectUsers.find(pu => pu.id === u.id))
+                      .filter(u => 
+                        !projectUsers.find(pu => pu.id === u.id) && 
+                        !u.is_admin
+                      )
                       .map((availableUser) => (
                         <div key={availableUser.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
                           <div>
