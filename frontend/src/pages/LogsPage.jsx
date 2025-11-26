@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { RefreshCw, ShieldAlert, ChevronDown, Minus  } from "lucide-react";
+import { RefreshCw, ShieldAlert, ChevronDown, Minus, ChevronUp  } from "lucide-react";
 import { api } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -301,6 +301,7 @@ const LogsPage = () => {
   const [selectedEvents, setSelectedEvents] = useState([]);
   const [excludedEvents, setExcludedEvents] = useState([]);
   const [limit, setLimit] = useState(100);
+  const [isEventsExpanded, setIsEventsExpanded] = useState(false);
 
   const activeEventLabels = useMemo(() => {
     if (selectedEvents.length > 0) {
@@ -308,16 +309,16 @@ const LogsPage = () => {
         .filter((opt) => selectedEvents.includes(opt.value))
         .map((opt) => opt.label)
         .join(", ");
-      return `Выбрано: ${selected}`;
+      return `Выбранные типы событий: ${selected}`;
     }
     if (excludedEvents.length > 0) {
       const excluded = EVENT_OPTIONS
         .filter((opt) => excludedEvents.includes(opt.value))
         .map((opt) => opt.label)
         .join(", ");
-      return `Все события кроме: ${excluded}`;
+      return `Показываются все типы событий кроме: ${excluded}`;
     }
-    return "Все события";
+    return "Показываются все типы событий";
   }, [selectedEvents, excludedEvents]);
 
   const toggleEvent = (value) => {
@@ -479,39 +480,100 @@ const LogsPage = () => {
               />
             </div>
           </div>
-  
+
           <div>
             <label className="text-sm font-medium text-gray-600">Типы событий</label>
-            <div className="mt-2 flex flex-wrap gap-2">
-            {EVENT_OPTIONS.map((option) => {
-              const isSelected = selectedEvents.includes(option.value);
-              const isExcluded = excludedEvents.includes(option.value);
-              
-              return (
-                <div key={option.value} className="relative inline-flex">
+            <div className="mt-2">
+              {/* Первая строка - всегда видимая */}
+              <div className="flex flex-wrap gap-2">
+                {EVENT_OPTIONS.slice(0, 6).map((option) => { // Показываем первые 6 событий
+                  const isSelected = selectedEvents.includes(option.value);
+                  const isExcluded = excludedEvents.includes(option.value);
+                  
+                  return (
+                    <div key={option.value} className="relative inline-flex">
+                      <Button
+                        type="button"
+                        variant={isSelected ? "default" : isExcluded ? "destructive" : "outline"}
+                        onClick={() => toggleEvent(option.value)}
+                        className={`text-sm pr-8 ${isExcluded ? 'opacity-70' : ''}`}
+                      >
+                        {option.label}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={(e) => toggleExcludeEvent(option.value, e)}
+                        className={`absolute right-0 top-0 bottom-0 px-2 flex items-center justify-center hover:bg-black/10 rounded-r transition-colors ${
+                          isExcluded ? 'text-white' : 'text-gray-600'
+                        }`}
+                        title={isExcluded ? "Убрать исключение" : "Исключить событие"}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Кнопка для разворачивания/сворачивания остальных событий */}
+              {EVENT_OPTIONS.length > 6 && (
+                <>
                   <Button
                     type="button"
-                    variant={isSelected ? "default" : isExcluded ? "destructive" : "outline"}
-                    onClick={() => toggleEvent(option.value)}
-                    className={`text-sm pr-8 ${isExcluded ? 'opacity-70' : ''}`}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEventsExpanded(!isEventsExpanded)}
+                    className="text-xs text-gray-500 hover:text-gray-700 p-1 h-auto mt-2"
                   >
-                    {option.label}
+                    {isEventsExpanded ? (
+                      <>
+                        <ChevronUp className="h-3 w-3 mr-1" />
+                        Свернуть
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3 w-3 mr-1" />
+                        Показать еще {EVENT_OPTIONS.length - 6} типов событий
+                      </>
+                    )}
                   </Button>
-                  <button
-                    type="button"
-                    onClick={(e) => toggleExcludeEvent(option.value, e)}
-                    className={`absolute right-0 top-0 bottom-0 px-2 flex items-center justify-center hover:bg-black/10 rounded-r transition-colors ${
-                      isExcluded ? 'text-white' : 'text-gray-600'
-                    }`}
-                    title={isExcluded ? "Убрать исключение" : "Исключить событие"}
-                  >
-                    <Minus className="h-3 w-3" />
-                  </button>
-                </div>
-              );
-            })}
+
+                  {/* Остальные события (скрыты по умолчанию) */}
+                  {isEventsExpanded && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {EVENT_OPTIONS.slice(6).map((option) => {
+                        const isSelected = selectedEvents.includes(option.value);
+                        const isExcluded = excludedEvents.includes(option.value);
+                        
+                        return (
+                          <div key={option.value} className="relative inline-flex">
+                            <Button
+                              type="button"
+                              variant={isSelected ? "default" : isExcluded ? "destructive" : "outline"}
+                              onClick={() => toggleEvent(option.value)}
+                              className={`text-sm pr-8 ${isExcluded ? 'opacity-70' : ''}`}
+                            >
+                              {option.label}
+                            </Button>
+                            <button
+                              type="button"
+                              onClick={(e) => toggleExcludeEvent(option.value, e)}
+                              className={`absolute right-0 top-0 bottom-0 px-2 flex items-center justify-center hover:bg-black/10 rounded-r transition-colors ${
+                                isExcluded ? 'text-white' : 'text-gray-600'
+                              }`}
+                              title={isExcluded ? "Убрать исключение" : "Исключить событие"}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            <p className="text-xs text-gray-500 mt-2">{activeEventLabels}</p>
+            <p className="text-xs text-gray-500 mt-2 text-center">{activeEventLabels}</p>
           </div>
         </CardContent>
       </Card>

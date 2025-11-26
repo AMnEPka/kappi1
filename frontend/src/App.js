@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import "@/App.css";
+//import "@/App.css";
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -378,8 +378,31 @@ const HostsPage = () => {
                 <div className="space-y-2 text-sm">
                   <div>Пользователь: <strong>{host.username}</strong></div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{host.connection_type === "ssh" ? "Linux" : "Windows"}</Badge>
-                    <Badge variant="outline">{host.auth_type === "password" ? "Пароль" : "SSH ключ"}</Badge>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline">
+                          {host.connection_type === "ssh" ? "Linux" : "Windows"}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{"Тип ОС на хосте"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline">
+                          {host.auth_type === "password" ? "Пароль" : "SSH ключ"}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{"Тип аутентификации"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   </div>
                 </div>
               </CardContent>
@@ -1386,77 +1409,91 @@ const Layout = ({ children }) => {
   };
   
   return (
-<div className="min-h-screen bg-gray-50">
-  {/* Первая строка шапки - фиксированная */}
-  <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
-    <div className="max-w-7xl mx-auto px-6">
-      <div className="flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-3">
-          <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
-          <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
-        </Link>
-        
-        {/* Блок пользователя и выхода */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <User className="h-4 w-4 text-gray-500" />
-            <span className="text-gray-700 font-medium">{user?.full_name}</span>
-            {user?.is_admin && (
-              <Badge className="bg-yellow-400 text-white text-xs border-0">adm</Badge>
-            )}
+<div className="m-0 p-0 w-full">
+  {/* Первая строка шапки - FIXED */}
+{/* Обертка для всего приложения */}
+<div className="m-0 p-0 w-full min-h-screen bg-gray-50">
+  {/* Первая строка шапки */}
+  {/* Первая строка шапки - FIXED */}
+  <nav className="fixed top-0 left-0 right-0 z-50 w-full"> {/* ← ДОБАВИЛ w-full */}
+    <div className="bg-gray-50 border-b border-gray-200 w-full"> {/* ← И здесь w-full */}
+      <div className="max-w-7xl mx-auto px-6 w-full"> {/* ← И здесь w-full */}
+        <div className="flex items-center justify-between h-16">
+          <Link to="/" className="flex items-center gap-3">
+            <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
+            <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
+          </Link>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <User className="h-4 w-4 text-gray-500" />
+              <span className="text-gray-700 font-medium">{user?.full_name}</span>
+              {user?.is_admin && (
+                <Badge className="bg-yellow-400 text-white text-xs border-0">adm</Badge>
+              )}
+            </div>
+            <Button 
+              className="bg-yellow-400 hover:bg-gray-50 text-black"
+              size="sm"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              Выйти
+            </Button>
           </div>
-          <Button 
-            className="bg-yellow-400 hover:bg-white text-black"
-            size="sm"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4 mr-1" />
-            Выйти
-          </Button>
         </div>
       </div>
     </div>
   </nav>
 
-  {/* Вторая строка шапки - навигация - тоже фиксированная */}
-  <div className="sticky top-16 z-40 bg-yellow-400 shadow-md">
-    <div className="max-w-7xl mx-auto px-6">
-      <div className="flex items-center justify-between h-12">
-        {/* Основные пункты меню слева */}
-        <div className="flex items-center gap-1">
+  {/* Вторая строка шапки */}
+  <div className="fixed top-16 left-0 right-0 z-40 w-full"> 
+    <div className="bg-yellow-400 shadow-md rounded-b-lg header-div"> 
+      <div className="max-w-7xl mx-auto px-6 w-full content-div"> 
+        <div className="flex items-center justify-between h-12">
+          {/* Основные пункты меню слева */}
+          <div className="flex items-center gap-1">
             <Link to="/">
-              <Button 
-                variant="ghost" 
-                data-testid="nav-projects" 
-                className="text-black hover:bg-white h-12 px-4 font-medium"
+              <Button
+                variant={isActive('/') ? "default" : "ghost"}
+                data-testid="nav-projects"
+                className={`h-12 px-4 font-medium ${
+                  isActive('/') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                }`}
               >
                 <Briefcase className="mr-3 h-5 w-5" /> Проекты
               </Button>
             </Link>
             <Link to="/hosts">
-              <Button 
-                variant="ghost" 
-                data-testid="nav-hosts" 
-                className="text-black hover:bg-white h-12 px-4 font-medium"
+              <Button
+                variant={isActive('/hosts') ? "default" : "ghost"}
+                data-testid="nav-hosts"
+                className={`h-12 px-4 font-medium ${
+                  isActive('/hosts') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                }`}
               >
                 <Server className="mr-3 h-5 w-5" /> Хосты
               </Button>
             </Link>
             <Link to="/scripts">
-              <Button 
-                variant="ghost" 
-                data-testid="nav-scripts" 
-                className="text-black hover:bg-white h-12 px-4 font-medium"
+              <Button
+                variant={isActive('/scripts') ? "default" : "ghost"}
+                data-testid="nav-scripts"
+                className={`h-12 px-4 font-medium ${
+                  isActive('/scripts') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                }`}
               >
                 <FileCode className="mr-3 h-5 w-5" /> Проверки
               </Button>
             </Link>
             {showScheduler && (
               <Link to="/scheduler">
-                <Button 
-                  variant="ghost" 
-                  data-testid="nav-scheduler" 
-                  className="text-black hover:bg-white h-12 px-4 font-medium"
+                <Button
+                  variant={isActive('/scheduler') ? "default" : "ghost"}
+                  data-testid="nav-scheduler"
+                  className={`h-12 px-4 font-medium ${
+                    isActive('/scheduler') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                  }`}
                 >
                   <Calendar className="mr-3 h-8 w-8" /> Планировщик
                 </Button>
@@ -1464,10 +1501,12 @@ const Layout = ({ children }) => {
             )}
             {isAdmin && (
               <Link to="/logs">
-                <Button 
-                  variant="ghost" 
-                  data-testid="nav-logs" 
-                  className="text-black hover:bg-white h-12 px-4 py-3 font-medium"
+                <Button
+                  variant={isActive('/logs') ? "default" : "ghost"}
+                  data-testid="nav-logs"
+                  className={`h-12 px-4 py-3 font-medium ${
+                    isActive('/logs') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                  }`}
                 >
                   <FileText className="mr-3 h-8 w-8" /> Логи
                 </Button>
@@ -1503,10 +1542,16 @@ const Layout = ({ children }) => {
         </div>
       </div>
     </div>
-
-  <div className="max-w-7xl mx-auto px-6 py-6">
-    {children}
   </div>
+
+  {/* Основной контент */}
+  <div className="pt-32">
+    <div className="max-w-7xl mx-auto px-6 content-div">
+      {children}
+    </div>
+  </div>
+</div>
+
 </div>
   );
 };

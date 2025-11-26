@@ -257,7 +257,7 @@ const fetchProjectUsers = async (projectId) => {
                       size="sm"
                       onClick={() => onNavigate('project-execute', project.id)}
                       className="flex-1"
-                      variant="yellow"
+                      variant="outline_green"
                     >
                       <Play className="mr-1 h-3 w-3" />
                       Запустить
@@ -313,7 +313,7 @@ const fetchProjectUsers = async (projectId) => {
                   Пользователи с доступом ({projectUsers.length})
                 </h3>
                 {projectUsers.length === 0 ? (
-                  <p className="text-sm text-gray-500">Нет пользователей с доступом</p>
+                  <p className="text-sm text-gray-500">Нет пользователей с доступом (Администраторы не отображаются)</p>
                 ) : (
                   <div className="space-y-2">
                     {projectUsers.map((projectUser) => (
