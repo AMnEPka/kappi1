@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon, CheckCircle, XCircle, Loader2} from "lucide-react";
+import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon, CheckCircle, XCircle, Loader2, Plus, X} from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import DateTimePicker from '../components/ui/datetime-picker';
 
@@ -63,6 +63,7 @@ const SchedulerPage = () => {
   const [editingJob, setEditingJob] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(3000); // 3 секунды
+  const [showJobForm, setShowJobForm] = useState(false);
   const [form, setForm] = useState({
     name: "",
     project_id: "",
@@ -121,6 +122,7 @@ const SchedulerPage = () => {
       recurrence_time: "10:00",
       recurrence_start_date: "",
     });
+    setShowJobForm(false);
   };
 
   const handleSubmit = async (e) => {
@@ -274,172 +276,208 @@ const SchedulerPage = () => {
 
   return (
     <div className="space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>{editingJob ? "Редактирование задания" : "Новое задание"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Название</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Проверка ежедневная"
-                  required
-                />
-              </div>
-              <div>
-                <Label>Проект</Label>
-                {editingJob ? (
-                  // При редактировании показываем заблокированное поле
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={projects.find(p => p.id === form.project_id)?.name || form.project_id}
-                      disabled
-                      className="bg-gray-100"
-                    />
-                    <Badge variant="secondary" className="whitespace-nowrap">
-                      Нельзя изменить
-                    </Badge>
-                  </div>
-                ) : (
-                  // При создании - обычный выбор
-                  <select
-                    className="w-full h-10 border rounded px-3"
-                    value={form.project_id}
-                    onChange={(e) => setForm({ ...form, project_id: e.target.value })}
+      {/* Большая кнопка "Новое задание" */}
+      {!editingJob && !showJobForm && (
+        <div className="flex justify-center py-12">
+          <Button
+            type="button"
+            onClick={() => setShowJobForm(true)}
+            className="h-16 px-8 text-lg"
+            size="lg"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Новое задание
+          </Button>
+        </div>
+      )}
+  
+      {/* Карточка формы (показывается при создании или редактировании) */}
+      {(showJobForm || editingJob) && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{editingJob ? "Редактирование задания" : "Новое задание"}</CardTitle>
+            {!editingJob && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowJobForm(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Название</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Проверка ежедневная"
                     required
-                  >
-                    <option value="">Выберите проект</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <Label>Тип запуска</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {JOB_TYPES.map((type) => (
-                  <Button
-                    key={type.value}
-                    type="button"
-                    variant={form.job_type === type.value ? "default" : "outline"}
-                    onClick={() => setForm({ ...form, job_type: type.value })}
-                  >
-                    {type.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {form.job_type === "one_time" && (
-              <div className="space-y-2"> {/* ← добавьте этот класс */}
-                <Label>Дата и время запуска</Label>
-                <div><DateTimePicker
-                  value={form.run_at}
-                  onChange={(value) => setForm({ ...form, run_at: value })}
-                  required
-                /></div>
-              </div>
-            )}
-
-            {form.job_type === "multi_run" && (
-              <div className="space-y-2">
-                <Label>Список запусков</Label>
-                {form.run_times.map((value, index) => (
-                  <div key={index} className="flex gap-2 items-center"> {/* ← изменено на items-center */}
-                    {/* Нумерация в кружке */}
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium flex-shrink-0">
-                      {index + 1}
+                  />
+                </div>
+                <div>
+                  <Label>Проект</Label>
+                  {editingJob ? (
+                    // При редактировании показываем заблокированное поле
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={projects.find(p => p.id === form.project_id)?.name || form.project_id}
+                        disabled
+                        className="bg-gray-100"
+                      />
+                      <Badge variant="secondary" className="whitespace-nowrap">
+                        Нельзя изменить
+                      </Badge>
                     </div>
-                    <div className="flex items-center gap-2 flex-1">
-                      <div className="flex-1">
-                        <DateTimePicker
-                          value={value}
-                          onChange={(newValue) => {
-                            const next = [...form.run_times];
-                            next[index] = newValue;
-                            setForm({ ...form, run_times: next });
-                          }}
-                          required
-                        />
-                      </div>
-                      {form.run_times.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const next = form.run_times.filter((_, i) => i !== index);
-                            setForm({ ...form, run_times: next.length ? next : [""] });
-                          }}
-                          className="flex-shrink-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setForm({ ...form, run_times: [...form.run_times, ""] })}
-                  className="ml-8" /* ← увеличенный отступ для кружковой нумерации */
-                >
-                  Добавить запуск
-                </Button>
-              </div>
-            )}
-
-            {form.job_type === "recurring" && (
-              <div className="space-y-2">
-                <Label>Ежедневный запуск</Label>
-                <div className="flex flex-wrap gap-3 items-end">
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-sm">Время</Label>
-                    <Input
-                      type="time"
-                      value={form.recurrence_time}
-                      onChange={(e) => setForm({ ...form, recurrence_time: e.target.value })}
+                  ) : (
+                    // При создании - обычный выбор
+                    <select
+                      className="w-full h-10 border rounded px-3"
+                      value={form.project_id}
+                      onChange={(e) => setForm({ ...form, project_id: e.target.value })}
                       required
-                      className="w-[200px]"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-sm">Дата начала (опционально)</Label>
-                    <Input
-                      type="date"
-                      value={form.recurrence_start_date}
-                      onChange={(e) => setForm({ ...form, recurrence_start_date: e.target.value })}
-                      className="w-[200px]"
-                    />
-                  </div>
+                    >
+                      <option value="">Выберите проект</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button type="submit" disabled={loading}>
-                {editingJob ? "Сохранить изменения" : "Создать задание"}
-              </Button>
-              {editingJob && (
-                <Button type="button" variant="ghost" onClick={resetForm}>
-                  Отмена
-                </Button>
+  
+              <div>
+                <Label>Тип запуска</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {JOB_TYPES.map((type) => (
+                    <Button
+                      key={type.value}
+                      type="button"
+                      variant={form.job_type === type.value ? "default" : "outline"}
+                      onClick={() => setForm({ ...form, job_type: type.value })}
+                    >
+                      {type.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+  
+              {form.job_type === "one_time" && (
+                <div className="space-y-2">
+                  <Label>Дата и время запуска</Label>
+                  <div><DateTimePicker
+                    value={form.run_at}
+                    onChange={(value) => setForm({ ...form, run_at: value })}
+                    required
+                  /></div>
+                </div>
               )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
+  
+              {form.job_type === "multi_run" && (
+                <div className="space-y-2">
+                  <Label>Список запусков</Label>
+                  {form.run_times.map((value, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      {/* Нумерация в кружке */}
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium flex-shrink-0">
+                        {index + 1}
+                      </div>
+                      <div className="flex items-center gap-2 flex-1">
+                        <div className="flex-1">
+                          <DateTimePicker
+                            value={value}
+                            onChange={(newValue) => {
+                              const next = [...form.run_times];
+                              next[index] = newValue;
+                              setForm({ ...form, run_times: next });
+                            }}
+                            required
+                          />
+                        </div>
+                        {form.run_times.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const next = form.run_times.filter((_, i) => i !== index);
+                              setForm({ ...form, run_times: next.length ? next : [""] });
+                            }}
+                            className="flex-shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setForm({ ...form, run_times: [...form.run_times, ""] })}
+                    className="ml-8"
+                  >
+                    Добавить запуск
+                  </Button>
+                </div>
+              )}
+  
+              {form.job_type === "recurring" && (
+                <div className="space-y-2">
+                  <Label>Ежедневный запуск</Label>
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-sm">Время</Label>
+                      <Input
+                        type="time"
+                        value={form.recurrence_time}
+                        onChange={(e) => setForm({ ...form, recurrence_time: e.target.value })}
+                        required
+                        className="w-[200px]"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-sm">Дата начала (опционально)</Label>
+                      <Input
+                        type="date"
+                        value={form.recurrence_start_date}
+                        onChange={(e) => setForm({ ...form, recurrence_start_date: e.target.value })}
+                        className="w-[200px]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+  
+              <div className="flex gap-2">
+                <Button type="submit" disabled={loading}>
+                  {editingJob ? "Сохранить изменения" : "Создать задание"}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => {
+                    if (editingJob) {
+                      resetForm();
+                    } else {
+                      setShowJobForm(false);
+                    }
+                  }}
+                >
+                  {editingJob ? "Отмена" : "Закрыть"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+  
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Запланированные задания</h2>
         <div className="flex gap-2">
@@ -459,7 +497,7 @@ const SchedulerPage = () => {
           </Button>
         </div>
       </div>
-
+  
       {jobs.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
@@ -512,7 +550,7 @@ const SchedulerPage = () => {
                   <Trash2 className="h-4 w-4 mr-2" /> Удалить
                 </Button>
               </div>
-
+  
               {expandedJobId === job.id && (
                 <div className="border rounded-lg p-4 bg-gray-50 space-y-2">
                   <h4 className="font-semibold">Запуски</h4>
@@ -525,7 +563,7 @@ const SchedulerPage = () => {
                         label: run.status, 
                         showResults: false 
                       };
-
+  
                       // Маппинг для вариантов Badge
                       const statusVariant = {
                         'running': 'secondary',
@@ -533,7 +571,7 @@ const SchedulerPage = () => {
                         'paused': 'secondary', 
                         'failed': 'destructive'
                       };
-
+  
                       return (
                         <div key={run.id} className="flex flex-col md:flex-row md:items-center md:justify-between py-2 border-b last:border-0">
                           <div className="flex-1">
