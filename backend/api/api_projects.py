@@ -273,7 +273,7 @@ async def grant_project_access(project_id: str, user_id: str, current_user: User
         "project_id": project_id,
         "user_id": user_id,
         "granted_by": current_user.id,
-        "granted_at": prepare_for_mongo({"granted_at": Project().created_at})["granted_at"]
+        "granted_at": prepare_for_mongo({"granted_at": datetime.now()})["granted_at"]
     }
     await db.project_access.insert_one(access_doc)
     
