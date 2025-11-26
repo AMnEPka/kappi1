@@ -7,6 +7,30 @@ import { toast } from "sonner";
 import { api } from '../config/api';
 
 export default function HistoryPage() {
+  const [executions, setExecutions] = useState([]);
+  const [hosts, setHosts] = useState({});
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [executionsRes, hostsRes] = await Promise.all([
+        api.get(`/api/executions`),
+        api.get(`/api/hosts`)
+      ]);
+      setExecutions(executionsRes.data);
+      
+      // Create hosts lookup map
+      const hostsMap = {};
+      hostsRes.data.forEach(host => {
+        hostsMap[host.id] = host;
+      });
+      setHosts(hostsMap);
+    } catch (error) {
+      toast.error("Ошибка загрузки истории");
+    }
   };
 
   // Get badge configuration by check status
@@ -177,29 +201,6 @@ export default function HistoryPage() {
       </div>
     </div>
   );
-}
+};
 
 // Main Layout
-const Layout = ({ children }) => {
-  const location = useLocation();
-  const { user, logout, hasPermission, isAdmin } = useAuth();
-  const navigate = useNavigate();
-  const showScheduler = isAdmin || hasPermission('projects_execute');
-  
-  const isActive = (path) => {
-    if (path === '/hosts') return location.pathname === '/hosts';
-    if (path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(path);
-  };
-  
-  const navLinkClass = (path) => {
-    return isActive(path) 
-      ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700" 
-      : "hover:bg-gray-100";
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-  
