@@ -15,14 +15,12 @@ const AdminPage = () => {
 
   if (!hasAnyPermission(['categories_manage', 'users_manage', 'roles_manage'])) {
     return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center h-64">
-            <Lock className="h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-gray-400 text-sm">У вас нет прав для доступа к панели администратора</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center h-64">
+          <Lock className="h-12 w-12 text-gray-400 mb-4" />
+          <p className="text-gray-400 text-sm">У вас нет прав для доступа к панели администратора</p>
+        </CardContent>
+      </Card>
     );
   }
 
