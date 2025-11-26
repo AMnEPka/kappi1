@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,7 @@ const SchedulerPage = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(3000); // 3 секунды
   const [showJobForm, setShowJobForm] = useState(false);
+  const [hideCompleted, setHideCompleted] = useState(false);
   const [form, setForm] = useState({
     name: "",
     project_id: "",
@@ -124,6 +125,17 @@ const SchedulerPage = () => {
     });
     setShowJobForm(false);
   };
+
+  const filteredJobs = useMemo(() => {
+    if (!hideCompleted) return jobs;
+    
+    return jobs.filter(job => {
+      // Не скрываем задания, которые не являются завершенными одиночными запусками
+      if (job.job_type !== 'one_time') return true;
+      if (job.status !== 'completed') return true;
+      return false;
+    });
+  }, [jobs, hideCompleted]);  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -480,7 +492,27 @@ const SchedulerPage = () => {
   
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Запланированные задания</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Переключатель скрытия выполненных - слайдер */}
+          <div className="flex items-center gap-2 mr-4">
+            <button
+              type="button"
+              onClick={() => setHideCompleted(!hideCompleted)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                hideCompleted ? 'bg-primary' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  hideCompleted ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <label className="text-sm text-gray-700 whitespace-nowrap cursor-pointer" onClick={() => setHideCompleted(!hideCompleted)}>
+              Скрыть выполненные
+            </label>
+          </div>
+          
           {/* Переключатель автообновления */}
           <Button 
             variant={autoRefresh ? "default" : "outline"} 
@@ -488,7 +520,7 @@ const SchedulerPage = () => {
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
-            {autoRefresh ? 'Автообновление статусов выполнения заданий' : 'Включить автообновление статусов выполнения заданий'}
+            {autoRefresh ? 'Автообновление' : 'Включить автообновление'}
           </Button>
           
           <Button variant="outline" size="sm" onClick={fetchJobs}>
@@ -497,12 +529,17 @@ const SchedulerPage = () => {
           </Button>
         </div>
       </div>
-  
-      {jobs.length === 0 ? (
+
+      {filteredJobs.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
             <CalendarClock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p>Пока нет запланированных запусков</p>
+            <p>
+              {hideCompleted && jobs.length > 0 
+                ? "Нет активных заданий" 
+                : "Пока нет запланированных запусков"
+              }
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -519,129 +556,160 @@ const SchedulerPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {jobs.map((job) => (
-                <>
-                  <tr key={job.id} className="hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <div className="font-medium">{job.name}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="text-sm text-gray-600">{projectName(job.project_id)}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline" className="whitespace-nowrap">
-                        {JOB_TYPES.find((type) => type.value === job.job_type)?.label || job.job_type}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant={statusMap[job.status]?.variant || "secondary"} className="flex items-center gap-1 w-fit">
-                        {job.status === "running" && <Loader2 className="h-3 w-3 animate-spin" />}
-                        {statusMap[job.status]?.label || job.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      {job.next_run_at ? (
-                        <div className="text-sm text-gray-600">{formatDateTime(job.next_run_at)}</div>
-                      ) : (
-                        <div className="text-sm text-gray-400">—</div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex gap-1 flex-wrap">
-                        {job.status === "active" ? (
-                          <Button variant="ghost" size="sm" onClick={() => handlePause(job.id)} title="Пауза">
-                            <PauseCircle className="h-4 w-4" />
-                          </Button>
-                        ) : job.status === "paused" ? (
-                          <Button variant="ghost" size="sm" onClick={() => handleResume(job.id)} title="Возобновить">
-                            <PlayCircle className="h-4 w-4" />
-                          </Button>
-                        ) : null}
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(job)} title="Изменить">
-                          <Repeat className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => toggleHistory(job.id)} title="История запусков">
-                          <HistoryIcon className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(job.id)} title="Удалить">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                  
-                  {/* Строка с историей запусков */}
-                  {expandedJobId === job.id && (
-                    <tr>
-                      <td colSpan={6} className="p-4 bg-gray-50">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">История запусков</h4>
-                          {(runs[job.id] || []).length === 0 ? (
-                            <p className="text-sm text-gray-500">Запусков пока не было</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {(runs[job.id] || []).map((run) => {
-                                const statusInfo = runStatusMap[run.status] || { 
-                                  label: run.status, 
-                                  showResults: false 
-                                };
-
-                                const statusVariant = {
-                                  'running': 'secondary',
-                                  'success': 'default',
-                                  'paused': 'secondary', 
-                                  'failed': 'destructive'
-                                };
-
-                                return (
-                                  <div key={run.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-3">
-                                        <p className="font-medium text-sm">{formatDateTime(run.started_at)}</p>
-                                        <Badge 
-                                          variant={statusVariant[run.status] || 'secondary'} 
-                                          className="flex items-center gap-1"
-                                        >
-                                          {statusIcons[run.status]}
-                                          {statusInfo.label}
-                                        </Badge>
-                                        {run.finished_at && (
-                                          <span className="text-xs text-gray-500">
-                                            Завершено: {formatDateTime(run.finished_at)}
-                                          </span>
-                                        )}
-                                      </div>
-                                      {run.session_id && (
-                                        <p className="text-xs text-gray-500 mt-1">Session ID: {run.session_id}</p>
-                                      )}
-                                      {run.error && (
-                                        <p className="text-xs text-red-500 mt-1">{run.error}</p>
-                                      )}
-                                    </div>
-                                    
-                                    {statusInfo.showResults && run.session_id && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          navigate(`/projects/${job.project_id}/results?session=${run.session_id}&returnTo=scheduler`);
-                                        }}
-                                        className="whitespace-nowrap"
-                                      >
-                                        Перейти к результатам
-                                      </Button>
-                                    )}
-                                  </div>
-                                );
-                              })}
+              {filteredJobs.map((job) => {
+                // Проверяем, нужно ли блокировать кнопку "Изменить"
+                const isOneTimeCompleted = job.job_type === 'one_time' && job.status === 'completed';
+                
+                return (
+                  <React.Fragment key={job.id}>
+                    <tr className="hover:bg-gray-50">
+                      <td className="py-3 px-4">
+                        <div className="font-medium">{job.name}</div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-sm text-gray-600">{projectName(job.project_id)}</div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant="outline" className="whitespace-nowrap">
+                          {JOB_TYPES.find((type) => type.value === job.job_type)?.label || job.job_type}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant={statusMap[job.status]?.variant || "secondary"} className="flex items-center gap-1 w-fit">
+                          {job.status === "running" && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {statusMap[job.status]?.label || job.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        {job.next_run_at ? (
+                          <div className="text-sm text-gray-600">{formatDateTime(job.next_run_at)}</div>
+                        ) : (
+                          <div className="text-sm text-gray-400">—</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex gap-1 flex-wrap">
+                          {job.status === "active" ? (
+                            <div className="relative group">
+                              <Button variant="ghost" size="sm" onClick={() => handlePause(job.id)} title="Пауза">
+                                <PauseCircle className="h-4 w-4" />
+                              </Button>
                             </div>
-                          )}
+                          ) : job.status === "paused" ? (
+                            <div className="relative group">
+                              <Button variant="ghost" size="sm" onClick={() => handleResume(job.id)} title="Возобновить">
+                                <PlayCircle className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : null}
+                          
+                          {/* Кнопка "Изменить" - заблокирована для завершенных одиночных запусков */}
+                          <div className="relative group">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => !isOneTimeCompleted && handleEdit(job)} 
+                              disabled={isOneTimeCompleted}
+                              className={isOneTimeCompleted ? "opacity-50 cursor-not-allowed" : ""}
+                            >
+                              <Repeat className="h-4 w-4" />
+                            </Button>
+                            {isOneTimeCompleted && (
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                Редактирование недоступно для завершенных одиночных запусков
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="relative group">
+                            <Button variant="ghost" size="sm" onClick={() => toggleHistory(job.id)} title="История">
+                              <HistoryIcon className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          <div className="relative group">
+                            <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(job.id)} title="Удалить">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </td>
                     </tr>
-                  )}
-                </>
-              ))}
+                    
+                    {/* Строка с историей запусков */}
+                    {expandedJobId === job.id && (
+                      <tr>
+                        <td colSpan={6} className="p-4 bg-gray-50">
+                          <div className="space-y-3">
+                            <h4 className="font-semibold text-sm">История запусков</h4>
+                            {(runs[job.id] || []).length === 0 ? (
+                              <p className="text-sm text-gray-500">Запусков пока не было</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {(runs[job.id] || []).map((run) => {
+                                  const statusInfo = runStatusMap[run.status] || { 
+                                    label: run.status, 
+                                    showResults: false 
+                                  };
+
+                                  const statusVariant = {
+                                    'running': 'secondary',
+                                    'success': 'default',
+                                    'paused': 'secondary', 
+                                    'failed': 'destructive'
+                                  };
+
+                                  return (
+                                    <div key={run.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-3">
+                                          <p className="font-medium text-sm">{formatDateTime(run.started_at)}</p>
+                                          <Badge 
+                                            variant={statusVariant[run.status] || 'secondary'} 
+                                            className="flex items-center gap-1"
+                                          >
+                                            {statusIcons[run.status]}
+                                            {statusInfo.label}
+                                          </Badge>
+                                          {run.finished_at && (
+                                            <span className="text-xs text-gray-500">
+                                              Завершено: {formatDateTime(run.finished_at)}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {run.session_id && (
+                                          <p className="text-xs text-gray-500 mt-1">Session ID: {run.session_id}</p>
+                                        )}
+                                        {run.error && (
+                                          <p className="text-xs text-red-500 mt-1">{run.error}</p>
+                                        )}
+                                      </div>
+                                      
+                                      {statusInfo.showResults && run.session_id && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            navigate(`/projects/${job.project_id}/results?session=${run.session_id}&returnTo=scheduler`);
+                                          }}
+                                          className="whitespace-nowrap"
+                                        >
+                                          Перейти к результатам
+                                        </Button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
