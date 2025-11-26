@@ -99,7 +99,8 @@ export default function ProjectsPage({ onNavigate }) {
       
       // Refresh project users list
       const response = await api.get(`/api/projects/${selectedProject.id}/users`);
-      setProjectUsers(response.data);
+      // Ensure projectUsers is always an array
+      setProjectUsers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error revoking access:', error);
       toast.error(error.response?.data?.detail || "Не удалось отозвать доступ");
