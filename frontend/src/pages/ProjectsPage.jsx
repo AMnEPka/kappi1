@@ -98,8 +98,9 @@ const fetchProjectUsers = async (projectId) => {
       ]);
       
       setAllUsers(usersRes.data.filter(u => u.is_active));
-      // Ensure projectUsers is always an array
-      setProjectUsers(Array.isArray(projectUsersRes.data) ? projectUsersRes.data : []);
+      // Ensure projectUsers is always an array (backend returns {users: [...]})
+      const users = projectUsersRes.data?.users || projectUsersRes.data;
+      setProjectUsers(Array.isArray(users) ? users : []);
     } catch (error) {
       console.error('Error fetching access data:', error);
       toast.error("Не удалось загрузить данные доступа");
