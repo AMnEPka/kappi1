@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from '../config/api';
 
 export default function ScriptsPage() {
+  const { hasPermission, isAdmin, user } = useAuth();
   const [scripts, setScripts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
@@ -621,29 +621,5 @@ export default function ScriptsPage() {
       </div>
     </div>
   );
+};
 }
-
-// Execute Page
-const ExecutePage = () => {
-  const navigate = useNavigate();
-  const [scripts, setScripts] = useState([]);
-  const [hosts, setHosts] = useState([]);
-  const [selectedScript, setSelectedScript] = useState("");
-  const [selectedHosts, setSelectedHosts] = useState([]);
-  const [isExecuting, setIsExecuting] = useState(false);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [scriptsRes, hostsRes] = await Promise.all([
-        api.get(`/api/scripts`),
-        api.get(`/api/hosts`)
-      ]);
-      setScripts(scriptsRes.data);
-      setHosts(hostsRes.data);
-    } catch (error) {
-      toast.error("Ошибка загрузки данных");
-    }

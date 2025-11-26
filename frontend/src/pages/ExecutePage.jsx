@@ -10,6 +10,30 @@ import { Play } from "lucide-react";
 import { api } from '../config/api';
 
 export default function ExecutePage() {
+  const navigate = useNavigate();
+  const [scripts, setScripts] = useState([]);
+  const [hosts, setHosts] = useState([]);
+  const [selectedScript, setSelectedScript] = useState("");
+  const [selectedHosts, setSelectedHosts] = useState([]);
+  const [isExecuting, setIsExecuting] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [scriptsRes, hostsRes] = await Promise.all([
+        api.get(`/api/scripts`),
+        api.get(`/api/hosts`)
+      ]);
+      setScripts(scriptsRes.data);
+      setHosts(hostsRes.data);
+    } catch (error) {
+      toast.error("Ошибка загрузки данных");
+    }
+  };
+
   const handleExecute = async () => {
     if (!selectedScript || selectedHosts.length === 0) {
       toast.error("Выберите проверку и хосты");
@@ -142,29 +166,5 @@ export default function ExecutePage() {
       </div>
     </div>
   );
+};
 }
-
-// History Page
-const HistoryPage = () => {
-  const [executions, setExecutions] = useState([]);
-  const [hosts, setHosts] = useState({});
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [executionsRes, hostsRes] = await Promise.all([
-        api.get(`/api/executions`),
-        api.get(`/api/hosts`)
-      ]);
-      setExecutions(executionsRes.data);
-      
-      // Create hosts lookup map
-      const hostsMap = {};
-      hostsRes.data.forEach(host => {
-        hostsMap[host.id] = host;
-      });
-      setHosts(hostsMap);
-    } catch (error) {
