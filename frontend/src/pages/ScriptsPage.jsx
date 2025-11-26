@@ -647,4 +647,3 @@ const ExecutePage = () => {
     } catch (error) {
       toast.error("Ошибка загрузки данных");
     }
-}

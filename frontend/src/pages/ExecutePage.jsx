@@ -168,4 +168,3 @@ const HistoryPage = () => {
       });
       setHosts(hostsMap);
     } catch (error) {
-}
