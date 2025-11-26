@@ -1505,8 +1505,8 @@ const Layout = ({ children }) => {
     </div>
   </div>
 
-  {/* Основной контент - добавляем отступ сверху равный высоте обеих шапок */}
-  <div className="container mx-auto px-4 pt-28">
+  {/* Основной контент */}
+  <div className="max-w-7xl mx-auto px-6 py-6">
     {children}
   </div>
 </div>
