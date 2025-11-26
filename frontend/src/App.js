@@ -22,6 +22,29 @@ import HistoryPage from "@/pages/HistoryPage";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+const Layout = ({ children }) => {
+  const location = useLocation();
+  const { user, logout, hasPermission, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const showScheduler = isAdmin || hasPermission('projects_execute');
+  
+  const isActive = (path) => {
+    if (path === '/hosts') return location.pathname === '/hosts';
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
+  
+  const navLinkClass = (path) => {
+    return isActive(path) 
+      ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700" 
+      : "hover:bg-gray-100";
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+  
   return (
 <div className="m-0 p-0 w-full">
   {/* Первая строка шапки - FIXED */}
