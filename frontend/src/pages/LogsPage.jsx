@@ -573,7 +573,7 @@ const LogsPage = () => {
                 </>
               )}
             </div>
-            <p className="text-xs text-gray-500 mt-2 text-center">{activeEventLabels}</p>
+            <p className="text-xs text-gray-500 mt-2 text-center"><b>{activeEventLabels}</b></p>
           </div>
         </CardContent>
       </Card>

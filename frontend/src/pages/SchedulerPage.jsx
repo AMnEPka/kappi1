@@ -488,7 +488,7 @@ const SchedulerPage = () => {
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
-            {autoRefresh ? 'Автообновление статуса выполнения' : 'Включить автообновление'}
+            {autoRefresh ? 'Автообновление статусов выполнения заданий' : 'Включить автообновление статусов выполнения заданий'}
           </Button>
           
           <Button variant="outline" size="sm" onClick={fetchJobs}>
@@ -506,126 +506,148 @@ const SchedulerPage = () => {
           </CardContent>
         </Card>
       ) : (
-        jobs.map((job) => (
-          <Card key={job.id}>
-           <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <CardTitle>{job.name}</CardTitle>
-                <p className="text-sm text-gray-500">{projectName(job.project_id)}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant={statusMap[job.status]?.variant || "secondary"}>
-                  {/* Анимация для выполняющегося задания */}
-                  {job.status === "running" && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                  {statusMap[job.status]?.label || job.status}
-                </Badge>
-                <Badge variant="outline">
-                  {JOB_TYPES.find((type) => type.value === job.job_type)?.label || job.job_type}
-                </Badge>
-                {job.next_run_at && (
-                  <Badge variant="outline">
-                    Следующий запуск: {formatDateTime(job.next_run_at)}
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {job.status === "active" ? (
-                  <Button variant="outline" size="sm" onClick={() => handlePause(job.id)}>
-                    <PauseCircle className="h-4 w-4 mr-2" /> Пауза
-                  </Button>
-                ) : job.status === "paused" ? (
-                  <Button variant="outline" size="sm" onClick={() => handleResume(job.id)}>
-                    <PlayCircle className="h-4 w-4 mr-2" /> Возобновить
-                  </Button>
-                ) : null}
-                <Button variant="outline" size="sm" onClick={() => handleEdit(job)}>
-                  <Repeat className="h-4 w-4 mr-2" /> Изменить
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => toggleHistory(job.id)}>
-                  <HistoryIcon className="h-4 w-4 mr-2" /> История
-                </Button>
-                <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(job.id)}>
-                  <Trash2 className="h-4 w-4 mr-2" /> Удалить
-                </Button>
-              </div>
-  
-              {expandedJobId === job.id && (
-                <div className="border rounded-lg p-4 bg-gray-50 space-y-2">
-                  <h4 className="font-semibold">Запуски</h4>
-                  {(runs[job.id] || []).length === 0 ? (
-                    <p className="text-sm text-gray-500">Запусков пока не было</p>
-                  ) : (
-                    (runs[job.id] || []).map((run) => {
-                      // Используем готовый маппинг из runStatusMap
-                      const statusInfo = runStatusMap[run.status] || { 
-                        label: run.status, 
-                        showResults: false 
-                      };
-  
-                      // Маппинг для вариантов Badge
-                      const statusVariant = {
-                        'running': 'secondary',
-                        'success': 'default',
-                        'paused': 'secondary', 
-                        'failed': 'destructive'
-                      };
-  
-                      return (
-                        <div key={run.id} className="flex flex-col md:flex-row md:items-center md:justify-between py-2 border-b last:border-0">
-                          <div className="flex-1">
-                            <p className="font-medium">{formatDateTime(run.started_at)}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge 
-                                variant={statusVariant[run.status] || 'secondary'} 
-                                className="flex items-center gap-1"
-                              >
-                                {statusIcons[run.status]}
-                                {statusInfo.label}
-                              </Badge>
-                              {run.finished_at && (
-                                <span className="text-xs text-gray-500">
-                                  Завершено: {formatDateTime(run.finished_at)}
-                                </span>
-                              )}
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left py-3 px-4 font-semibold text-sm">Задание</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm">Проект</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm">Тип</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm">Статус</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm">Следующий запуск</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {jobs.map((job) => (
+                <>
+                  <tr key={job.id} className="hover:bg-gray-50">
+                    <td className="py-3 px-4">
+                      <div className="font-medium">{job.name}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="text-sm text-gray-600">{projectName(job.project_id)}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant="outline" className="whitespace-nowrap">
+                        {JOB_TYPES.find((type) => type.value === job.job_type)?.label || job.job_type}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant={statusMap[job.status]?.variant || "secondary"} className="flex items-center gap-1 w-fit">
+                        {job.status === "running" && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {statusMap[job.status]?.label || job.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      {job.next_run_at ? (
+                        <div className="text-sm text-gray-600">{formatDateTime(job.next_run_at)}</div>
+                      ) : (
+                        <div className="text-sm text-gray-400">—</div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex gap-1 flex-wrap">
+                        {job.status === "active" ? (
+                          <Button variant="ghost" size="sm" onClick={() => handlePause(job.id)} title="Пауза">
+                            <PauseCircle className="h-4 w-4" />
+                          </Button>
+                        ) : job.status === "paused" ? (
+                          <Button variant="ghost" size="sm" onClick={() => handleResume(job.id)} title="Возобновить">
+                            <PlayCircle className="h-4 w-4" />
+                          </Button>
+                        ) : null}
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(job)} title="Изменить">
+                          <Repeat className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => toggleHistory(job.id)} title="История запусков">
+                          <HistoryIcon className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(job.id)} title="Удалить">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                  
+                  {/* Строка с историей запусков */}
+                  {expandedJobId === job.id && (
+                    <tr>
+                      <td colSpan={6} className="p-4 bg-gray-50">
+                        <div className="space-y-3">
+                          <h4 className="font-semibold text-sm">История запусков</h4>
+                          {(runs[job.id] || []).length === 0 ? (
+                            <p className="text-sm text-gray-500">Запусков пока не было</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {(runs[job.id] || []).map((run) => {
+                                const statusInfo = runStatusMap[run.status] || { 
+                                  label: run.status, 
+                                  showResults: false 
+                                };
+
+                                const statusVariant = {
+                                  'running': 'secondary',
+                                  'success': 'default',
+                                  'paused': 'secondary', 
+                                  'failed': 'destructive'
+                                };
+
+                                return (
+                                  <div key={run.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-3">
+                                        <p className="font-medium text-sm">{formatDateTime(run.started_at)}</p>
+                                        <Badge 
+                                          variant={statusVariant[run.status] || 'secondary'} 
+                                          className="flex items-center gap-1"
+                                        >
+                                          {statusIcons[run.status]}
+                                          {statusInfo.label}
+                                        </Badge>
+                                        {run.finished_at && (
+                                          <span className="text-xs text-gray-500">
+                                            Завершено: {formatDateTime(run.finished_at)}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {run.session_id && (
+                                        <p className="text-xs text-gray-500 mt-1">Session ID: {run.session_id}</p>
+                                      )}
+                                      {run.error && (
+                                        <p className="text-xs text-red-500 mt-1">{run.error}</p>
+                                      )}
+                                    </div>
+                                    
+                                    {statusInfo.showResults && run.session_id && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          navigate(`/projects/${job.project_id}/results?session=${run.session_id}&returnTo=scheduler`);
+                                        }}
+                                        className="whitespace-nowrap"
+                                      >
+                                        Перейти к результатам
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                            {run.session_id && (
-                              <p className="text-xs text-gray-500 mt-1">Session ID: {run.session_id}</p>
-                            )}
-                            {run.error && (
-                              <p className="text-xs text-red-500 mt-1">{run.error}</p>
-                            )}
-                          </div>
-                          
-                          {/* Кнопка "Перейти к результатам" показывается только для статусов где showResults = true */}
-                          {statusInfo.showResults && run.session_id && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                navigate(`/projects/${job.project_id}/results?session=${run.session_id}&returnTo=scheduler`);
-                              }}
-                              className="whitespace-nowrap"
-                            >
-                              Перейти к результатам
-                            </Button>
                           )}
                         </div>
-                      );
-                    })
+                      </td>
+                    </tr>
                   )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
 };
 
-
-
 export default SchedulerPage;
-
