@@ -67,7 +67,8 @@ export default function ProjectsPage({ onNavigate }) {
       ]);
       
       setAllUsers(usersRes.data.filter(u => u.is_active));
-      setProjectUsers(projectUsersRes.data);
+      // Ensure projectUsers is always an array
+      setProjectUsers(Array.isArray(projectUsersRes.data) ? projectUsersRes.data : []);
     } catch (error) {
       console.error('Error fetching access data:', error);
       toast.error("Не удалось загрузить данные доступа");
