@@ -621,5 +621,4 @@ export default function ScriptsPage() {
       </div>
     </div>
   );
-};
 }

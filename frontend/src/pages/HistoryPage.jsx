@@ -202,5 +202,4 @@ export default function HistoryPage() {
     </div>
   );
 };
-
 // Main Layout
