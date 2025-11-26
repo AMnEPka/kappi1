@@ -298,17 +298,15 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
   if (!project) {
     return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
         <Button variant="outline" onClick={() => onNavigate('projects')}>
           <ChevronLeft className="mr-2 h-4 w-4" />
           Назад
