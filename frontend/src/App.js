@@ -1521,11 +1521,11 @@ const ProjectsPageWrapper = () => {
   const navigate = useNavigate();
   const handleNavigate = (page, id) => {
     if (page === 'project-wizard') {
-      navigate('/projects/new');
+      navigate('/new');
     } else if (page === 'project-execute') {
-      navigate(`/projects/${id}/execute`);
+      navigate(`/${id}/execute`);
     } else if (page === 'project-results') {
-      navigate(`/projects/${id}/results`);
+      navigate(`/${id}/results`);
     } else if (page === 'projects') {
       navigate('/');
     }
@@ -1550,7 +1550,7 @@ const ProjectExecutionPageWrapper = () => {
     if (page === 'projects') {
       navigate('/');
     } else if (page === 'project-results') {
-      navigate(`/projects/${id || projectId}/results`);
+      navigate(`/${id || projectId}/results`);
     }
   };
   return <ProjectExecutionPage projectId={projectId} onNavigate={handleNavigate} />;
