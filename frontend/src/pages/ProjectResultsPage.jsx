@@ -52,9 +52,9 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     const returnTo = searchParams.get('returnTo');
     
     if (returnTo === 'scheduler') {
-      navigate('/scheduler'); // или тот путь, по которому доступен планировщик
+      navigate('/scheduler');
     } else {
-      navigate('/projects'); // или путь к списку проектов
+      navigate('/');
     }
   };
 
