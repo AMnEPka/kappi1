@@ -12,6 +12,7 @@ import { Server, Plus, Edit, Trash2, Loader2, EthernetPort, Upload } from "lucid
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from '../config/api';
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 export default function HostsPage() {
   const { hasPermission, isAdmin, user } = useAuth();
@@ -31,6 +32,14 @@ export default function HostsPage() {
     ssh_key: "",
     connection_type: "ssh"
   });
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    open: false,
+    title: "",
+    description: "",
+    onConfirm: null,
+    onCancel: null,
+    variant: "default",
+  });  
 
   const fileInputRef = useRef(null);
   const [importing, setImporting] = useState(false);  
@@ -73,15 +82,25 @@ export default function HostsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Удалить хост?")) {
-      try {
-        await api.delete(`/api/hosts/${id}`);
-        toast.success("Хост удален");
-        fetchHosts();
-      } catch (error) {
-        toast.error("Ошибка удаления хоста");
-      }
+  // Обновленная функция удаления с кастомным confirm
+  const handleDelete = async (hostId) => {
+    const host = hosts.find(h => h.id === hostId);
+    if (!host) return;
+
+    // Используем кастомный confirm вместо нативного
+    const confirmed = await showConfirm(
+      "Удаление хоста",
+      `Вы уверены, что хотите удалить хост "${host.name}"? Это действие нельзя отменить.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/hosts/${hostId}`);
+      fetchHosts();
+    } catch (error) {
+      console.error('Error deleting host:', error);
+      await showAlert("Ошибка", "Не удалось удалить хост");
     }
   };
 
@@ -109,7 +128,8 @@ export default function HostsPage() {
       username: "",
       auth_type: "password",
       password: "",
-      ssh_key: ""
+      ssh_key: "",
+      connection_type: "ssh"
     });
     setEditingHost(null);
   };
@@ -143,7 +163,6 @@ export default function HostsPage() {
     setIsDialogOpen(true);
   };
 
-  // Функция для обработки импорта файла с задержкой
   const handleFileImport = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -171,7 +190,6 @@ export default function HostsPage() {
       let successCount = 0;
       let errorCount = 0;
       
-      // Функция для задержки
       const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
       
       for (let i = 0; i < hostsData.length; i++) {
@@ -193,11 +211,10 @@ export default function HostsPage() {
           errorCount++;
         }
         
-        // Обновляем прогресс
         setImportProgress({ current: i + 1, total: hostsData.length });
         
-        // Добавляем задержку 2 секунды между импортом хостов
-        if (i < hostsData.length - 1) { // Не ждем после последнего хоста
+        // Задержка 2 секунды между хостами (кроме последнего)
+        if (i < hostsData.length - 1) {
           await delay(2000);
         }
       }
@@ -208,12 +225,20 @@ export default function HostsPage() {
       fetchHosts();
       setImportDialogOpen(false);
       
-      alert(`Импорт завершен. Успешно: ${successCount}, с ошибками: ${errorCount}`);
+      // Используем кастомный alert вместо нативного
+        await showAlert(
+          "Импорт завершен", 
+          `Успешно импортировано: ${successCount} хостов\\nС ошибками: ${errorCount}`
+        );
+      
       
     } catch (error) {
       console.error('Ошибка импорта файла:', error);
-      alert('Ошибка при импорте файла. Проверьте формат файла.');
       setImportDialogOpen(false);
+      await showAlert(
+        "Ошибка импорта", 
+        "Ошибка при импорте файла. Проверьте формат файла."
+      );
     } finally {
       setImporting(false);
       if (fileInputRef.current) {
@@ -221,6 +246,42 @@ export default function HostsPage() {
       }
     }
   };
+
+  const showAlert = (title, description) => {
+    return new Promise((resolve) => {
+      setConfirmationDialog({
+        open: true,
+        title,
+        description,
+        onConfirm: () => {
+          setConfirmationDialog({ open: false, title: "", description: "", onConfirm: null, onCancel: null });
+          resolve(true);
+        },
+        onCancel: null,
+        variant: "default",
+      });
+    });
+  };
+
+  // Функция для показа кастомного confirm
+  const showConfirm = (title, description) => {
+    return new Promise((resolve) => {
+      setConfirmationDialog({
+        open: true,
+        title,
+        description,
+        onConfirm: () => {
+          setConfirmationDialog({ open: false, title: "", description: "", onConfirm: null, onCancel: null });
+          resolve(true);
+        },
+        onCancel: () => {
+          setConfirmationDialog({ open: false, title: "", description: "", onConfirm: null, onCancel: null });
+          resolve(false);
+        },
+        variant: "default",
+      });
+    });
+  };  
 
   return (
     <div className="space-y-6">
@@ -240,40 +301,12 @@ export default function HostsPage() {
             type="button"
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
           >
             <Upload className="mr-2 h-4 w-4" />
             Импортировать хосты
           </Button>
           
-          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Импорт хостов</DialogTitle>
-                <DialogDescription>
-                  Импортирование хостов из файла...
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="flex justify-between text-sm">
-                  <span>Прогресс:</span>
-                  <span>{importProgress.current} из {importProgress.total}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
-                  />
-                </div>
-                {importing && (
-                  <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Импорт...
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
             if (!open) resetForm();
@@ -406,6 +439,49 @@ export default function HostsPage() {
           </Dialog>
         </div>
       </div>
+
+      {/* Диалог прогресса импорта */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Импорт хостов</DialogTitle>
+            <DialogDescription>
+              Импортирование хостов из файла...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex justify-between text-sm">
+              <span>Прогресс:</span>
+              <span>{importProgress.current} из {importProgress.total}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+              />
+            </div>
+            {importing && (
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Импорт... ({Math.round((importProgress.current / importProgress.total) * 100)}%)
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Кастомный диалог подтверждения */}
+      <ConfirmationDialog
+        open={confirmationDialog.open}
+        onOpenChange={(open) => setConfirmationDialog(prev => ({ ...prev, open }))}
+        title={confirmationDialog.title}
+        description={confirmationDialog.description}
+        confirmText="ОК"
+        cancelText={confirmationDialog.onCancel ? "Отмена" : undefined}
+        onConfirm={confirmationDialog.onConfirm || (() => {})}
+        onCancel={confirmationDialog.onCancel}
+        variant={confirmationDialog.variant}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {hosts.length === 0 ? (
