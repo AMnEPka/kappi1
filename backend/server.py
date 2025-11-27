@@ -65,10 +65,9 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
     if not await can_access_project(current_user, project_id):
         raise HTTPException(status_code=403, detail="Access denied to this project")
     
-    if not skip_audit_log:
-        # Получаем имя проекта
-        project_doc = await db.projects.find_one({"id": project_id})
-        project_name = project_doc.get('name') if project_doc else "Неизвестный проект"
+
+    project_doc = await db.projects.find_one({"id": project_id})
+    project_name = project_doc.get('name') if project_doc else "Неизвестный проект"
         
     log_audit(
         "23",
@@ -367,7 +366,7 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
         }
     )
 
-@api_router.get("/projects/{project_id}/execution-failed")  # ← ИЗМЕНИТЬ POST НА GET
+@api_router.get("/projects/{project_id}/execution-failed") 
 async def log_failed_execution(
     project_id: str, 
     current_user: User = Depends(get_current_user)

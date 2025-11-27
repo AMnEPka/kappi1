@@ -11,6 +11,9 @@ export const api = axios.create({
   baseURL: API_URL,
 });
 
+// Переменная для отслеживания редиректа
+let isRedirecting = false;
+
 // Request interceptor - add token to all requests
 api.interceptors.request.use(
   (config) => {
@@ -29,9 +32,29 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-   if (error.response?.status === 401) {
-      console.log('Unauthorized request - token might be expired');
-      // Не делаем редирект здесь - пусть компоненты обрабатывают это
+    if (error.response?.status === 401 && !isRedirecting) {
+      console.log('Unauthorized request - token expired, redirecting to login...');
+      
+      // Защита от множественных редиректов
+      isRedirecting = true;
+      
+      // Очищаем данные авторизации
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Останавливаем все последующие запросы
+      if (error.config?.url?.includes('/auth/')) {
+        return Promise.reject(error);
+      }
+      
+      // Редирект на страницу логина с информацией о причине
+      setTimeout(() => {
+        const currentPath = window.location.pathname + window.location.search;
+        const loginUrl = `/login?redirect=${encodeURIComponent(currentPath)}&reason=session_expired`;
+        window.location.href = loginUrl;
+      }, 100);
+      
+      return Promise.reject(new Error('Session expired'));
     }
     return Promise.reject(error);
   }

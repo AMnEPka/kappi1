@@ -97,6 +97,7 @@ async def execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Optio
     """
     # Import here to avoid circular dependency
     from server import execute_project
+    from config.config_security import create_access_token  # Импортируем функцию создания токена
     
     user_doc = await db.users.find_one({"id": job.created_by}, {"_id": 0})
     if not user_doc:
@@ -116,7 +117,15 @@ async def execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Optio
             "scheduler_job_name": job.name}
     )
     
-    response = await execute_project(job.project_id, current_user=scheduler_user, skip_audit_log=True)  
+    # Создаем JWT токен для пользователя
+    token = create_access_token(data={"sub": scheduler_user.id})
+    
+    # Передаем токен вместо current_user
+    response = await execute_project(
+        project_id=job.project_id, 
+        token=token, 
+        skip_audit_log=True
+    )  
     session_id, final_status = await consume_streaming_response(response)
     return session_id, final_status
 

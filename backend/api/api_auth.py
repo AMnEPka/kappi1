@@ -1,6 +1,6 @@
 """Authentication API endpoints"""
 
-from fastapi import APIRouter, HTTPException, Depends, status, Request
+from fastapi import APIRouter, HTTPException, Depends, status, Request  # pyright: ignore[reportMissingImports]
 
 from config.config_init import db
 from config.config_security import verify_password, create_access_token

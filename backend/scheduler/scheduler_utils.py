@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone, timedelta, time
 from typing import Optional, List, Dict, Any
-from fastapi import HTTPException
+from fastapi import HTTPException  # pyright: ignore[reportMissingImports]
 
 from models.execution_models import SchedulerJob
 

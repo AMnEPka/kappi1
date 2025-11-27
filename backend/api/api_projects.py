@@ -7,7 +7,7 @@ This module contains endpoints for:
 - Project execution (see execute_project function)
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends  # pyright: ignore[reportMissingImports]
 from typing import List
 from datetime import datetime
 
@@ -168,7 +168,6 @@ async def create_project_task(project_id: str, task_input: ProjectTaskCreate, cu
     await db.project_tasks.insert_one(doc)
     return task_obj
 
-
 @router.get("/projects/{project_id}/tasks", response_model=List[ProjectTask])
 async def get_project_tasks(project_id: str, current_user: User = Depends(get_current_user)):
     """Get all tasks for a project (requires access to project)"""
@@ -178,7 +177,6 @@ async def get_project_tasks(project_id: str, current_user: User = Depends(get_cu
     tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
     return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
 
-
 @router.get("/projects/{project_id}/tasks/bulk", response_model=List[ProjectTask])
 async def get_project_tasks_bulk(project_id: str, current_user: User = Depends(get_current_user)):
     """Get all tasks for a project with all details (requires access to project)"""
@@ -187,7 +185,6 @@ async def get_project_tasks_bulk(project_id: str, current_user: User = Depends(g
     
     tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
     return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
-
 
 @router.put("/projects/{project_id}/tasks/{task_id}", response_model=ProjectTask)
 async def update_project_task(project_id: str, task_id: str, task_update: ProjectTaskUpdate, current_user: User = Depends(get_current_user)):
@@ -209,7 +206,6 @@ async def update_project_task(project_id: str, task_id: str, task_update: Projec
     updated_task = await db.project_tasks.find_one({"id": task_id}, {"_id": 0})
     return ProjectTask(**parse_from_mongo(updated_task))
 
-
 @router.delete("/projects/{project_id}/tasks/{task_id}")
 async def delete_project_task(project_id: str, task_id: str, current_user: User = Depends(get_current_user)):
     """Delete task from project (requires access to project)"""
@@ -220,7 +216,6 @@ async def delete_project_task(project_id: str, task_id: str, current_user: User 
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Задание не найдено")
     return {"message": "Задание удалено"}
-
 
 # ============================================================================
 # Project Access Management
@@ -245,7 +240,6 @@ async def get_project_users(project_id: str, current_user: User = Depends(get_cu
     users = await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "username": 1, "full_name": 1}).to_list(1000) if user_ids else []
     
     return {"users": users}
-
 
 @router.post("/projects/{project_id}/users/{user_id}")
 async def grant_project_access(project_id: str, user_id: str, current_user: User = Depends(get_current_user)):
@@ -288,7 +282,6 @@ async def grant_project_access(project_id: str, user_id: str, current_user: User
     )
     
     return {"message": "Access granted"}
-
 
 @router.delete("/projects/{project_id}/users/{user_id}")
 async def revoke_project_access(project_id: str, user_id: str, current_user: User = Depends(get_current_user)):
