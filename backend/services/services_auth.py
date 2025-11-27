@@ -21,7 +21,7 @@ async def get_current_user_from_token(token: str) -> User:
         if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
+                detail="Ошибка авторизации",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
@@ -30,7 +30,7 @@ async def get_current_user_from_token(token: str) -> User:
         if not user_doc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
+                detail="Пользователь не найден",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
@@ -40,7 +40,7 @@ async def get_current_user_from_token(token: str) -> User:
         logger.error(f"Authentication error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Ошибка авторизации",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -52,7 +52,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
+            detail="Требуется авторизация",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -64,7 +64,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
+                detail="Неверный токен авторизации",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
@@ -73,7 +73,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         if not user_doc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
+                detail="Пользователь не найден",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
@@ -86,7 +86,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         logger.error(f"Authentication error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Ошибка авторизации",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -137,7 +137,7 @@ async def require_permission(user: User, *permissions: str) -> None:
     if not any(perm in user_permissions for perm in permissions):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permission denied. Required one of: {', '.join(permissions)}"
+            detail=f"Недостаточно прав. Требуемые права: {', '.join(permissions)}"
         )
 
 

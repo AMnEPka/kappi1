@@ -95,17 +95,13 @@ const formatEventDetails = (eventNumber, details) => {
 ФИО: ${detailsObj.target_full_name || 'ФИО'}`;
 
       case "4": // Редактирование пользователя
-        return `Логин: ${detailsObj.username}\nФИО: ${detailsObj.target_full_name || 'ФИО'}
-Измененные поля: ${detailsObj.changed_fields || 'нет'}
-Было ролей: ${detailsObj.old_roles_count}
-Стало ролей: ${detailsObj.new_roles_count}`;
+        return `Логин: ${detailsObj.username}
+ФИО: ${detailsObj.target_full_name || 'ФИО'}`;
         
       case "5": // Удаление пользователя
         return `Удаленный пользователь: ${detailsObj.username}
 ФИО: ${detailsObj.full_name}
-Администратор: ${detailsObj.is_admin ? 'Да' : 'Нет'}
-Данные перепривязаны на: ${detailsObj.reassigned_to_admin}
-Всего объектов перепривязано: ${detailsObj.total_objects_reassigned || 0}`;  
+Администратор: ${detailsObj.is_admin ? 'Да' : 'Нет'}`;  
 
       case "6": // Создание роли
         return `Роль: ${detailsObj.role_name}
@@ -191,15 +187,11 @@ const formatEventDetails = (eventNumber, details) => {
 
       case "27": // Предоставлен доступ к проекту
         return `Проект: ${detailsObj.project_name}
-Пользователь: ${detailsObj.target_username}
-ФИО: ${detailsObj.target_full_name}
-Кем предоставлен доступ: ${detailsObj.access_granted_by}`;
+Пользователь: ${detailsObj.target_username}`;
       
       case "28": // Отозван доступ к проекту
         return `Проект: ${detailsObj.project_name}
-Пользователь: ${detailsObj.target_username}
-ФИО: ${detailsObj.target_full_name}
-Кем отозван доступ: ${detailsObj.access_revoked_by}`;        
+Пользователь: ${detailsObj.target_username}`;        
 
       case "29": // Создание задания планировщика
         return `Задание: ${detailsObj.job_name}

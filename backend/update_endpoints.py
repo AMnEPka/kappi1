@@ -84,7 +84,7 @@ async def get_script(script_id: str, current_user: User = Depends(get_current_us
     # Check access
     if not await has_permission(current_user, 'checks_edit_all'):
         if script.get('created_by') != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied")
+            raise HTTPException(status_code=403, detail="Доступ запрещен")
     
     return Script(**parse_from_mongo(script))
 

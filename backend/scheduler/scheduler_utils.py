@@ -32,7 +32,7 @@ def parse_datetime_param(value: Optional[str], *, end_of_day: bool = False) -> O
         try:
             dt = datetime.fromisoformat(f"{value}T00:00:00")
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid date format: {value}")
+            raise HTTPException(status_code=400, detail=f"Неверный формат даты: {value}")
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     if end_of_day:
@@ -54,7 +54,7 @@ def parse_time_of_day(value: str) -> time:
     """
     parts = value.split(":")
     if len(parts) < 2:
-        raise HTTPException(status_code=400, detail=f"Invalid time format: {value}")
+        raise HTTPException(status_code=400, detail=f"Неверный формат времени: {value}")
     hour = int(parts[0])
     minute = int(parts[1])
     return time(hour=hour, minute=minute, tzinfo=timezone.utc)

@@ -59,11 +59,11 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
     
     # Check permission
     if not await has_permission(current_user, 'projects_execute'):
-        raise HTTPException(status_code=403, detail="Permission denied: projects_execute")
+        raise HTTPException(status_code=403, detail="Вам запрещено производить запуски проектов")
     
     # Check project access
     if not await can_access_project(current_user, project_id):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+        raise HTTPException(status_code=403, detail="У вас нет доступа к текущему проекту")
     
 
     project_doc = await db.projects.find_one({"id": project_id})
@@ -374,7 +374,7 @@ async def log_failed_execution(
     """Log failed project execution attempts"""
     project = await db.projects.find_one({"id": project_id})
     if not project:
-        raise HTTPException(status_code=404, detail="Проект не найдена")
+        raise HTTPException(status_code=404, detail="Проект не найден")
     
     project_name = project.get('name', 'Неизвестный проект')
     
@@ -403,7 +403,7 @@ async def get_audit_logs(
 ):
     """Fetch audit logs with optional filters (admin only)"""
     if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail="Доступ запрещен")
     
     query: Dict[str, Any] = {}
     created_filter: Dict[str, Any] = {}
@@ -441,7 +441,7 @@ async def get_project_executions(project_id: str, current_user: User = Depends(g
     """Get all execution results for a project"""
     if not await has_permission(current_user, 'results_view_all'):
         if not await can_access_project(current_user, project_id):
-            raise HTTPException(status_code=403, detail="Access denied to this project")
+            raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
     
     executions = await db.executions.find(
         {"project_id": project_id},
@@ -466,7 +466,7 @@ async def get_project_sessions(project_id: str, current_user: User = Depends(get
     # Check access: user must either view all results or have access to the project
     if not await has_permission(current_user, 'results_view_all'):
         if not await can_access_project(current_user, project_id):
-            raise HTTPException(status_code=403, detail="Access denied to this project")
+            raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
 
     # Get distinct session IDs with their timestamps and check status counts
     # If check_status is not one of the expected values, count it as error
@@ -529,7 +529,7 @@ async def get_session_executions(project_id: str, session_id: str, current_user:
     # Check if user can view all results or has access to project
     if not await has_permission(current_user, 'results_view_all'):
         if not await can_access_project(current_user, project_id):
-            raise HTTPException(status_code=403, detail="Access denied to this project")
+            raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
     
     executions = await db.executions.find(
         {"project_id": project_id, "execution_session_id": session_id},
@@ -622,7 +622,7 @@ async def get_execution(execution_id: str, current_user: User = Depends(get_curr
     # Check access
     if not await has_permission(current_user, 'results_view_all'):
         if execution.get('executed_by') != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied")
+            raise HTTPException(status_code=403, detail="Доступ запрещен")
     
     return Execution(**parse_from_mongo(execution))
 
@@ -635,7 +635,7 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
     # Check if user can export all results or has access to project
     if not await has_permission(current_user, 'results_export_all'):
         if not await can_access_project(current_user, project_id):
-            raise HTTPException(status_code=403, detail="Access denied to this project")    
+            raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")    
     
     # Get project info
     project = await db.projects.find_one({"id": project_id}, {"_id": 0})

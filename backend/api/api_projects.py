@@ -82,7 +82,7 @@ async def get_projects(current_user: User = Depends(get_current_user)):
 async def get_project(project_id: str, current_user: User = Depends(get_current_user)):
     """Get project by ID"""
     if not await can_access_project(current_user, project_id):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+        raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
     
     project = await db.projects.find_one({"id": project_id}, {"_id": 0})
     if not project:
@@ -98,7 +98,7 @@ async def update_project(project_id: str, project_update: ProjectUpdate, current
         raise HTTPException(status_code=404, detail="Проект не найден")
     
     if project.get('created_by') != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only project creator or admin can update")
+        raise HTTPException(status_code=403, detail="Только пользователь с доступом к этому проекту может редактировать его")
     
     update_data = project_update.model_dump(exclude_unset=True)
     
@@ -113,7 +113,6 @@ async def update_project(project_id: str, project_update: ProjectUpdate, current
     updated_project = await db.projects.find_one({"id": project_id}, {"_id": 0})
     return Project(**parse_from_mongo(updated_project))
 
-
 @router.delete("/projects/{project_id}")
 async def delete_project(project_id: str, current_user: User = Depends(get_current_user)):
     """Delete project (only creator or admin)"""
@@ -122,7 +121,7 @@ async def delete_project(project_id: str, current_user: User = Depends(get_curre
         raise HTTPException(status_code=404, detail="Проект не найден")
     
     if project.get('created_by') != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only project creator or admin can delete")
+        raise HTTPException(status_code=403, detail="Только пользователь с доступом к этому проекту может удалить его")
     
     # Check if project has executions
     executions_count = await db.executions.count_documents({"project_id": project_id})
@@ -156,7 +155,7 @@ async def create_project_task(project_id: str, task_input: ProjectTaskCreate, cu
     """Create task in project (requires access to project)"""
     # Check project access
     if not await can_access_project(current_user, project_id):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
     
     project = await db.projects.find_one({"id": project_id})
     if not project:
@@ -172,7 +171,7 @@ async def create_project_task(project_id: str, task_input: ProjectTaskCreate, cu
 async def get_project_tasks(project_id: str, current_user: User = Depends(get_current_user)):
     """Get all tasks for a project (requires access to project)"""
     if not await can_access_project(current_user, project_id):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
     
     tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
     return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
@@ -181,7 +180,7 @@ async def get_project_tasks(project_id: str, current_user: User = Depends(get_cu
 async def get_project_tasks_bulk(project_id: str, current_user: User = Depends(get_current_user)):
     """Get all tasks for a project with all details (requires access to project)"""
     if not await can_access_project(current_user, project_id):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
     
     tasks = await db.project_tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
     return [ProjectTask(**parse_from_mongo(task)) for task in tasks]
@@ -190,7 +189,7 @@ async def get_project_tasks_bulk(project_id: str, current_user: User = Depends(g
 async def update_project_task(project_id: str, task_id: str, task_update: ProjectTaskUpdate, current_user: User = Depends(get_current_user)):
     """Update task in project (requires access to project)"""
     if not await can_access_project(current_user, project_id):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
     
     task = await db.project_tasks.find_one({"id": task_id, "project_id": project_id}, {"_id": 0})
     if not task:
@@ -210,7 +209,7 @@ async def update_project_task(project_id: str, task_id: str, task_update: Projec
 async def delete_project_task(project_id: str, task_id: str, current_user: User = Depends(get_current_user)):
     """Delete task from project (requires access to project)"""
     if not await can_access_project(current_user, project_id):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
     
     result = await db.project_tasks.delete_one({"id": task_id, "project_id": project_id})
     if result.deleted_count == 0:
@@ -230,7 +229,7 @@ async def get_project_users(project_id: str, current_user: User = Depends(get_cu
     
     # Only project creator or admin can view access list
     if project.get('created_by') != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
     
     # Get project access records
     access_records = await db.project_access.find({"project_id": project_id}).to_list(1000)
@@ -250,7 +249,7 @@ async def grant_project_access(project_id: str, user_id: str, current_user: User
     
     # Only project creator or admin can grant access
     if project.get('created_by') != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
     
     # Check if user exists
     target_user = await db.users.find_one({"id": user_id})
@@ -272,12 +271,13 @@ async def grant_project_access(project_id: str, user_id: str, current_user: User
     await db.project_access.insert_one(access_doc)
     
     log_audit(
-        "27",
+        "27", # предоставлен доступ к проекту
         user_id=current_user.id,
         username=current_user.username,
         details={
             "project_name": project.get('name'),
-            "target_username": target_user.get('username')
+            "target_username": target_user.get('username'),
+            "target_fio": target_user.get('full_name')
         }
     )
     
@@ -292,12 +292,12 @@ async def revoke_project_access(project_id: str, user_id: str, current_user: Use
     
     # Only project creator or admin can revoke access
     if project.get('created_by') != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
     
     # Revoke access
     result = await db.project_access.delete_one({"project_id": project_id, "user_id": user_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Access record not found")
+        raise HTTPException(status_code=404, detail="Ошибка предоставления доступа")
     
     # Get target user for logging
     target_user = await db.users.find_one({"id": user_id})
@@ -308,8 +308,7 @@ async def revoke_project_access(project_id: str, user_id: str, current_user: Use
         username=current_user.username,
         details={
             "project_name": project.get('name'),
-            "target_username": target_user.get('username') if target_user else user_id,
-            "action": "revoke"
+            "target_username": target_user.get('username')
         }
     )
     

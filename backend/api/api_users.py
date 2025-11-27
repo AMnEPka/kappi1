@@ -34,7 +34,7 @@ async def create_user(user_input: UserCreate, current_user: User = Depends(get_c
     # Check if username already exists
     existing = await db.users.find_one({"username": user_input.username})
     if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
+        raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
     
     # Create user
     user = User(
@@ -73,7 +73,7 @@ async def update_user(user_id: str, user_update: UserUpdate, current_user: User 
     # Find user
     user_doc = await db.users.find_one({"id": user_id})
     if not user_doc:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     old_user = User(**user_doc)
     
@@ -120,18 +120,18 @@ async def delete_user(user_id: str, current_user: User = Depends(get_current_use
     # Check if user exists
     user_doc = await db.users.find_one({"id": user_id})
     if not user_doc:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     user = User(**user_doc)
     
     # Cannot delete self
     if user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+        raise HTTPException(status_code=400, detail="Вы не можете удалить свою учетную запись")
     
     # Find admin user to reassign data
     admin_user = await db.users.find_one({"is_admin": True})
     if not admin_user:
-        raise HTTPException(status_code=500, detail="No admin user found to reassign data")
+        raise HTTPException(status_code=500, detail="Вы не можете удалить единственного администратора")
     
     admin_id = admin_user['id']
     
@@ -176,7 +176,7 @@ async def change_user_password(user_id: str, password_data: PasswordResetRequest
     # Find user
     user_doc = await db.users.find_one({"id": user_id})
     if not user_doc:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     user = User(**user_doc)
     
@@ -225,13 +225,13 @@ async def update_user_roles(user_id: str, role_ids: List[str], current_user: Use
     # Verify user exists
     user_doc = await db.users.find_one({"id": user_id})
     if not user_doc:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     # Verify all roles exist
     for role_id in role_ids:
         role = await db.roles.find_one({"id": role_id})
         if not role:
-            raise HTTPException(status_code=404, detail=f"Role {role_id} not found")
+            raise HTTPException(status_code=404, detail=f"Роль '{role_id}' не найдена")
     
     # Delete existing role associations
     await db.user_roles.delete_many({"user_id": user_id})
@@ -281,7 +281,7 @@ async def create_role(role_input: RoleCreate, current_user: User = Depends(get_c
     # Check if role name already exists
     existing = await db.roles.find_one({"name": role_input.name})
     if existing:
-        raise HTTPException(status_code=400, detail="Role name already exists")
+        raise HTTPException(status_code=400, detail="Роль с таким название уже существует")
     
     # Create role
     role = Role(
@@ -317,7 +317,7 @@ async def update_role(role_id: str, role_update: RoleUpdate, current_user: User 
     # Find role
     role_doc = await db.roles.find_one({"id": role_id})
     if not role_doc:
-        raise HTTPException(status_code=404, detail="Role not found")
+        raise HTTPException(status_code=404, detail="Роль не найдена")
     
     # Build update data
     update_data = {}
@@ -325,7 +325,7 @@ async def update_role(role_id: str, role_update: RoleUpdate, current_user: User 
         # Check if new name already exists
         existing = await db.roles.find_one({"name": role_update.name, "id": {"$ne": role_id}})
         if existing:
-            raise HTTPException(status_code=400, detail="Role name already exists")
+            raise HTTPException(status_code=400, detail="Роль с таким именем уже существует")
         update_data["name"] = role_update.name
     
     if role_update.description is not None:
@@ -364,14 +364,14 @@ async def delete_role(role_id: str, current_user: User = Depends(get_current_use
     # Find role
     role_doc = await db.roles.find_one({"id": role_id})
     if not role_doc:
-        raise HTTPException(status_code=404, detail="Role not found")
+        raise HTTPException(status_code=404, detail="Роль не найдена")
     
     # Check if role is assigned to any users
     user_roles = await db.user_roles.find_one({"role_id": role_id})
     if user_roles:
         raise HTTPException(
             status_code=400,
-            detail="Cannot delete role that is assigned to users. Please remove the role from all users first."
+            detail="Существуют пользователи, которым назначена эта роль, поэтому удаление отменено"
         )
     
     # Delete role

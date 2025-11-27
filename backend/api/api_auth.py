@@ -41,7 +41,7 @@ async def login(login_data: LoginRequest, request: Request):
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
+            detail="Неверные имя пользоавтеля или пароль"
         )
     
     user = User(**user_doc)
@@ -60,7 +60,7 @@ async def login(login_data: LoginRequest, request: Request):
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
+            detail="Неверные имя пользоавтеля или пароль"
         )
     
     if not user.is_active:
@@ -74,7 +74,7 @@ async def login(login_data: LoginRequest, request: Request):
                 "user_agent": user_agent
             }
         )
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=400, detail="Пользователь неактивен")
     
     # Create access token
     access_token = create_access_token(data={"sub": user.id})

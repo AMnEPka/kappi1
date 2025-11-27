@@ -73,7 +73,7 @@ async def get_host(host_id: str, current_user: User = Depends(get_current_user))
     # Check access
     if not await has_permission(current_user, 'hosts_edit_all'):
         if host.get('created_by') != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied")
+            raise HTTPException(status_code=403, detail="Доступ запрещен")
     
     return Host(**parse_from_mongo(host))
 

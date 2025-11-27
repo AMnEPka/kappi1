@@ -22,7 +22,7 @@ router = APIRouter()
 async def _ensure_project_access(current_user: User, project_id: str):
     """Ensure user has access to project"""
     if not (await can_access_project(current_user, project_id)):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
 
 
 def _get_job_type_label(job_type: str) -> str:
