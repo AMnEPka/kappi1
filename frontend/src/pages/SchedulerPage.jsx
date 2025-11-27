@@ -383,11 +383,28 @@ const SchedulerPage = () => {
               {form.job_type === "one_time" && (
                 <div className="space-y-2">
                   <Label>Дата и время запуска</Label>
-                  <div><DateTimePicker
-                    value={form.run_at}
-                    onChange={(value) => setForm({ ...form, run_at: value })}
-                    required
-                  /></div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <DateTimePicker
+                        value={form.run_at}
+                        onChange={(value) => setForm({ ...form, run_at: value })}
+                        required
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const now = new Date();
+                        now.setMinutes(now.getMinutes() + 2);
+                        setForm({ ...form, run_at: now.toISOString() });
+                      }}
+                      className="whitespace-nowrap"
+                    >
+                      Сегодня +2 мин
+                    </Button>
+                  </div>
                 </div>
               )}
   
