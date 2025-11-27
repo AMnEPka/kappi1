@@ -26,7 +26,9 @@ import {
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {description && (
-              <DialogDescription>{description}</DialogDescription>
+              <DialogDescription 
+              dangerouslySetInnerHTML={{ __html: description }}
+              />
             )}
           </DialogHeader>
           <DialogFooter className="flex flex-row justify-end gap-2 pt-4">

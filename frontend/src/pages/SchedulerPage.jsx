@@ -684,7 +684,9 @@ const SchedulerPage = () => {
                                             <p className="font-medium text-sm">{formatDateTime(run.started_at)}</p>
                                             <Badge 
                                               variant={statusVariant[run.status] || 'secondary'} 
-                                              className="flex items-center gap-1"
+                                              className={`flex items-center gap-1 ${
+                                                run.status === 'success' ? 'bg-green-600 hover:bg-green-600 text-black' : ''
+                                              }`}
                                             >
                                               {statusIcons[run.status]}
                                               {statusInfo.label}

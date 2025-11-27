@@ -181,7 +181,7 @@ const formatEventDetails = (eventNumber, details) => {
       case "25": // Просмотр результатов проекта
         return `Проект: ${detailsObj.project_name}`;
         
-      case "26": // Запуск проекта планировщиком
+      case "26": // Экспорт результатов проекта
         return `Проект: ${detailsObj.project_name}
 Имя файла: ${detailsObj.project_filename}`; 
 
@@ -254,36 +254,6 @@ const formatEventDetails = (eventNumber, details) => {
   }
 };
 
-const renderDetails = (details, eventNumber) => {
-  // eventNumber приходит как цифра "1", "3" и т.д.
-  const eventOption = EVENT_OPTIONS.find(opt => opt.value === eventNumber);
-  const eventName = eventOption ? eventOption.label : `Событие ${eventNumber}`;
-  
-  if (!details) return "-";
-  if (typeof details === "string") return details;
-  
-  try {
-    const detailsObj = typeof details === 'string' ? JSON.parse(details) : details;
-    
-    // Можно добавить специфичное форматирование для разных цифровых событий
-    switch(eventNumber) {
-      case "1": // Успешный вход
-        return `IP: ${detailsObj.ip_address || 'неизвестно'}\nБраузер: ${detailsObj.user_agent || 'неизвестно'}`;
-        
-      case "3": // Создание пользователя
-        return `Новый пользователь: ${detailsObj.new_user}\nРоль: ${detailsObj.role || 'не указана'}`;
-        
-      case "24": // Запуск планировщиком
-        return `ID проекта: ${detailsObj.project_id}\nID задания: ${detailsObj.scheduler_job_id}`;
-        
-      default:
-        return JSON.stringify(detailsObj, null, 2);
-    }
-  } catch (error) {
-    return typeof details === 'string' ? details : JSON.stringify(details);
-  }
-};
-
 const LogsPage = () => {
   const { isAdmin } = useAuth();
   const [logs, setLogs] = useState([]);
@@ -292,9 +262,35 @@ const LogsPage = () => {
   const [endDate, setEndDate] = useState("");
   const [selectedEvents, setSelectedEvents] = useState([]);
   const [excludedEvents, setExcludedEvents] = useState([]);
-  const [limit, setLimit] = useState(100);
+  const [limit, setLimit] = useState(250);
   const [isEventsExpanded, setIsEventsExpanded] = useState(false);
-  
+
+  // Функция для форматирования даты в YYYY-MM-DD
+  const formatDateForInput = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Функция для получения дат по умолчанию
+  const getDefaultDates = () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    return {
+      start: formatDateForInput(yesterday),
+      end: formatDateForInput(today)
+    };
+  };
+
+  // Установка дат по умолчанию при загрузке компонента
+  useEffect(() => {
+    const dates = getDefaultDates();
+    setStartDate(dates.start);
+    setEndDate(dates.end);
+  }, []);
 
   const activeEventLabels = useMemo(() => {
     if (selectedEvents.length > 0) {
@@ -311,7 +307,7 @@ const LogsPage = () => {
         .join(", ");
       return `Показываются все типы событий кроме: ${excluded}`;
     }
-    return "Показываются все типы событий";
+    return "Показываются все типы событий (лимит 250 сообщений)";
   }, [selectedEvents, excludedEvents]);
 
   const toggleEvent = (value) => {
@@ -355,7 +351,7 @@ const LogsPage = () => {
     }
   };
 
-  // Обработчики изменений с дебаунсом
+  // Обработчики изменений
   const handleDateChange = (setter) => (e) => {
     setter(e.target.value);
   };
@@ -364,26 +360,13 @@ const LogsPage = () => {
     setLimit(Number(e.target.value));
   };  
 
-  const CollapsibleDetails = ({ details }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    
-    return (
-      <div>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="p-1 hover:bg-gray-200 rounded transition-colors"
-          title={isExpanded ? "Свернуть" : "Развернуть"}
-        >
-          <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-        </button>
-        
-        {isExpanded && (
-          <div className="absolute mt-1 p-2 bg-white border rounded shadow-lg z-10 max-w-md text-xs whitespace-pre-wrap">
-            {details}
-          </div>
-        )}
-      </div>
-    );
+  const handleReset = () => {
+    const dates = getDefaultDates();
+    setStartDate(dates.start);
+    setEndDate(dates.end);
+    setSelectedEvents([]);
+    setExcludedEvents([]);
+    setLimit(250);
   };
 
   useEffect(() => {
@@ -402,14 +385,6 @@ const LogsPage = () => {
       clearTimeout(timeoutId);
     };
   }, [isAdmin, startDate, endDate, limit, selectedEvents, excludedEvents]);
-
-  const handleReset = () => {
-    setStartDate("");
-    setEndDate("");
-    setSelectedEvents([]);
-    setExcludedEvents([]);
-    fetchLogs();
-  };
 
   if (!isAdmin) {
     return (
@@ -446,23 +421,25 @@ const LogsPage = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-600">Дата от</label>
-              <Input 
-                type="date" 
-                value={startDate} 
-                onChange={handleDateChange(setStartDate)} 
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Дата до</label>
-              <Input 
-                type="date" 
-                value={endDate} 
-                onChange={handleDateChange(setEndDate)} 
-              />
-            </div>
-            <div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-600">Дата от</label>
+                <Input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={handleDateChange(setStartDate)} 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Дата до</label>
+                <Input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={handleDateChange(setEndDate)} 
+                />
+              </div>
+
+            {/* <div>
               <label className="text-sm font-medium text-gray-600">Количество записей</label>
               <Input
                 type="number"
@@ -471,7 +448,7 @@ const LogsPage = () => {
                 value={limit}
                 onChange={handleLimitChange}
               />
-            </div>
+            </div> */}
           </div>
 
           <div>
@@ -613,7 +590,6 @@ const LogsPage = () => {
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium">{log.username || "Система"}</span>
-{/*}                      <span className="text-xs text-gray-500">{log.user_id || "-"}</span> */}
                     </div>
                   </TableCell>
 
@@ -633,4 +609,3 @@ const LogsPage = () => {
 };
 
 export default LogsPage;
-

@@ -19,7 +19,7 @@ const logout = () => {
     setUser(null);
     setPermissions([]);
     // Редирект на логин
-    window.location.href = '/login';
+   window.location.href = '/login';
   };
 
 export const AuthProvider = ({ children }) => {

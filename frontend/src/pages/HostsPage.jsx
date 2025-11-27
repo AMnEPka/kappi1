@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Server, Plus, Edit, Trash2, Loader2, EthernetPort, Upload } from "lucide-react";
+import { Server, Plus, Edit, Trash2, Loader2, EthernetPort, Upload, HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from '../config/api';
@@ -215,7 +215,7 @@ export default function HostsPage() {
         
         // Задержка 2 секунды между хостами (кроме последнего)
         if (i < hostsData.length - 1) {
-          await delay(2000);
+          await delay(1000);
         }
       }
       
@@ -228,7 +228,7 @@ export default function HostsPage() {
       // Используем кастомный alert вместо нативного
         await showAlert(
           "Импорт завершен", 
-          `Успешно импортировано: ${successCount} хостов\\nС ошибками: ${errorCount}`
+          `Успешно импортировано: ${successCount} хостов<br />С ошибками: ${errorCount}`
         );
       
       
@@ -297,15 +297,55 @@ export default function HostsPage() {
             className="hidden"
           />
           
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Импортировать хосты
-          </Button>
+          <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    className="h-10 w-10 p-0"
+                  >
+                    <HelpCircle className="h-5 w-5" />
+                  </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="w=96">
+                  <pre className="text-xs whitespace-pre-wrap">
+{`
+•Импорт хостов реализован в формате json;
+•Используйте файлы .json или .txt;
+•Они должны содержать валидный массив json-файлов или json'ы одной строкой;
+•Для linux порт 22 и connection_type=ssh;
+•Для windows порт 5986 и connection_type=winrm; 
+•Для авторизации через ssh-key auth_type=key;
+•Пример:
+[
+  {
+    "name": "Linux Server 1",
+    "hostname": "192.168.1.100",
+    "port": 22,
+    "username": "admin",
+    "auth_type": "password",
+    "password": "admin123",
+    "ssh_key": "",
+    "connection_type": "ssh"
+  }
+]`}
+                  </pre>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Импортировать хосты
+            </Button>
+          </div>
           
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
