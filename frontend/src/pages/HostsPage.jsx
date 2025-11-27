@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Server, Plus, Edit, Trash2, Loader2, EthernetPort } from "lucide-react";
+import { Server, Plus, Edit, Trash2, Loader2, EthernetPort, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from '../config/api';
@@ -19,6 +19,8 @@ export default function HostsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingHost, setEditingHost] = useState(null);
   const [testingHostId, setTestingHostId] = useState(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });  
   const [formData, setFormData] = useState({
     name: "",
     hostname: "",
@@ -29,6 +31,9 @@ export default function HostsPage() {
     ssh_key: "",
     connection_type: "ssh"
   });
+
+  const fileInputRef = useRef(null);
+  const [importing, setImporting] = useState(false);  
 
   useEffect(() => {
     fetchHosts();
@@ -138,27 +143,154 @@ export default function HostsPage() {
     setIsDialogOpen(true);
   };
 
+  // Функция для обработки импорта файла с задержкой
+  const handleFileImport = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportDialogOpen(true);
+    
+    try {
+      const text = await file.text();
+      let hostsData;
+      
+      try {
+        hostsData = JSON.parse(text);
+      } catch (e) {
+        const jsonObjects = text.trim().split('\n').filter(line => line.trim());
+        hostsData = jsonObjects.map(obj => JSON.parse(obj));
+      }
+      
+      if (!Array.isArray(hostsData)) {
+        hostsData = [hostsData];
+      }
+      
+      setImportProgress({ current: 0, total: hostsData.length });
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // Функция для задержки
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      
+      for (let i = 0; i < hostsData.length; i++) {
+        const hostData = hostsData[i];
+        try {
+          await api.post('/api/hosts', {
+            name: hostData.name,
+            hostname: hostData.hostname,
+            port: hostData.port,
+            username: hostData.username,
+            auth_type: hostData.auth_type,
+            password: hostData.password,
+            ssh_key: hostData.ssh_key,
+            connection_type: hostData.connection_type,
+          });
+          successCount++;
+        } catch (error) {
+          console.error(`Ошибка импорта хоста ${hostData.name}:`, error);
+          errorCount++;
+        }
+        
+        // Обновляем прогресс
+        setImportProgress({ current: i + 1, total: hostsData.length });
+        
+        // Добавляем задержку 2 секунды между импортом хостов
+        if (i < hostsData.length - 1) { // Не ждем после последнего хоста
+          await delay(2000);
+        }
+      }
+      
+      // Небольшая задержка перед закрытием диалога
+      await delay(500);
+      
+      fetchHosts();
+      setImportDialogOpen(false);
+      
+      alert(`Импорт завершен. Успешно: ${successCount}, с ошибками: ${errorCount}`);
+      
+    } catch (error) {
+      console.error('Ошибка импорта файла:', error);
+      alert('Ошибка при импорте файла. Проверьте формат файла.');
+      setImportDialogOpen(false);
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Хосты</h1>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button data-testid="add-host-btn">
-              <Plus className="mr-2 h-4 w-4" /> Добавить хост
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingHost ? "Редактировать хост" : "Новый хост"}</DialogTitle>
-              <DialogDescription>
-                Внесите информацию о сервере
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex gap-2">
+          {/* Скрытый input для выбора файла */}
+          <input
+            type="file"
+            accept=".json, .txt"
+            ref={fileInputRef}
+            onChange={handleFileImport}
+            className="hidden"
+          />
+          
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Импортировать хосты
+          </Button>
+          
+          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Импорт хостов</DialogTitle>
+                <DialogDescription>
+                  Импортирование хостов из файла...
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex justify-between text-sm">
+                  <span>Прогресс:</span>
+                  <span>{importProgress.current} из {importProgress.total}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                  />
+                </div>
+                {importing && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Импорт...
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button data-testid="add-host-btn">
+                <Plus className="mr-2 h-4 w-4" /> Добавить хост
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingHost ? "Редактировать хост" : "Новый хост"}</DialogTitle>
+                <DialogDescription>
+                  Внесите информацию о сервере
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Название</Label>
@@ -269,9 +401,10 @@ export default function HostsPage() {
                   {editingHost ? "Обновить" : "Создать"}
                 </Button>
               </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
