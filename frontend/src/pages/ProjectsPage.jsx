@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { Checkbox } from "../components/ui/checkbox";
-import { Label } from "../components/ui/label";
 import { PlusCircle, Play, Trash2, Eye, Users, UserPlus, UserMinus, User } from "lucide-react";
 import { toast } from "sonner";
-import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
+import { Badge } from "@/components/ui/badge";
 
 export default function ProjectsPage({ onNavigate }) {
   const [projects, setProjects] = useState([]);
