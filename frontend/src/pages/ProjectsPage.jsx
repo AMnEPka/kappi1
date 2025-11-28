@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { PlusCircle, Play, Trash2, Eye, Users, UserPlus, UserMinus, User } from "lucide-react";
+import { PlusCircle, Play, Trash2, Eye, Users, UserPlus, UserMinus, User, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 export default function ProjectsPage({ onNavigate }) {
   const [projects, setProjects] = useState([]);
@@ -18,11 +19,30 @@ export default function ProjectsPage({ onNavigate }) {
   const [projectUsers, setProjectUsers] = useState([]);
   const [loadingAccess, setLoadingAccess] = useState(false);
   const {hasPermission, isAdmin, user} = useAuth();
+  const [userSearchTerm, setUserSearchTerm] = useState('');  
 
   useEffect(() => {
     fetchProjects();
   }, []);
 
+  const availableUsers = useMemo(() => {
+    const filteredUsers = allUsers.filter(u => 
+      // Исключаем пользователей которые уже имеют доступ
+      !projectUsers.find(pu => pu.id === u.id) && 
+      // Исключаем администраторов
+      !u.is_admin
+    );
+  
+    if (!userSearchTerm.trim()) {
+      return filteredUsers;
+    }
+  
+    const searchTerm = userSearchTerm.toLowerCase();
+    return filteredUsers.filter(user =>
+      user.full_name?.toLowerCase().includes(searchTerm) ||
+      user.username?.toLowerCase().includes(searchTerm)
+    );
+  }, [allUsers, projectUsers, userSearchTerm]);
 
   const fetchProjects = async () => {
     try {
@@ -288,105 +308,116 @@ const fetchProjectUsers = async (projectId) => {
         </div>
       )}
 
-      {/* Access Management Dialog */}
-      <Dialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Управление доступом к проекту</DialogTitle>
-            <DialogDescription>
-              {selectedProject?.name}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {loadingAccess ? (
-            <div className="flex justify-center items-center py-8">
-              <div className="text-gray-500">Загрузка...</div>
-            </div>
+{/* Access Management Dialog */}
+<Dialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen}>
+  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>Управление доступом к проекту</DialogTitle>
+      <DialogDescription>
+        {selectedProject?.name}
+      </DialogDescription>
+    </DialogHeader>
+    
+    {loadingAccess ? (
+      <div className="flex justify-center items-center py-8">
+        <div className="text-gray-500">Загрузка...</div>
+      </div>
+    ) : (
+      <div className="space-y-6">
+        {/* Current users with access */}
+        <div>
+          <h3 className="font-semibold mb-3 flex items-center">
+            <Users className="mr-2 h-4 w-4" />
+            Пользователи с доступом ({projectUsers.length})
+          </h3>
+          {projectUsers.length === 0 ? (
+            <p className="text-sm text-gray-500">Нет пользователей с доступом (Администраторы не отображаются)</p>
           ) : (
-            <div className="space-y-6">
-              {/* Current users with access */}
-              <div>
-                <h3 className="font-semibold mb-3 flex items-center">
-                  <Users className="mr-2 h-4 w-4" />
-                  Пользователи с доступом ({projectUsers.length})
-                </h3>
-                {projectUsers.length === 0 ? (
-                  <p className="text-sm text-gray-500">Нет пользователей с доступом (Администраторы не отображаются)</p>
-                ) : (
-                  <div className="space-y-2">
-                    {projectUsers.map((projectUser) => (
-                      <div key={projectUser.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <p className="font-medium">{projectUser.full_name}</p>
-                            <p className="text-sm text-gray-500">@{projectUser.username}</p>
-                          </div>
-                          {projectUser.id === selectedProject?.created_by && (
-                            <Badge variant="outline" className="text-xs">
-                              Создатель
-                            </Badge>
-                          )}
-                        </div>
-                        {projectUser.id !== selectedProject?.created_by && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRevokeAccess(projectUser.id)}
-                          >
-                            <UserMinus className="mr-1 h-3 w-3" />
-                            Отозвать
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+            <div className="space-y-2">
+              {projectUsers.map((projectUser) => (
+                <div key={projectUser.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <p className="font-medium">{projectUser.full_name}</p>
+                      <p className="text-sm text-gray-500">@{projectUser.username}</p>
+                    </div>
+                    {projectUser.id === selectedProject?.created_by && (
+                      <Badge variant="outline" className="text-xs">
+                        Создатель
+                      </Badge>
+                    )}
                   </div>
-                )}
-              </div>
-
-              {/* Available users to grant access */}
-              <div>
-                <h3 className="font-semibold mb-3 flex items-center">
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Предоставить доступ
-                </h3>
-                {allUsers
-                  .filter(u => 
-                    // Исключаем пользователей которые уже имеют доступ
-                    !projectUsers.find(pu => pu.id === u.id) && 
-                    // Исключаем администраторов
-                    !u.is_admin
-                  ).length === 0 ? (
-                  <p className="text-sm text-gray-500">Нет пользователей для предоставления доступа</p>
-                ) : (
-                  <div className="space-y-2">
-                    {allUsers
-                      .filter(u => 
-                        !projectUsers.find(pu => pu.id === u.id) && 
-                        !u.is_admin
-                      )
-                      .map((availableUser) => (
-                        <div key={availableUser.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div>
-                            <p className="font-medium">{availableUser.full_name}</p>
-                            <p className="text-sm text-gray-500">@{availableUser.username}</p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleGrantAccess(availableUser.id)}
-                          >
-                            <UserPlus className="mr-1 h-3 w-3" />
-                            Добавить
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
+                  {projectUser.id !== selectedProject?.created_by && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRevokeAccess(projectUser.id)}
+                    >
+                      <UserMinus className="mr-1 h-3 w-3" />
+                      Отозвать
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+
+        {/* Available users to grant access */}
+        <div>
+          <h3 className="font-semibold mb-3 flex items-center">
+            <UserPlus className="mr-2 h-4 w-4" />
+            Предоставить доступ
+          </h3>
+          
+          {/* Search input with clear button */}
+          <div className="mb-4 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Поиск пользователей по имени или логину..."
+              value={userSearchTerm}
+              onChange={(e) => setUserSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-10"
+            />
+            {userSearchTerm && (
+              <button
+                onClick={() => setUserSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {availableUsers.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              {userSearchTerm ? "Пользователи не найдены" : "Нет пользователей для предоставления доступа"}
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {availableUsers.map((availableUser) => (
+                <div key={availableUser.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                  <div>
+                    <p className="font-medium">{availableUser.full_name}</p>
+                    <p className="text-sm text-gray-500">@{availableUser.username}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleGrantAccess(availableUser.id)}
+                  >
+                    <UserPlus className="mr-1 h-3 w-3" />
+                    Добавить
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
     </div>
   );
 }

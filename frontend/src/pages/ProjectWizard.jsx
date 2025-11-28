@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Upload } from 'lucide-react';
 import { Textarea } from "../components/ui/textarea";
 import { Checkbox } from "../components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -265,6 +266,234 @@ export default function ProjectWizard({ onNavigate }) {
     return scripts.filter(s => s.system_id === systemId);
   };
 
+  const Step5AccessManagement = ({ 
+    users, 
+    currentUser, 
+    projectData, 
+    setProjectData 
+  }) => {
+    const [userSearchTerm, setUserSearchTerm] = useState('');
+  
+    const filteredUsers = useMemo(() => {
+      const baseUsers = users.filter(u => 
+        u.is_active && 
+        u.username !== 'admin' && 
+        u.id !== currentUser?.id
+      );
+  
+      if (!userSearchTerm.trim()) {
+        return baseUsers;
+      }
+  
+      const searchTerm = userSearchTerm.toLowerCase();
+      return baseUsers.filter(user =>
+        user.full_name?.toLowerCase().includes(searchTerm) ||
+        user.username?.toLowerCase().includes(searchTerm)
+      );
+    }, [users, currentUser?.id, userSearchTerm]);
+  
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Шаг 5: Управление доступом</CardTitle>
+          <CardDescription>Выберите пользователей, которые смогут выполнять этот проект</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              По умолчанию доступ к проекту есть у вас (создателя) и у администраторов. Вы можете предоставить доступ другим пользователям.
+            </p>
+            
+            <div className="mb-4">
+              <Input
+                placeholder="Поиск пользователей по имени или логину..."
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
+
+            {projectData.accessUserIds.length > 0 && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-700 font-medium mb-2">
+                  Выбрано пользователей: {projectData.accessUserIds.length}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {projectData.accessUserIds.map(userId => {
+                    const user = users.find(u => u.id === userId);
+                    return user ? (
+                      <Badge key={user.id} variant="outline" className="text-xs bg-green-100 text-green-800">
+                        {user.full_name}
+                      </Badge>
+                    ) : null;
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              {/* Текущий пользователь (неснимаемый) */}
+              <div className="flex items-center space-x-3 p-3 border rounded-lg bg-gray-50">
+                <Checkbox
+                  id="current-user"
+                  checked={true}
+                  disabled
+                  className="opacity-50"
+                />
+                <div className="flex-1">
+                  <Label htmlFor="current-user" className="font-medium">
+                    {currentUser?.full_name} (вы)
+                  </Label>
+                  <p className="text-sm text-gray-500">@{currentUser?.username}</p>
+                </div>
+                <span className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-md">
+                  Создатель
+                </span>
+              </div>
+  
+              {/* Остальные пользователи с поиском */}
+              {filteredUsers.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  {userSearchTerm ? "Пользователи не найдены" : "Нет доступных пользователей"}
+                </div>
+              ) : (
+                filteredUsers.map((user) => (
+                  <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                    <Checkbox
+                      id={`user-${user.id}`}
+                      checked={projectData.accessUserIds.includes(user.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setProjectData(prev => ({
+                            ...prev,
+                            accessUserIds: [...prev.accessUserIds, user.id]
+                          }));
+                        } else {
+                          setProjectData(prev => ({
+                            ...prev,
+                            accessUserIds: prev.accessUserIds.filter(id => id !== user.id)
+                          }));
+                        }
+                      }}
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor={`user-${user.id}`} className="cursor-pointer font-medium">
+                        {user.full_name}
+                        {user.is_admin && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            Админ
+                          </Badge>
+                        )}
+                      </Label>
+                      <p className="text-sm text-gray-500">@{user.username}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+  
+
+  
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Администраторы</strong> имеют доступ ко всем проектам по умолчанию и не отображаются в этом списке.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const Step2HostSelection = ({ 
+    hosts, 
+    projectData, 
+    handleHostToggle 
+  }) => {
+    const [hostSearchTerm, setHostSearchTerm] = useState('');
+  
+    const filteredHosts = useMemo(() => {
+      if (!hostSearchTerm.trim()) {
+        return hosts;
+      }
+  
+      const searchTerm = hostSearchTerm.toLowerCase();
+      return hosts.filter(host =>
+        host.name?.toLowerCase().includes(searchTerm) ||
+        host.hostname?.toLowerCase().includes(searchTerm)
+      );
+    }, [hosts, hostSearchTerm]);
+  
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Шаг 2: Выбор хостов</CardTitle>
+          <CardDescription>Выберите хосты для выполнения проверок</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Строка поиска хостов */}
+          <div className="mb-2">
+            <Input
+              placeholder="Поиск хостов по названию или IP-адресу..."
+              value={hostSearchTerm}
+              onChange={(e) => setHostSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
+
+          {/* Статистика выбранных хостов */}
+          <div className="mb-2">
+            {projectData.hosts.length > 0 && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm text-blue-700 font-medium mb-2">
+                  Выбрано хостов: {projectData.hosts.length} 
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {projectData.hosts.map(hostId => {
+                    const host = hosts.find(h => h.id === hostId);
+                    return host ? (
+                      <Badge key={host.id} variant="outline" className="text-xs bg-blue-100 text-blue-800">
+                        {host.hostname}
+                      </Badge>
+                    ) : null;
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            )}          
+          </div>
+  
+          {filteredHosts.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">
+              {hostSearchTerm ? "Хосты не найдены" : "Нет доступных хостов"}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredHosts.map((host) => (
+                <div key={host.id} className="flex items-center space-x-2 p-2 border rounded hover:bg-gray-50">
+                  <Checkbox
+                    checked={projectData.hosts.includes(host.id)}
+                    onCheckedChange={() => handleHostToggle(host.id)}
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium">{host.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {host.hostname}:{host.port}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {host.connection_type === "ssh" ? "Linux" : "Windows"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+  
+
+        </CardContent>
+      </Card>
+    );
+  };  
+
   const renderStep1 = () => (
     <Card>
       <CardHeader>
@@ -296,34 +525,11 @@ export default function ProjectWizard({ onNavigate }) {
   );
 
   const renderStep2 = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Шаг 2: Выбор хостов</CardTitle>
-        <CardDescription>Выберите хосты для выполнения проверок</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {hosts.length === 0 ? (
-          <p className="text-gray-500">Нет доступных хостов</p>
-        ) : (
-          <div className="space-y-2">
-            {hosts.map((host) => (
-              <div key={host.id} className="flex items-center space-x-2 p-2 border rounded">
-                <Checkbox
-                  checked={projectData.hosts.includes(host.id)}
-                  onCheckedChange={() => handleHostToggle(host.id)}
-                />
-                <div className="flex-1">
-                  <p className="font-medium">{host.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {host.hostname}:{host.port}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <Step2HostSelection
+      hosts={hosts}
+      projectData={projectData}
+      handleHostToggle={handleHostToggle}
+    />
   );
 
   const handleSelectAllScripts = (hostId, systemIndex, system, scripts) => {
@@ -343,124 +549,194 @@ export default function ProjectWizard({ onNavigate }) {
   });
 };
 
-  const renderStep3 = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Шаг 3: Назначение проверок</CardTitle>
-        <CardDescription>Для каждого хоста выберите системы и проверкуы</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {projectData.tasks.map((task) => {
-            const host = getHostById(task.host_id);
+const renderStep3 = () => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Шаг 3: Назначение проверок</CardTitle>
+      <CardDescription>Для каждого хоста выберите системы и проверки</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-6">
+        {projectData.tasks.map((task) => {
+          const host = getHostById(task.host_id);
 
-            return (
-              <div key={task.host_id} className="border-2 rounded-lg p-4">
-                <h3 className="font-bold text-lg mb-4">{host?.name}</h3>
+          return (
+            <div key={task.host_id} className="border-2 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg">{host?.name}</h3>
+                <Badge variant="outline" className="text-xs">
+                  {host?.connection_type === "ssh" ? "Linux" : "Windows"}
+                </Badge>
+              </div>
 
-                {/* Список систем для этого хоста */}
-                {task.systems.map((system, systemIndex) => {
-                  const availableScripts = getScriptsBySystemId(system.system_id);
-                  const selectedSystem = getSystemById(system.system_id);
+              {/* Список систем для этого хоста */}
+              {task.systems.map((system, systemIndex) => {
+                const availableScripts = getScriptsBySystemId(system.system_id);
+                const selectedSystem = getSystemById(system.system_id);
 
-                  return (
-                    <div key={systemIndex} className="mb-6 p-3 border rounded bg-gray-50">
-                      <div className="flex items-center justify-between mb-3">
-                        <Label className="text-base font-semibold">
-                          Система {systemIndex + 1}
-                        </Label>
-                        {task.systems.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveSystemFromHost(task.host_id, systemIndex)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-
-                      <div className="mb-3">
-                        <Label className="text-sm">Выберите систему</Label>
-                        <Select
-                          value={system.system_id}
-                          onValueChange={(value) => handleTaskSystemChange(task.host_id, systemIndex, value)}
+                return (
+                  <div key={systemIndex} className="mb-6 p-3 border rounded bg-gray-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-base font-semibold">
+                        Система {systemIndex + 1}
+                      </Label>
+                      {task.systems.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveSystemFromHost(task.host_id, systemIndex)}
+                          className="text-red-600 hover:text-red-700"
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите систему" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {systems.map((sys) => {
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="mb-3">
+                      <Label className="text-sm">Выберите систему</Label>
+                      <Select
+                        value={system.system_id}
+                        onValueChange={(value) => handleTaskSystemChange(task.host_id, systemIndex, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите систему" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {systems
+                            .filter(sys => {
+                              // Фильтруем системы по типу ОС хоста
+                              const systemOsType = sys.os_type;
+                              const hostConnectionType = host?.connection_type;
+                              
+                              // Для Linux хостов показываем только Linux системы
+                              if (hostConnectionType === 'ssh') {
+                                return systemOsType === 'linux';
+                              }
+                              // Для Windows хостов показываем только Windows системы
+                              if (hostConnectionType === 'winrm') {
+                                return systemOsType === 'windows';
+                              }
+                              return true;
+                            })
+                            .filter(sys => {
+                              // Исключаем системы, которые уже выбраны для этого хоста
+                              const isSystemAlreadySelected = task.systems.some(
+                                existingSystem => existingSystem.system_id === sys.id
+                              );
+                              return !isSystemAlreadySelected || sys.id === system.system_id;
+                            })
+                            .map((sys) => {
                               const category = getCategoryById(sys.category_id);
+                              const isSystemAlreadySelected = task.systems.some(
+                                existingSystem => existingSystem.system_id === sys.id && existingSystem !== system
+                              );
+                              
                               return (
-                                <SelectItem key={sys.id} value={sys.id}>
-                                  {category?.icon} {category?.name} → {sys.name}
+                                <SelectItem 
+                                  key={sys.id} 
+                                  value={sys.id}
+                                  disabled={isSystemAlreadySelected && sys.id !== system.system_id}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span>
+                                      {category?.icon} {category?.name} → {sys.name}
+                                      <span className="text-xs text-gray-500 ml-2">
+                                        ({sys.os_type === 'windows' ? 'Windows' : 'Linux'})
+                                      </span>
+                                    </span>
+                                    {isSystemAlreadySelected && sys.id !== system.system_id && (
+                                      <Badge variant="outline" className="text-xs ml-2">
+                                        Уже выбрана
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </SelectItem>
                               );
                             })}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {system.system_id && (
-                        <div>
-                          <Label className="text-sm">Проверки</Label>
-                          {availableScripts.length === 0 ? (
-                            <p className="text-gray-500 text-sm mt-2">Нет доступных проверок</p>
-                          ) : (
-                            <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
-                              {/* Чекбокс "Выбрать все" */}
-                              <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
-                                <Checkbox
-                                  checked={availableScripts.every(script => 
-                                    system.script_ids.includes(script.id)
-                                  )}
-                                  onCheckedChange={() => handleSelectAllScripts(task.host_id, systemIndex, system, availableScripts)}
-                                />
-                                <Label className="font-medium text-sm cursor-pointer">Выбрать все</Label>
-                              </div>
-
-                              {/* Список проверок */}
-                              {availableScripts.map((script) => (
-                                <div key={script.id} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    checked={system.script_ids.includes(script.id)}
-                                    onCheckedChange={() => handleTaskScriptToggle(task.host_id, systemIndex, script.id)}
-                                  />
-                                  <div className="flex-1">
-                                    <p className="font-medium text-sm">{script.name}</p>
-                                    {script.description && (
-                                      <p className="text-xs text-gray-500">{script.description}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  );
-                })}
 
-                {/* Кнопка добавления системы */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleAddSystemToHost(task.host_id)}
-                  className="w-full"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Добавить ещё систему
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
+                    {system.system_id && (
+                      <div>
+                        <Label className="text-sm">Проверки</Label>
+                        {availableScripts.length === 0 ? (
+                          <p className="text-gray-500 text-sm mt-2">Нет доступных проверок</p>
+                        ) : (
+                          <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
+                            {/* Чекбокс "Выбрать все" */}
+                            <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
+                              <Checkbox
+                                checked={availableScripts.every(script => 
+                                  system.script_ids.includes(script.id)
+                                )}
+                                onCheckedChange={() => handleSelectAllScripts(task.host_id, systemIndex, system, availableScripts)}
+                              />
+                              <Label className="font-medium text-sm cursor-pointer">Выбрать все</Label>
+                            </div>
+
+                            {/* Список проверок */}
+                            {availableScripts.map((script) => (
+                              <div key={script.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  checked={system.script_ids.includes(script.id)}
+                                  onCheckedChange={() => handleTaskScriptToggle(task.host_id, systemIndex, script.id)}
+                                />
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{script.name}</p>
+                                  {script.description && (
+                                    <p className="text-xs text-gray-500">{script.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Кнопка добавления системы */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddSystemToHost(task.host_id)}
+                className="w-full"
+                disabled={systems
+                  .filter(sys => {
+                    const systemOsType = sys.os_type;
+                    const hostConnectionType = host?.connection_type;
+                    if (hostConnectionType === 'ssh') return systemOsType === 'linux';
+                    if (hostConnectionType === 'winrm') return systemOsType === 'windows';
+                    return true;
+                  })
+                  .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
+                  .length === 0}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Добавить ещё систему
+                {systems
+                  .filter(sys => {
+                    const systemOsType = sys.os_type;
+                    const hostConnectionType = host?.connection_type;
+                    if (hostConnectionType === 'ssh') return systemOsType === 'linux';
+                    if (hostConnectionType === 'winrm') return systemOsType === 'windows';
+                    return true;
+                  })
+                  .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
+                  .length === 0 && (
+                  <span className="text-xs ml-2">(все системы уже выбраны)</span>
+                )}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </CardContent>
+  </Card>
+);
 
   const renderStep4 = () => {
     // Collect all scripts that have reference files
@@ -644,83 +920,12 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const renderStep5 = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Шаг 5: Управление доступом</CardTitle>
-        <CardDescription>Выберите пользователей, которые смогут выполнять этот проект</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            По умолчанию доступ к проекту есть у вас (создателя) и у администраторов. Вы можете предоставить доступ другим пользователям.
-          </p>
-          
-          <div className="space-y-2">
-            {/* Текущий пользователь (неснимаемый) */}
-            <div className="flex items-center space-x-3 p-3 border rounded-lg bg-gray-50">
-              <Checkbox
-                id="current-user"
-                checked={true}
-                disabled
-                className="opacity-50"
-              />
-              <div className="flex-1">
-                <Label htmlFor="current-user" className="font-medium">
-                  {currentUser?.full_name} (вы)
-                </Label>
-                <p className="text-sm text-gray-500">@{currentUser?.username}</p>
-              </div>
-              <span className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-md">
-                Создатель
-              </span>
-            </div>
-
-            {/* Остальные пользователи (кроме admin и текущего) */}
-            {users
-              .filter(u => u.is_active && u.username !== 'admin' && u.id !== currentUser?.id)
-              .map((user) => (
-                <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                  <Checkbox
-                    id={`user-${user.id}`}
-                    checked={projectData.accessUserIds.includes(user.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setProjectData(prev => ({
-                          ...prev,
-                          accessUserIds: [...prev.accessUserIds, user.id]
-                        }));
-                      } else {
-                        setProjectData(prev => ({
-                          ...prev,
-                          accessUserIds: prev.accessUserIds.filter(id => id !== user.id)
-                        }));
-                      }
-                    }}
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor={`user-${user.id}`} className="cursor-pointer font-medium">
-                      {user.full_name}
-                      {user.is_admin && (
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          Админ
-                        </Badge>
-                      )}
-                    </Label>
-                    <p className="text-sm text-gray-500">@{user.username}</p>
-                  </div>
-                </div>
-              ))}
-          </div>
-
-          {/* Информация о администраторах */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-700">
-              <strong>Администраторы</strong> имеют доступ ко всем проектам по умолчанию и не отображаются в этом списке.
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <Step5AccessManagement
+      users={users}
+      currentUser={currentUser}
+      projectData={projectData}
+      setProjectData={setProjectData}
+    />
   );
 
   const renderStep6 = () => (
@@ -787,36 +992,32 @@ export default function ProjectWizard({ onNavigate }) {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Создание проекта</h1>
-        <div className="flex items-center gap-2 mt-4">
-          {[1, 2, 3, 4, 5, 6].map((s) => (
-            <div key={s} className="flex items-center">
+        
+        {/* Прогресс-бар с точным контролем ширины */}
+        <div className="w-full flex items-center mt-4 px-4"> {/* px-4 для отступов по краям */}
+          {[1, 2, 3, 4, 5, 6].map((s, index) => (
+            <React.Fragment key={s}>
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                   s <= step ? 'bg-yellow-400 text-white' : 'bg-gray-300 text-gray-600'
                 }`}
               >
                 {s < step ? <Check className="h-4 w-4" /> : s}
               </div>
-              {s < 6 && (
+              {index < 5 && (
                 <div
-                  className={`w-16 h-1 ${
+                  className={`flex-1 h-1 ${
                     s < step ? 'bg-yellow-400' : 'bg-gray-300'
                   }`}
                 />
               )}
-            </div>
+            </React.Fragment>
           ))}
         </div>
       </div>
-
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
-      {step === 3 && renderStep3()}
-      {step === 4 && renderStep4()}
-      {step === 5 && renderStep5()}
-      {step === 6 && renderStep6()}
-
-      <div className="flex justify-between mt-6">
+  
+      {/* Кнопки навигации с увеличенным отступом */}
+      <div className="flex justify-between mb-3"> {/* mb-8 вместо mt-6 */}
         <Button
           variant="outline"
           onClick={step === 1 ? () => onNavigate('projects') : handleBack}
@@ -824,7 +1025,7 @@ export default function ProjectWizard({ onNavigate }) {
           <ChevronLeft className="mr-2 h-4 w-4" />
           {step === 1 ? 'Отмена' : 'Назад'}
         </Button>
-
+  
         {step < 6 ? (
           <Button onClick={handleNext}>
             Далее
@@ -836,6 +1037,14 @@ export default function ProjectWizard({ onNavigate }) {
           </Button>
         )}
       </div>
+  
+      {/* Контент шага */}
+      {step === 1 && renderStep1()}
+      {step === 2 && renderStep2()}
+      {step === 3 && renderStep3()}
+      {step === 4 && renderStep4()}
+      {step === 5 && renderStep5()}
+      {step === 6 && renderStep6()}
     </div>
   );
 }
