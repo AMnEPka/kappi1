@@ -1,6 +1,6 @@
 """Scripts API endpoints"""
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends  # pyright: ignore[reportMissingImports]
 from typing import Optional
 
 from config.config_init import db

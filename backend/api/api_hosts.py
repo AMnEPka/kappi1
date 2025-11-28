@@ -1,6 +1,6 @@
 """Hosts API endpoints"""
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends  # pyright: ignore[reportMissingImports]
 from typing import List
 
 from config.config_init import db
