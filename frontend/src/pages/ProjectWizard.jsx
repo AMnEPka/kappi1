@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Label } from "../components/ui/label";
-import { Upload } from 'lucide-react';
 import { Textarea } from "../components/ui/textarea";
 import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { ChevronLeft, ChevronRight, Check, Plus, Trash2 } from "lucide-react";
+import { Server, ChevronLeft, ChevronRight, Check, Plus, Trash2, HelpCircle, Loader2, EthernetPort, Upload, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -406,93 +407,484 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const Step2HostSelection = ({ 
-    hosts, 
     projectData, 
-    handleHostToggle 
+    onHostsChange // callback для обновления списка хостов проекта
   }) => {
-    const [hostSearchTerm, setHostSearchTerm] = useState('');
+    const [isHostDialogOpen, setIsHostDialogOpen] = useState(false);
+    const [editingHost, setEditingHost] = useState(null);
+    const [testingHostId, setTestingHostId] = useState(null);
+    const [importDialogOpen, setImportDialogOpen] = useState(false);
+    const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+    const [formData, setFormData] = useState({
+      name: "",
+      hostname: "",
+      port: 22,
+      username: "",
+      auth_type: "password",
+      password: "",
+      ssh_key: "",
+      connection_type: "ssh"
+    });
   
-    const filteredHosts = useMemo(() => {
-      if (!hostSearchTerm.trim()) {
-        return hosts;
+    const fileInputRef = useRef(null);
+    const [importing, setImporting] = useState(false);
+  
+    // Хосты текущего проекта
+    const projectHosts = projectData.hostsList || [];
+  
+    const handleSubmitHost = async (e) => {
+      e.preventDefault();
+      try {
+        const isEditing = !!editingHost;
+        const newHost = {
+          ...formData,
+          id: isEditing ? editingHost.id : `host-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        };
+    
+        let updatedHosts;
+        if (isEditing) {
+          // Обновляем существующий хост
+          updatedHosts = projectHosts.map(h => h.id === editingHost.id ? newHost : h);
+        } else {
+          // Добавляем новый хост
+          updatedHosts = [...projectHosts, newHost];
+        }
+    
+        // Обновляем список хостов проекта
+        onHostsChange(updatedHosts);
+    
+        setIsHostDialogOpen(false);
+        resetForm();
+        toast.success(isEditing ? "Хост обновлен" : "Хост добавлен");
+      } catch (error) {
+        console.error('Error saving host:', error);
+        toast.error("Ошибка сохранения хоста");
       }
+    };
   
-      const searchTerm = hostSearchTerm.toLowerCase();
-      return hosts.filter(host =>
-        host.name?.toLowerCase().includes(searchTerm) ||
-        host.hostname?.toLowerCase().includes(searchTerm)
-      );
-    }, [hosts, hostSearchTerm]);
+    const handleDeleteHost = async (hostId) => {
+      const host = projectHosts.find(h => h.id === hostId);
+      if (!host) return;
+  
+      // Удаляем хост из списка хостов проекта
+      const updatedHosts = projectHosts.filter(h => h.id !== hostId);
+      onHostsChange(updatedHosts);
+      toast.success("Хост удален");
+    };
+  
+    const handleTestConnection = async (host) => {
+      setTestingHostId(host.id);
+      try {
+        // Имитация тестирования подключения
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // В реальном приложении здесь был бы API вызов
+        const success = Math.random() > 0.3; // случайный результат для демо
+        
+        if (success) {
+          toast.success(`✅ Подключение к ${host.hostname} успешно`);
+        } else {
+          toast.error(`❌ Не удалось подключиться к ${host.hostname}`);
+        }
+      } catch (error) {
+        toast.error(`Ошибка тестирования: ${error.message}`);
+      } finally {
+        setTestingHostId(null);
+      }
+    };
+  
+    const resetForm = () => {
+      setFormData({
+        name: "",
+        hostname: "",
+        port: 22,
+        username: "",
+        auth_type: "password",
+        password: "",
+        ssh_key: "",
+        connection_type: "ssh"
+      });
+      setEditingHost(null);
+    };
+  
+    const openEditDialog = (host) => {
+      setEditingHost(host);
+      setFormData({
+        name: host.name,
+        hostname: host.hostname,
+        port: host.port,
+        username: host.username,
+        auth_type: host.auth_type,
+        password: "",
+        ssh_key: host.ssh_key || "",
+        connection_type: host.connection_type || "ssh"
+      });
+      setIsHostDialogOpen(true);
+    };
+  
+    const handleFileImport = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+  
+      setImporting(true);
+      setImportDialogOpen(true);
+      
+      try {
+        const text = await file.text();
+        let hostsData;
+        
+        try {
+          hostsData = JSON.parse(text);
+        } catch (e) {
+          const jsonObjects = text.trim().split('\n').filter(line => line.trim());
+          hostsData = jsonObjects.map(obj => JSON.parse(obj));
+        }
+        
+        if (!Array.isArray(hostsData)) {
+          hostsData = [hostsData];
+        }
+        
+        setImportProgress({ current: 0, total: hostsData.length });
+        
+        const newHosts = [];
+        
+        for (let i = 0; i < hostsData.length; i++) {
+          const hostData = hostsData[i];
+          const newHost = {
+            ...hostData,
+            id: `imported-${Date.now()}-${i}`
+          };
+          newHosts.push(newHost);
+          
+          setImportProgress({ current: i + 1, total: hostsData.length });
+          
+          // Задержка для визуализации прогресса
+          if (i < hostsData.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        // Добавляем импортированные хосты к существующим хостам проекта
+        const updatedHosts = [...projectHosts, ...newHosts];
+        onHostsChange(updatedHosts);
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setImportDialogOpen(false);
+        
+        toast.success(`Импортировано хостов: ${newHosts.length} `);
+        
+      } catch (error) {
+        console.error('Ошибка импорта файла:', error);
+        setImportDialogOpen(false);
+        toast.error("Ошибка при импорте файла. Проверьте формат файла.");
+      } finally {
+        setImporting(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
   
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Шаг 2: Выбор хостов</CardTitle>
-          <CardDescription>Выберите хосты для выполнения проверок</CardDescription>
+          <CardTitle>Шаг 2: Управление хостами проекта</CardTitle>
+          <CardDescription>Добавьте хосты для выполнения проверок. Все добавленные хосты будут использоваться в проекте.</CardDescription>
         </CardHeader>
-        <CardContent>
-          {/* Строка поиска хостов */}
-          <div className="mb-2">
-            <Input
-              placeholder="Поиск хостов по названию или IP-адресу..."
-              value={hostSearchTerm}
-              onChange={(e) => setHostSearchTerm(e.target.value)}
-              className="w-full"
-            />
-          </div>
-
-          {/* Статистика выбранных хостов */}
-          <div className="mb-2">
-            {projectData.hosts.length > 0 && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-sm text-blue-700 font-medium mb-2">
-                  Выбрано хостов: {projectData.hosts.length} 
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {projectData.hosts.map(hostId => {
-                    const host = hosts.find(h => h.id === hostId);
-                    return host ? (
-                      <Badge key={host.id} variant="outline" className="text-xs bg-blue-100 text-blue-800">
-                        {host.hostname}
-                      </Badge>
-                    ) : null;
-                  }).filter(Boolean)}
-                </div>
-              </div>
-            )}          
+        <CardContent className="space-y-4">
+          {/* Панель управления хостами */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex gap-2">
+              {/* Скрытый input для выбора файла */}
+              <input
+                type="file"
+                accept=".json, .txt"
+                ref={fileInputRef}
+                onChange={handleFileImport}
+                className="hidden"
+              />
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Импорт хостов
+              </Button>
+  
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      className="h-10 w-10 p-0"
+                    >
+                      <HelpCircle className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="w-96">
+                    <pre className="text-xs whitespace-pre-wrap">
+                    {`
+•Импорт хостов реализован в формате json;
+•Используйте файлы .json или .txt;
+•Они должны содержать валидный массив json-файлов или json'ы одной строкой;
+•Для linux порт 22 и connection_type=ssh;
+•Для windows порт 5986 и connection_type=winrm; 
+•Для авторизации через ssh-key auth_type=key;
+•Пример:
+[
+  {
+    "name": "Linux Server 1",
+    "hostname": "192.168.1.100",
+    "port": 22,
+    "username": "admin",
+    "auth_type": "password",
+    "password": "admin123",
+    "ssh_key": "",
+    "connection_type": "ssh"
+  }
+]`}
+                    </pre>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            
+            <Dialog open={isHostDialogOpen} onOpenChange={(open) => {
+              setIsHostDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" /> Добавить хост вручную
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingHost ? "Редактировать хост" : "Новый хост"}</DialogTitle>
+                  <DialogDescription>
+                    Внесите информацию о сервере
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmitHost} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Название</Label>
+                      <Input
+                        placeholder="ЗАКС сервер хранения"
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label>Хост</Label>
+                      <Input
+                        placeholder="192.168.1.1 или host1.rn.ru"
+                        value={formData.hostname}
+                        onChange={(e) => setFormData({...formData, hostname: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Порт</Label>
+                      <Input
+                        type="number"
+                        value={formData.port}
+                        onChange={(e) => setFormData({...formData, port: parseInt(e.target.value)})}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label>Имя пользователя</Label>
+                      <Input
+                        value={formData.username}
+                        placeholder="user"
+                        onChange={(e) => setFormData({...formData, username: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Тип подключения</Label>
+                      <Select 
+                        value={formData.connection_type || 'ssh'} 
+                        onValueChange={(value) => {
+                          const newPort = value === 'winrm' ? 5985 : 22;
+                          setFormData({...formData, connection_type: value, port: newPort});
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ssh">SSH (Linux)</SelectItem>
+                          <SelectItem value="winrm">WinRM (Windows)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Тип аутентификации</Label>
+                      <Select value={formData.auth_type} onValueChange={(value) => setFormData({...formData, auth_type: value})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="password">Пароль</SelectItem>
+                          {formData.connection_type !== 'winrm' && <SelectItem value="key">SSH ключ</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+  
+                  {formData.auth_type === "password" ? (
+                    <div>
+                      <Label>Пароль</Label>
+                      <Input
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({...formData, password: e.target.value})}
+                        placeholder={editingHost ? "Оставьте пустым, чтобы не менять" : ""}
+                        required={!editingHost}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <Label>SSH приватный ключ</Label>
+                      <Textarea
+                        value={formData.ssh_key}
+                        onChange={(e) => setFormData({...formData, ssh_key: e.target.value})}
+                        placeholder="-----BEGIN RSA PRIVATE KEY-----\n..."
+                        rows={6}
+                        required
+                      />
+                    </div>
+                  )}
+  
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsHostDialogOpen(false)}>
+                      Отмена
+                    </Button>
+                    <Button type="submit">
+                      {editingHost ? "Обновить" : "Создать"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
   
-          {filteredHosts.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">
-              {hostSearchTerm ? "Хосты не найдены" : "Нет доступных хостов"}
+          {/* Список хостов проекта */}
+          {projectHosts.length === 0 ? (
+            <div className="text-center py-8 border-2 border-dashed rounded-lg">
+              <Server className="h-12 w-12 mx-auto text-slate-300 mb-4" />
+              <p className="text-slate-500 text-lg mb-2">Нет добавленных хостов</p>
+              <p className="text-slate-400 text-sm mb-4">Добавьте хосты для этого проекта</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {filteredHosts.map((host) => (
-                <div key={host.id} className="flex items-center space-x-2 p-2 border rounded hover:bg-gray-50">
-                  <Checkbox
-                    checked={projectData.hosts.includes(host.id)}
-                    onCheckedChange={() => handleHostToggle(host.id)}
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium">{host.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {host.hostname}:{host.port}
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {projectHosts.map((host, index) => (
+                <div key={host.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 group">
+                  {/* Нумерация в желтом кружочке */}
+                  <div className="flex-shrink-0 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-sm font-bold text-yellow-900">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium truncate">{host.name}</p>
+                      <Badge variant="outline" className="text-xs">
+                        {host.connection_type === "ssh" ? "Linux" : "Windows"}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {host.auth_type === "password" ? "Пароль" : "SSH ключ"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-500 truncate">
+                      {host.username}@{host.hostname}:{host.port}
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {host.connection_type === "ssh" ? "Linux" : "Windows"}
-                  </Badge>
+                  <div className="flex gap-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => openEditDialog(host)} 
+                            className="h-8 w-8"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Редактировать хост</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDeleteHost(host.id)} 
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Удалить хост</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
               ))}
             </div>
           )}
   
-
+          {/* Диалог прогресса импорта */}
+          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Импорт хостов из файла</DialogTitle>
+                <DialogDescription>
+                  Импортирование хостов из файла...
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex justify-between text-sm">
+                  <span>Прогресс:</span>
+                  <span>{importProgress.current} из {importProgress.total}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                  />
+                </div>
+                {importing && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Импорт... ({Math.round((importProgress.current / importProgress.total) * 100)}%)
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     );
-  };  
+  };
 
   const renderStep1 = () => (
     <Card>
@@ -526,9 +918,8 @@ export default function ProjectWizard({ onNavigate }) {
 
   const renderStep2 = () => (
     <Step2HostSelection
-      hosts={hosts}
       projectData={projectData}
-      handleHostToggle={handleHostToggle}
+      onHostsChange={(hostsList) => setProjectData(prev => ({ ...prev, hostsList }))}
     />
   );
 
@@ -549,194 +940,194 @@ export default function ProjectWizard({ onNavigate }) {
   });
 };
 
-const renderStep3 = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Шаг 3: Назначение проверок</CardTitle>
-      <CardDescription>Для каждого хоста выберите системы и проверки</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <div className="space-y-6">
-        {projectData.tasks.map((task) => {
-          const host = getHostById(task.host_id);
+  const renderStep3 = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Шаг 3: Назначение проверок</CardTitle>
+        <CardDescription>Для каждого хоста выберите системы и проверки</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {projectData.tasks.map((task) => {
+            const host = getHostById(task.host_id);
 
-          return (
-            <div key={task.host_id} className="border-2 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg">{host?.name}</h3>
-                <Badge variant="outline" className="text-xs">
-                  {host?.connection_type === "ssh" ? "Linux" : "Windows"}
-                </Badge>
-              </div>
+            return (
+              <div key={task.host_id} className="border-2 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-lg">{host?.name}</h3>
+                  <Badge variant="outline" className="text-xs">
+                    {host?.connection_type === "ssh" ? "Linux" : "Windows"}
+                  </Badge>
+                </div>
 
-              {/* Список систем для этого хоста */}
-              {task.systems.map((system, systemIndex) => {
-                const availableScripts = getScriptsBySystemId(system.system_id);
-                const selectedSystem = getSystemById(system.system_id);
+                {/* Список систем для этого хоста */}
+                {task.systems.map((system, systemIndex) => {
+                  const availableScripts = getScriptsBySystemId(system.system_id);
+                  const selectedSystem = getSystemById(system.system_id);
 
-                return (
-                  <div key={systemIndex} className="mb-6 p-3 border rounded bg-gray-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <Label className="text-base font-semibold">
-                        Система {systemIndex + 1}
-                      </Label>
-                      {task.systems.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSystemFromHost(task.host_id, systemIndex)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="mb-3">
-                      <Label className="text-sm">Выберите систему</Label>
-                      <Select
-                        value={system.system_id}
-                        onValueChange={(value) => handleTaskSystemChange(task.host_id, systemIndex, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите систему" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {systems
-                            .filter(sys => {
-                              // Фильтруем системы по типу ОС хоста
-                              const systemOsType = sys.os_type;
-                              const hostConnectionType = host?.connection_type;
-                              
-                              // Для Linux хостов показываем только Linux системы
-                              if (hostConnectionType === 'ssh') {
-                                return systemOsType === 'linux';
-                              }
-                              // Для Windows хостов показываем только Windows системы
-                              if (hostConnectionType === 'winrm') {
-                                return systemOsType === 'windows';
-                              }
-                              return true;
-                            })
-                            .filter(sys => {
-                              // Исключаем системы, которые уже выбраны для этого хоста
-                              const isSystemAlreadySelected = task.systems.some(
-                                existingSystem => existingSystem.system_id === sys.id
-                              );
-                              return !isSystemAlreadySelected || sys.id === system.system_id;
-                            })
-                            .map((sys) => {
-                              const category = getCategoryById(sys.category_id);
-                              const isSystemAlreadySelected = task.systems.some(
-                                existingSystem => existingSystem.system_id === sys.id && existingSystem !== system
-                              );
-                              
-                              return (
-                                <SelectItem 
-                                  key={sys.id} 
-                                  value={sys.id}
-                                  disabled={isSystemAlreadySelected && sys.id !== system.system_id}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span>
-                                      {category?.icon} {category?.name} → {sys.name}
-                                      <span className="text-xs text-gray-500 ml-2">
-                                        ({sys.os_type === 'windows' ? 'Windows' : 'Linux'})
-                                      </span>
-                                    </span>
-                                    {isSystemAlreadySelected && sys.id !== system.system_id && (
-                                      <Badge variant="outline" className="text-xs ml-2">
-                                        Уже выбрана
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              );
-                            })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {system.system_id && (
-                      <div>
-                        <Label className="text-sm">Проверки</Label>
-                        {availableScripts.length === 0 ? (
-                          <p className="text-gray-500 text-sm mt-2">Нет доступных проверок</p>
-                        ) : (
-                          <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
-                            {/* Чекбокс "Выбрать все" */}
-                            <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
-                              <Checkbox
-                                checked={availableScripts.every(script => 
-                                  system.script_ids.includes(script.id)
-                                )}
-                                onCheckedChange={() => handleSelectAllScripts(task.host_id, systemIndex, system, availableScripts)}
-                              />
-                              <Label className="font-medium text-sm cursor-pointer">Выбрать все</Label>
-                            </div>
-
-                            {/* Список проверок */}
-                            {availableScripts.map((script) => (
-                              <div key={script.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                  checked={system.script_ids.includes(script.id)}
-                                  onCheckedChange={() => handleTaskScriptToggle(task.host_id, systemIndex, script.id)}
-                                />
-                                <div className="flex-1">
-                                  <p className="font-medium text-sm">{script.name}</p>
-                                  {script.description && (
-                                    <p className="text-xs text-gray-500">{script.description}</p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                  return (
+                    <div key={systemIndex} className="mb-6 p-3 border rounded bg-gray-50">
+                      <div className="flex items-center justify-between mb-3">
+                        <Label className="text-base font-semibold">
+                          Система {systemIndex + 1}
+                        </Label>
+                        {task.systems.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveSystemFromHost(task.host_id, systemIndex)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
 
-              {/* Кнопка добавления системы */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleAddSystemToHost(task.host_id)}
-                className="w-full"
-                disabled={systems
-                  .filter(sys => {
-                    const systemOsType = sys.os_type;
-                    const hostConnectionType = host?.connection_type;
-                    if (hostConnectionType === 'ssh') return systemOsType === 'linux';
-                    if (hostConnectionType === 'winrm') return systemOsType === 'windows';
-                    return true;
-                  })
-                  .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
-                  .length === 0}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Добавить ещё систему
-                {systems
-                  .filter(sys => {
-                    const systemOsType = sys.os_type;
-                    const hostConnectionType = host?.connection_type;
-                    if (hostConnectionType === 'ssh') return systemOsType === 'linux';
-                    if (hostConnectionType === 'winrm') return systemOsType === 'windows';
-                    return true;
-                  })
-                  .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
-                  .length === 0 && (
-                  <span className="text-xs ml-2">(все системы уже выбраны)</span>
-                )}
-              </Button>
-            </div>
-          );
-        })}
-      </div>
-    </CardContent>
-  </Card>
-);
+                      <div className="mb-3">
+                        <Label className="text-sm">Выберите систему</Label>
+                        <Select
+                          value={system.system_id}
+                          onValueChange={(value) => handleTaskSystemChange(task.host_id, systemIndex, value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите систему" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {systems
+                              .filter(sys => {
+                                // Фильтруем системы по типу ОС хоста
+                                const systemOsType = sys.os_type;
+                                const hostConnectionType = host?.connection_type;
+                                
+                                // Для Linux хостов показываем только Linux системы
+                                if (hostConnectionType === 'ssh') {
+                                  return systemOsType === 'linux';
+                                }
+                                // Для Windows хостов показываем только Windows системы
+                                if (hostConnectionType === 'winrm') {
+                                  return systemOsType === 'windows';
+                                }
+                                return true;
+                              })
+                              .filter(sys => {
+                                // Исключаем системы, которые уже выбраны для этого хоста
+                                const isSystemAlreadySelected = task.systems.some(
+                                  existingSystem => existingSystem.system_id === sys.id
+                                );
+                                return !isSystemAlreadySelected || sys.id === system.system_id;
+                              })
+                              .map((sys) => {
+                                const category = getCategoryById(sys.category_id);
+                                const isSystemAlreadySelected = task.systems.some(
+                                  existingSystem => existingSystem.system_id === sys.id && existingSystem !== system
+                                );
+                                
+                                return (
+                                  <SelectItem 
+                                    key={sys.id} 
+                                    value={sys.id}
+                                    disabled={isSystemAlreadySelected && sys.id !== system.system_id}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span>
+                                        {category?.icon} {category?.name} → {sys.name}
+                                        <span className="text-xs text-gray-500 ml-2">
+                                          ({sys.os_type === 'windows' ? 'Windows' : 'Linux'})
+                                        </span>
+                                      </span>
+                                      {isSystemAlreadySelected && sys.id !== system.system_id && (
+                                        <Badge variant="outline" className="text-xs ml-2">
+                                          Уже выбрана
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {system.system_id && (
+                        <div>
+                          <Label className="text-sm">Проверки</Label>
+                          {availableScripts.length === 0 ? (
+                            <p className="text-gray-500 text-sm mt-2">Нет доступных проверок</p>
+                          ) : (
+                            <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
+                              {/* Чекбокс "Выбрать все" */}
+                              <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
+                                <Checkbox
+                                  checked={availableScripts.every(script => 
+                                    system.script_ids.includes(script.id)
+                                  )}
+                                  onCheckedChange={() => handleSelectAllScripts(task.host_id, systemIndex, system, availableScripts)}
+                                />
+                                <Label className="font-medium text-sm cursor-pointer">Выбрать все</Label>
+                              </div>
+
+                              {/* Список проверок */}
+                              {availableScripts.map((script) => (
+                                <div key={script.id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    checked={system.script_ids.includes(script.id)}
+                                    onCheckedChange={() => handleTaskScriptToggle(task.host_id, systemIndex, script.id)}
+                                  />
+                                  <div className="flex-1">
+                                    <p className="font-medium text-sm">{script.name}</p>
+                                    {script.description && (
+                                      <p className="text-xs text-gray-500">{script.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Кнопка добавления системы */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAddSystemToHost(task.host_id)}
+                  className="w-full"
+                  disabled={systems
+                    .filter(sys => {
+                      const systemOsType = sys.os_type;
+                      const hostConnectionType = host?.connection_type;
+                      if (hostConnectionType === 'ssh') return systemOsType === 'linux';
+                      if (hostConnectionType === 'winrm') return systemOsType === 'windows';
+                      return true;
+                    })
+                    .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
+                    .length === 0}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Добавить ещё систему
+                  {systems
+                    .filter(sys => {
+                      const systemOsType = sys.os_type;
+                      const hostConnectionType = host?.connection_type;
+                      if (hostConnectionType === 'ssh') return systemOsType === 'linux';
+                      if (hostConnectionType === 'winrm') return systemOsType === 'windows';
+                      return true;
+                    })
+                    .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
+                    .length === 0 && (
+                    <span className="text-xs ml-2">(все системы уже выбраны)</span>
+                  )}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   const renderStep4 = () => {
     // Collect all scripts that have reference files

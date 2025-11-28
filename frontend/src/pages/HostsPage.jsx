@@ -228,7 +228,7 @@ export default function HostsPage() {
       // Используем кастомный alert вместо нативного
         await showAlert(
           "Импорт завершен", 
-          `Успешно импортировано: ${successCount} хостов<br />С ошибками: ${errorCount}`
+          `Успешно импортировано хостов: ${successCount} <br />С ошибками: ${errorCount}`
         );
       
       
