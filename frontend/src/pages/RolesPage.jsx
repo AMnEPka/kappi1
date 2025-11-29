@@ -9,18 +9,16 @@ import { Badge } from "../components/ui/badge";
 import { Checkbox } from "../components/ui/checkbox";
 import { PlusCircle, Edit, Trash2, Shield, Lock } from "lucide-react";
 import { toast } from "sonner";
-import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
-
 
 export default function RolesPage() {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
-  const { hasPermission } = useAuth();
+  const { hasPermission, user, isAdmin } = useAuth();
   
   const [permissionsData, setPermissionsData] = useState({
     permissions: {},
@@ -33,40 +31,91 @@ export default function RolesPage() {
     permissions: []
   });
 
+  // Отладочная информация
+  useEffect(() => {
+    console.log('🔐 RolesPage Debug Info:');
+    console.log('User:', user);
+    console.log('isAdmin:', isAdmin);
+    console.log('hasPermission("roles_manage"):', hasPermission('roles_manage'));
+    console.log('All permissions in context:', user?.permissions);
+  }, [user, isAdmin, hasPermission]);
+
+  const canManageRoles = isAdmin || hasPermission('roles_manage');
+
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
+        console.log('🔄 Fetching permissions...');
         const response = await api.get('/api/permissions');
+        console.log('✅ Permissions loaded:', response.data);
         setPermissionsData(response.data);
       } catch (error) {
-        console.error('Error fetching permissions:', error);
-        }
+        console.error('❌ Error fetching permissions:', error);
+        toast.error("Ошибка загрузки разрешений");
+      }
     };
     
-    fetchPermissions();
-  }, []); 
+    if (canManageRoles) {
+      fetchPermissions();
+    }
+  }, [canManageRoles]); 
   
-  const { permissions: ALL_PERMISSIONS, groups: PERMISSION_GROUPS } = permissionsData;
+  const { permissions: ALL_PERMISSIONS = {}, groups: PERMISSION_GROUPS = {} } = permissionsData;
 
   useEffect(() => {
-    if (hasPermission('roles_manage')) {
+    if (canManageRoles) {
       fetchRoles();
+    } else {
+      setLoading(false);
     }
-  }, []);  
+  }, [canManageRoles]);  
 
   const fetchRoles = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Fetching roles...');
+      
+      // Добавим детальную отладку
+      const token = localStorage.getItem('token');
+      console.log('📝 Token from localStorage:', token);
+      
+      // Проверим заголовки которые отправляются
+      console.log('🔑 API instance headers:', api.defaults.headers);
+      
       const response = await api.get(`/api/roles`);
+      console.log('✅ Roles loaded:', response.data);
       setRoles(response.data);
     } catch (error) {
-      console.error('Error fetching roles:', error);
-      toast.error("Ошибка загрузки ролей");
+      console.error('❌ Error fetching roles:', error);
+      console.log('🔍 Full error object:', error);
+      console.log('📊 Response data:', error.response?.data);
+      console.log('📊 Response status:', error.response?.status);
+      console.log('📊 Response headers:', error.response?.headers);
+      
+      // Проверим конфигурацию запроса
+      console.log('🌐 Request config:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers,
+        baseURL: error.config?.baseURL
+      });
+      
+      if (error.response?.status === 401) {
+        toast.error("Ошибка авторизации. Проверьте токен.");
+        // Попробуем обновить токен или разлогинить
+        localStorage.removeItem('token');
+        window.location.reload();
+      } else if (error.response?.status === 403) {
+        toast.error("Недостаточно прав для просмотра ролей");
+      } else {
+        toast.error("Ошибка загрузки ролей");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // Остальной код без изменений...
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -77,11 +126,9 @@ export default function RolesPage() {
 
     try {
       if (editingRole) {
-        // Update role
         await api.put(`/api/roles/${editingRole.id}`, formData);
         toast.success("Роль обновлена");
       } else {
-        // Create role
         await api.post(`/api/roles`, formData);
         toast.success("Роль создана");
       }
@@ -91,7 +138,11 @@ export default function RolesPage() {
       fetchRoles();
     } catch (error) {
       console.error('Error saving role:', error);
-      toast.error(error.response?.data?.detail || "Ошибка сохранения роли");
+      if (error.response?.status === 403) {
+        toast.error("Недостаточно прав для управления ролями");
+      } else {
+        toast.error(error.response?.data?.detail || "Ошибка сохранения роли");
+      }
     }
   };
 
@@ -106,7 +157,11 @@ export default function RolesPage() {
       fetchRoles();
     } catch (error) {
       console.error('Error deleting role:', error);
-      toast.error(error.response?.data?.detail || "Не удалось удалить роль");
+      if (error.response?.status === 403) {
+        toast.error("Недостаточно прав для удаления ролей");
+      } else {
+        toast.error(error.response?.data?.detail || "Не удалось удалить роль");
+      }
     }
   };
 
@@ -147,13 +202,11 @@ export default function RolesPage() {
     const allSelected = groupPermissions.every(p => formData.permissions.includes(p));
     
     if (allSelected) {
-      // Unselect all in group
       setFormData({
         ...formData,
         permissions: formData.permissions.filter(p => !groupPermissions.includes(p))
       });
     } else {
-      // Select all in group
       const newPermissions = [...new Set([...formData.permissions, ...groupPermissions])];
       setFormData({
         ...formData,
@@ -162,12 +215,16 @@ export default function RolesPage() {
     }
   };
 
-  if (!hasPermission('roles_manage')) {
+  if (!canManageRoles) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-64">
           <Lock className="h-12 w-12 text-gray-400 mb-4" />
           <p className="text-gray-500">У вас нет прав для управления ролями</p>
+          <p className="text-sm text-gray-400 mt-2">
+            isAdmin: {isAdmin ? 'true' : 'false'}, 
+            hasPermission: {hasPermission('roles_manage') ? 'true' : 'false'}
+          </p>
         </CardContent>
       </Card>
     );
@@ -254,7 +311,7 @@ export default function RolesPage() {
                               htmlFor={`permission-${permission}`} 
                               className="cursor-pointer text-sm"
                             >
-                              {ALL_PERMISSIONS[permission]}
+                              {ALL_PERMISSIONS[permission] || permission}
                             </Label>
                           </div>
                         ))}
@@ -284,81 +341,89 @@ export default function RolesPage() {
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">Загрузка...</div>
+          <div className="text-gray-500">Загрузка ролей...</div>
         </div>
       ) : (
         <div className="grid gap-4">
-          {roles.map((role) => (
-            <Card key={role.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
-                      <Shield className="h-6 w-6 text-yellow-600" />
-                    </div>
-                    <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2">
-                        {role.name}
-                        <Badge variant="outline" className="ml-2">
-                          {role.permissions?.length || 0} разрешений
-                        </Badge>
-                      </CardTitle>
-                      {role.description && (
-                        <CardDescription className="mt-1">{role.description}</CardDescription>
-                      )}
-                    </div>
-                  </div>
-                  <TooltipProvider>
-                    <div className="flex gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openEditDialog(role)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Редактировать роль</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDelete(role.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Удалить роль</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TooltipProvider>
-                </div>
-              </CardHeader>
-              {role.permissions && role.permissions.length > 0 && (
-                <CardContent>
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-gray-700">Разрешения:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {role.permissions.map((permission) => (
-                        <Badge key={permission} variant="secondary" className="text-xs">
-                          {ALL_PERMISSIONS[permission] || permission}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              )}
+          {roles.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center h-32">
+                <p className="text-gray-500">Роли не найдены</p>
+              </CardContent>
             </Card>
-          ))}
+          ) : (
+            roles.map((role) => (
+              <Card key={role.id}>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                        <Shield className="h-6 w-6 text-yellow-600" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="flex items-center gap-2">
+                          {role.name}
+                          <Badge variant="outline" className="ml-2">
+                            {role.permissions?.length || 0} разрешений
+                          </Badge>
+                        </CardTitle>
+                        {role.description && (
+                          <CardDescription className="mt-1">{role.description}</CardDescription>
+                        )}
+                      </div>
+                    </div>
+                    <TooltipProvider>
+                      <div className="flex gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openEditDialog(role)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Редактировать роль</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDelete(role.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Удалить роль</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
+                  </div>
+                </CardHeader>
+                {role.permissions && role.permissions.length > 0 && (
+                  <CardContent>
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-gray-700">Разрешения:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {role.permissions.map((permission) => (
+                          <Badge key={permission} variant="secondary" className="text-xs">
+                            {ALL_PERMISSIONS[permission] || permission}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            ))
+          )}
         </div>
       )}
     </div>
