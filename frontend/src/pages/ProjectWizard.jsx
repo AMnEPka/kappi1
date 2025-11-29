@@ -158,7 +158,7 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const canProceedToStep3 = () => {
-    return projectData.hosts.length > 0;
+    return projectData.hostsList && projectData.hostsList.length > 0;
   };
 
   const canProceedToStep4 = () => {
@@ -178,6 +178,16 @@ export default function ProjectWizard({ onNavigate }) {
       toast.error("Выберите хотя бы один хост");
       return;
     }
+
+    // При переходе на шаг 3 инициализируем задачи
+    if (step === 2) {
+      const tasks = initializeTasksFromHosts(projectData.hostsList);
+      setProjectData(prev => ({
+        ...prev,
+        tasks: tasks
+      }));
+    }
+
     if (step === 3 && !canProceedToStep4()) {
       toast.error("Для каждого хоста добавьте хотя бы одну систему и выберите проверки");
       return;
@@ -252,6 +262,7 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const getHostById = (hostId) => {
+    console.log('Searching for host:', hostId, 'in:', projectData.hostsList);
     return hosts.find(h => h.id === hostId);
   };
 
@@ -443,15 +454,12 @@ export default function ProjectWizard({ onNavigate }) {
     
         let updatedHosts;
         if (isEditing) {
-          // Обновляем существующий хост
           updatedHosts = projectHosts.map(h => h.id === editingHost.id ? newHost : h);
         } else {
-          // Добавляем новый хост
           updatedHosts = [...projectHosts, newHost];
         }
     
-        // Обновляем список хостов проекта
-        onHostsChange(updatedHosts);
+        handleHostsUpdate(updatedHosts);
     
         setIsHostDialogOpen(false);
         resetForm();
@@ -472,27 +480,12 @@ export default function ProjectWizard({ onNavigate }) {
       toast.success("Хост удален");
     };
   
-    const handleTestConnection = async (host) => {
-      setTestingHostId(host.id);
-      try {
-        // Имитация тестирования подключения
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // В реальном приложении здесь был бы API вызов
-        const success = Math.random() > 0.3; // случайный результат для демо
-        
-        if (success) {
-          toast.success(`✅ Подключение к ${host.hostname} успешно`);
-        } else {
-          toast.error(`❌ Не удалось подключиться к ${host.hostname}`);
-        }
-      } catch (error) {
-        toast.error(`Ошибка тестирования: ${error.message}`);
-      } finally {
-        setTestingHostId(null);
-      }
+    const handleHostsUpdate = (updatedHostsList) => {
+      // Автоматически создаем задачи для новых хостов
+      const updatedTasks = initializeTasksFromHosts(updatedHostsList);
+      onHostsChange(updatedHostsList, updatedTasks);
     };
-  
+
     const resetForm = () => {
       setFormData({
         name: "",
@@ -525,7 +518,7 @@ export default function ProjectWizard({ onNavigate }) {
     const handleFileImport = async (event) => {
       const file = event.target.files[0];
       if (!file) return;
-  
+    
       setImporting(true);
       setImportDialogOpen(true);
       
@@ -547,6 +540,7 @@ export default function ProjectWizard({ onNavigate }) {
         setImportProgress({ current: 0, total: hostsData.length });
         
         const newHosts = [];
+        const newHostIds = [];
         
         for (let i = 0; i < hostsData.length; i++) {
           const hostData = hostsData[i];
@@ -555,6 +549,7 @@ export default function ProjectWizard({ onNavigate }) {
             id: `imported-${Date.now()}-${i}`
           };
           newHosts.push(newHost);
+          newHostIds.push(newHost.id); // Сохраняем ID для добавления в выбранные
           
           setImportProgress({ current: i + 1, total: hostsData.length });
           
@@ -566,7 +561,8 @@ export default function ProjectWizard({ onNavigate }) {
         
         // Добавляем импортированные хосты к существующим хостам проекта
         const updatedHosts = [...projectHosts, ...newHosts];
-        onHostsChange(updatedHosts);
+        const updatedSelectedHosts = [...(projectData.hosts || []), ...newHostIds];
+        onHostsChange(updatedHosts, updatedSelectedHosts);
         
         await new Promise(resolve => setTimeout(resolve, 500));
         setImportDialogOpen(false);
@@ -919,9 +915,29 @@ export default function ProjectWizard({ onNavigate }) {
   const renderStep2 = () => (
     <Step2HostSelection
       projectData={projectData}
-      onHostsChange={(hostsList) => setProjectData(prev => ({ ...prev, hostsList }))}
+      onHostsChange={(hostsList, tasks) => {
+        const updatedData = { ...projectData, hostsList };
+        if (tasks) {
+          updatedData.tasks = tasks;
+        }
+        setProjectData(updatedData);
+      }}
     />
   );
+
+  const initializeTasksFromHosts = (hostsList) => {
+    if (!hostsList || hostsList.length === 0) return [];
+  
+    return hostsList.map(host => ({
+      host_id: host.id,
+      systems: [
+        {
+          system_id: "",
+          script_ids: []
+        }
+      ]
+    }));
+  };
 
   const handleSelectAllScripts = (hostId, systemIndex, system, scripts) => {
   const allSelected = scripts.every(script => 
@@ -940,194 +956,236 @@ export default function ProjectWizard({ onNavigate }) {
   });
 };
 
-  const renderStep3 = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Шаг 3: Назначение проверок</CardTitle>
-        <CardDescription>Для каждого хоста выберите системы и проверки</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {projectData.tasks.map((task) => {
-            const host = getHostById(task.host_id);
+  const renderStep3 = () => {
+    // Функция для получения хоста по ID
+    const getHostById = (hostId) => {
+      const foundHost = projectData.hostsList?.find(host => {
+        return host.id === hostId;
+      });
+      return foundHost;
+    };
 
-            return (
-              <div key={task.host_id} className="border-2 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-lg">{host?.name}</h3>
-                  <Badge variant="outline" className="text-xs">
-                    {host?.connection_type === "ssh" ? "Linux" : "Windows"}
-                  </Badge>
-                </div>
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Шаг 3: Назначение проверок</CardTitle>
+          <CardDescription>Для каждого хоста выберите системы и проверки</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {projectData.tasks?.map((task, taskIndex) => {
+              const host = getHostById(task.host_id);
+              
+              if (!host) {
+                console.warn(`Хост с ID ${task.host_id} не найден`);
+                return null;
+              }
 
-                {/* Список систем для этого хоста */}
-                {task.systems.map((system, systemIndex) => {
-                  const availableScripts = getScriptsBySystemId(system.system_id);
-                  const selectedSystem = getSystemById(system.system_id);
-
-                  return (
-                    <div key={systemIndex} className="mb-6 p-3 border rounded bg-gray-50">
-                      <div className="flex items-center justify-between mb-3">
-                        <Label className="text-base font-semibold">
-                          Система {systemIndex + 1}
-                        </Label>
-                        {task.systems.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveSystemFromHost(task.host_id, systemIndex)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+              return (
+                <div key={task.host_id} className="border-2 rounded-lg p-4">
+                  {/* Заголовок хоста */}
+                  <div className="flex items-center justify-between mb-4 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-sm font-bold text-yellow-900">
+                        {taskIndex + 1}
                       </div>
-
-                      <div className="mb-3">
-                        <Label className="text-sm">Выберите систему</Label>
-                        <Select
-                          value={system.system_id}
-                          onValueChange={(value) => handleTaskSystemChange(task.host_id, systemIndex, value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите систему" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {systems
-                              .filter(sys => {
-                                // Фильтруем системы по типу ОС хоста
-                                const systemOsType = sys.os_type;
-                                const hostConnectionType = host?.connection_type;
-                                
-                                // Для Linux хостов показываем только Linux системы
-                                if (hostConnectionType === 'ssh') {
-                                  return systemOsType === 'linux';
-                                }
-                                // Для Windows хостов показываем только Windows системы
-                                if (hostConnectionType === 'winrm') {
-                                  return systemOsType === 'windows';
-                                }
-                                return true;
-                              })
-                              .filter(sys => {
-                                // Исключаем системы, которые уже выбраны для этого хоста
-                                const isSystemAlreadySelected = task.systems.some(
-                                  existingSystem => existingSystem.system_id === sys.id
-                                );
-                                return !isSystemAlreadySelected || sys.id === system.system_id;
-                              })
-                              .map((sys) => {
-                                const category = getCategoryById(sys.category_id);
-                                const isSystemAlreadySelected = task.systems.some(
-                                  existingSystem => existingSystem.system_id === sys.id && existingSystem !== system
-                                );
-                                
-                                return (
-                                  <SelectItem 
-                                    key={sys.id} 
-                                    value={sys.id}
-                                    disabled={isSystemAlreadySelected && sys.id !== system.system_id}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span>
-                                        {category?.icon} {category?.name} → {sys.name}
-                                        <span className="text-xs text-gray-500 ml-2">
-                                          ({sys.os_type === 'windows' ? 'Windows' : 'Linux'})
-                                        </span>
-                                      </span>
-                                      {isSystemAlreadySelected && sys.id !== system.system_id && (
-                                        <Badge variant="outline" className="text-xs ml-2">
-                                          Уже выбрана
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })}
-                          </SelectContent>
-                        </Select>
+                      <div>
+                        <h3 className="font-bold text-lg">{host.name}</h3>
+                        <p className="text-sm text-gray-500">
+                          {host.username}@{host.hostname}:{host.port}
+                        </p>
                       </div>
+                    </div>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        host.connection_type === "ssh" 
+                          ? "bg-green-100 text-green-800" 
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {host.connection_type === "ssh" ? "Linux" : "Windows"}
+                    </Badge>
+                  </div>
 
-                      {system.system_id && (
-                        <div>
-                          <Label className="text-sm">Проверки</Label>
-                          {availableScripts.length === 0 ? (
-                            <p className="text-gray-500 text-sm mt-2">Нет доступных проверок</p>
-                          ) : (
-                            <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
-                              {/* Чекбокс "Выбрать все" */}
-                              <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
-                                <Checkbox
-                                  checked={availableScripts.every(script => 
-                                    system.script_ids.includes(script.id)
-                                  )}
-                                  onCheckedChange={() => handleSelectAllScripts(task.host_id, systemIndex, system, availableScripts)}
-                                />
-                                <Label className="font-medium text-sm cursor-pointer">Выбрать все</Label>
-                              </div>
+                  {/* Список систем для этого хоста */}
+                  {task.systems.map((system, systemIndex) => {
+                    const availableScripts = getScriptsBySystemId(system.system_id);
+                    const selectedSystem = getSystemById(system.system_id);
 
-                              {/* Список проверок */}
-                              {availableScripts.map((script) => (
-                                <div key={script.id} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    checked={system.script_ids.includes(script.id)}
-                                    onCheckedChange={() => handleTaskScriptToggle(task.host_id, systemIndex, script.id)}
-                                  />
-                                  <div className="flex-1">
-                                    <p className="font-medium text-sm">{script.name}</p>
-                                    {script.description && (
-                                      <p className="text-xs text-gray-500">{script.description}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                    return (
+                      <div key={systemIndex} className="mb-6 p-4 border rounded-lg bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-base font-semibold">
+                              Система {systemIndex + 1}
+                            </Label>
+                            {selectedSystem && (
+                              <Badge variant="secondary" className="text-xs">
+                                {selectedSystem.name}
+                              </Badge>
+                            )}
+                          </div>
+                          {task.systems.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveSystemFromHost(task.host_id, systemIndex)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
 
-                {/* Кнопка добавления системы */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleAddSystemToHost(task.host_id)}
-                  className="w-full"
-                  disabled={systems
-                    .filter(sys => {
-                      const systemOsType = sys.os_type;
-                      const hostConnectionType = host?.connection_type;
-                      if (hostConnectionType === 'ssh') return systemOsType === 'linux';
-                      if (hostConnectionType === 'winrm') return systemOsType === 'windows';
-                      return true;
-                    })
-                    .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
-                    .length === 0}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Добавить ещё систему
-                  {systems
-                    .filter(sys => {
-                      const systemOsType = sys.os_type;
-                      const hostConnectionType = host?.connection_type;
-                      if (hostConnectionType === 'ssh') return systemOsType === 'linux';
-                      if (hostConnectionType === 'winrm') return systemOsType === 'windows';
-                      return true;
-                    })
-                    .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
-                    .length === 0 && (
-                    <span className="text-xs ml-2">(все системы уже выбраны)</span>
-                  )}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
+                        <div className="mb-3">
+                          <Label className="text-sm font-medium">Выберите систему</Label>
+                          <Select
+                            value={system.system_id}
+                            onValueChange={(value) => handleTaskSystemChange(task.host_id, systemIndex, value)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Выберите систему для проверки" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {systems
+                                .filter(sys => {
+                                  // Фильтруем системы по типу ОС хоста
+                                  const systemOsType = sys.os_type;
+                                  const hostConnectionType = host?.connection_type;
+                                  
+                                  if (hostConnectionType === 'ssh') {
+                                    return systemOsType === 'linux';
+                                  }
+                                  if (hostConnectionType === 'winrm') {
+                                    return systemOsType === 'windows';
+                                  }
+                                  return true;
+                                })
+                                .filter(sys => {
+                                  // Исключаем системы, которые уже выбраны для этого хоста
+                                  const isSystemAlreadySelected = task.systems.some(
+                                    existingSystem => existingSystem.system_id === sys.id
+                                  );
+                                  return !isSystemAlreadySelected || sys.id === system.system_id;
+                                })
+                                .map((sys) => {
+                                  const category = getCategoryById(sys.category_id);
+                                  const isSystemAlreadySelected = task.systems.some(
+                                    existingSystem => existingSystem.system_id === sys.id && existingSystem !== system
+                                  );
+                                  
+                                  return (
+                                    <SelectItem 
+                                      key={sys.id} 
+                                      value={sys.id}
+                                      disabled={isSystemAlreadySelected && sys.id !== system.system_id}
+                                      className="py-2"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm">{category?.icon}</span>
+                                          <span>
+                                            {sys.name}
+                                            <span className="text-xs text-gray-500 ml-2">
+                                              ({sys.os_type === 'windows' ? 'Windows' : 'Linux'})
+                                            </span>
+                                          </span>
+                                        </div>
+                                        {isSystemAlreadySelected && sys.id !== system.system_id && (
+                                          <Badge variant="outline" className="text-xs">
+                                            Уже выбрана
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </SelectItem>
+                                  );
+                                })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {system.system_id && (
+                          <div>
+                            <Label className="text-sm font-medium">Проверки для системы</Label>
+                            {availableScripts.length === 0 ? (
+                              <p className="text-gray-500 text-sm mt-2">Нет доступных проверок для выбранной системы</p>
+                            ) : (
+                              <div className="space-y-2 mt-2 max-h-48 overflow-y-auto p-2 border rounded">
+                                {/* Чекбокс "Выбрать все" */}
+                                <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
+                                  <Checkbox
+                                    checked={availableScripts.every(script => 
+                                      system.script_ids.includes(script.id)
+                                    )}
+                                    onCheckedChange={() => handleSelectAllScripts(task.host_id, systemIndex, system, availableScripts)}
+                                  />
+                                  <Label className="font-medium text-sm cursor-pointer">Выбрать все проверки</Label>
+                                </div>
+
+                                {/* Список проверок */}
+                                {availableScripts.map((script) => (
+                                  <div key={script.id} className="flex items-center space-x-2 p-1 hover:bg-gray-100 rounded">
+                                    <Checkbox
+                                      checked={system.script_ids.includes(script.id)}
+                                      onCheckedChange={() => handleTaskScriptToggle(task.host_id, systemIndex, script.id)}
+                                    />
+                                    <div className="flex-1">
+                                      <p className="font-medium text-sm">{script.name}</p>
+                                      {script.description && (
+                                        <p className="text-xs text-gray-500">{script.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Кнопка добавления системы */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddSystemToHost(task.host_id)}
+                    className="w-full mt-2"
+                    disabled={systems
+                      .filter(sys => {
+                        const systemOsType = sys.os_type;
+                        const hostConnectionType = host?.connection_type;
+                        if (hostConnectionType === 'ssh') return systemOsType === 'linux';
+                        if (hostConnectionType === 'winrm') return systemOsType === 'windows';
+                        return true;
+                      })
+                      .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
+                      .length === 0}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Добавить ещё систему
+                    {systems
+                      .filter(sys => {
+                        const systemOsType = sys.os_type;
+                        const hostConnectionType = host?.connection_type;
+                        if (hostConnectionType === 'ssh') return systemOsType === 'linux';
+                        if (hostConnectionType === 'winrm') return systemOsType === 'windows';
+                        return true;
+                      })
+                      .filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id))
+                      .length === 0 && (
+                      <span className="text-xs ml-2">(все системы уже выбраны)</span>
+                    )}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderStep4 = () => {
     // Collect all scripts that have reference files
@@ -1163,8 +1221,6 @@ export default function ProjectWizard({ onNavigate }) {
       <CardContent>
         <div className="space-y-4">
           {(() => {
-            console.log('🔍 scriptsWithReferences:', scriptsWithReferences);
-            
             // Создаем мапу для группировки по script.id
             const scriptGroups = new Map();
             
@@ -1184,7 +1240,6 @@ export default function ProjectWizard({ onNavigate }) {
             });
 
             const groupedScripts = Array.from(scriptGroups.values());
-            console.log('🔍 Grouped scripts:', groupedScripts);
 
             return groupedScripts.map((group, index) => {
               // Берем первый хост для получения текущего значения
@@ -1256,11 +1311,12 @@ export default function ProjectWizard({ onNavigate }) {
                     <p className="text-sm text-gray-600 mt-1">
                       <strong>Применяется к {group.hosts.length} хосту(ам):</strong>{' '}
                       {group.hosts.map((host, idx) => {
-                        const hostObj = getHostById(host.hostId);
-                        const systemObj = getSystemById(host.systemId);
+                        // Используем hostsList напрямую без функции
+                        const hostObj = projectData.hostsList?.find(h => h.id === host.hostId);
+                        
                         return (
                           <span key={host.hostId}>
-                            {hostObj?.name} ({systemObj?.name})
+                            {hostObj?.name || `Хост ${host.hostId}`}
                             {idx < group.hosts.length - 1 ? ', ' : ''}
                           </span>
                         );
