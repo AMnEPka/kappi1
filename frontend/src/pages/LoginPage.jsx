@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
+import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Input, Label } from '@/components/ui-new';
 import { toast } from 'sonner';
+import './LoginPage.css';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -36,24 +35,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-32 h-32 flex items-center justify-center">
+    <div className="md3-login-page">
+      <Card className="md3-login-card" elevation={3}>
+        <CardHeader className="md3-login-header">
+          <div className="md3-login-logo">
             <img
               src="/logo.png" 
-              className="w-full h-full object-contain"
+              alt="OSIB Logo"
+              className="md3-login-logo-img"
             />
           </div>
-          <CardTitle className="text-2xl">Инструмент автоматизации ОСИБ</CardTitle>
-          <CardDescription>Вход в систему</CardDescription>
+          <CardTitle className="md3-login-title">Инструмент автоматизации ОСИБ</CardTitle>
+          <CardDescription className="md3-login-description">Вход в систему</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="username" className="text-sm font-medium">
-                Логин
-              </label>
+        <CardContent className="md3-login-content">
+          <form onSubmit={handleSubmit} className="md3-login-form">
+            <div className="md3-login-field">
+              <Label htmlFor="username">Логин</Label>
               <Input
                 id="username"
                 type="text"
@@ -65,10 +63,8 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Пароль
-              </label>
+            <div className="md3-login-field">
+              <Label htmlFor="password">Пароль</Label>
               <Input
                 id="password"
                 type="password"
@@ -80,20 +76,20 @@ export default function LoginPage() {
               />
             </div>
             
-
             <Button 
               type="submit" 
-              className="w-full" 
+              variant="filled"
+              size="lg"
+              className="md3-login-button" 
               disabled={loading}
-              variant="yellow"
             >
               {loading ? 'Вход...' : 'Войти'}
             </Button>
           </form>
 
-          <div className="mt-4 text-center text-sm text-gray-500">
+          <div className="md3-login-hint">
             <p>По умолчанию:</p>
-            <p className="font-mono">admin / admin123</p>
+            <p className="md3-login-hint-credentials">admin / admin123</p>
           </div>
         </CardContent>
       </Card>

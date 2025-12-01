@@ -1,0 +1,69 @@
+/* Material Design 3 Layout Styles */
+
+.md3-layout {
+  min-height: 100vh;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-sys-typescale-body-large-font);
+}
+
+.md3-main-content {
+  margin-top: 4rem; /* App bar height */
+  transition: margin-left var(--md-sys-motion-duration-medium4) var(--md-sys-motion-easing-standard);
+  min-height: calc(100vh - 4rem);
+}
+
+.md3-main-content-sidebar-expanded {
+  margin-left: 16rem;
+}
+
+.md3-main-content-sidebar-collapsed {
+  margin-left: 5rem;
+}
+
+.md3-page-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--md-sys-spacing-6);
+}
+
+.md3-page-content {
+  background-color: var(--md-sys-color-surface-container);
+  border-radius: var(--md-sys-shape-corner-xl);
+  box-shadow: var(--md-sys-elevation-1);
+  padding: var(--md-sys-spacing-6);
+}
+
+.md3-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--md-sys-spacing-2);
+  margin-bottom: var(--md-sys-spacing-6);
+  font-family: var(--md-sys-typescale-body-medium-font, var(--md-sys-typescale-body-large-font));
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.md3-breadcrumb-link {
+  display: flex;
+  align-items: center;
+  gap: var(--md-sys-spacing-1);
+  color: var(--md-sys-color-primary);
+  text-decoration: none;
+  transition: color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+
+.md3-breadcrumb-link:hover {
+  color: var(--md-sys-color-primary);
+  opacity: 0.8;
+}
+
+.md3-breadcrumb-separator {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.md3-breadcrumb-current {
+  color: var(--md-sys-color-on-surface);
+  font-weight: 500;
+}
+
