@@ -1,25 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Server, 
-  FileCode, 
-  Briefcase, 
-  LogOut, 
-  User, 
-  Shield, 
-  Menu, 
-  Calendar, 
-  FileText, 
-  Settings,
-  ChevronRight,
-  Home,
-  PlayCircle,
-  BarChart3,
-  ChevronLeft,
-  ChevronRight as ChevronRightIcon
-} from "lucide-react";
-import { useState } from "react";
+import { Server, FileCode, Briefcase, LogOut, User, Shield, Menu, Calendar, FileText, Settings } from "lucide-react";
 
 // Page imports
 import AdminPage from "@/pages/AdminPage";
@@ -44,7 +26,6 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const { user, logout, hasPermission, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const showScheduler = isAdmin || hasPermission('projects_execute');
   
   const isActive = (path) => {
@@ -52,270 +33,164 @@ const Layout = ({ children }) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
+  
+  const navLinkClass = (path) => {
+    return isActive(path) 
+      ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700" 
+      : "hover:bg-gray-100";
+  };
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
-  // Желто-черная цветовая палитра
-  const primaryColor = "bg-yellow-400";
-  const primaryHover = "hover:bg-yellow-500";
-  const surfaceColor = "bg-gray-50";
-  const onSurface = "text-gray-900";
-  const onPrimary = "text-black";
   
-  const sidebarWidth = isSidebarExpanded ? "w-64" : "w-20";
-  const contentMargin = isSidebarExpanded ? "ml-64" : "ml-20";
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* App Bar - Fixed Top */}
-      <header className={`fixed top-0 left-0 right-0 z-50 ${primaryColor} shadow-sm`}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo and Brand */}
-            <Link to="/" className="flex items-center gap-3 group">
-              <div className="relative">
-                <img 
-                  src="/logo.png" 
-                  alt="OSIB" 
-                  className="h-10 w-10 object-contain rounded-lg transition-transform group-hover:scale-105" 
-                />
-                <div className="absolute inset-0 rounded-lg bg-black/10 group-hover:bg-black/20 transition-colors"></div>
-              </div>
-              <span className="text-xl font-bold text-black">
-                Инструмент автоматизации ОСИБ
-              </span>
-            </Link>
-            
-            {/* User Info and Actions */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3 px-3 py-2 rounded-full bg-black/10 backdrop-blur-sm">
-                <div className="w-8 h-8 rounded-full bg-black/20 flex items-center justify-center">
-                  <User className="h-4 w-4 text-black" />
-                </div>
-                <span className="text-black text-sm font-medium">{user?.full_name}</span>
-                {user?.is_admin && (
-                  <Badge className="bg-black/20 text-black text-xs border-0 rounded-full px-2">
-                    adm
-                  </Badge>
-                )}
-              </div>
-              
-              <Button 
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="text-black hover:bg-black/10 hover:text-black rounded-full px-4"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Выйти
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation Sidebar - Fixed Side */}
-      <nav className={`fixed top-16 left-0 bottom-0 z-40 ${sidebarWidth} bg-white border-r border-gray-200 transition-all duration-300`}>
-        <div className="flex flex-col h-full py-4">
-          {/* Main Navigation Items */}
-          <div className="flex-1 space-y-1 px-3">
-            <Link to="/" className="block">
-              <Button
-                variant="ghost"
-                className={`w-full justify-start rounded-lg h-12 ${
-                  isActive('/') 
-                    ? 'bg-yellow-100 text-black border border-yellow-300' 
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-black'
-                }`}
-              >
-                <Home className="h-5 w-5 mr-3" />
-                {isSidebarExpanded && "Проекты"}
-              </Button>
-            </Link>
-
-            <Link to="/hosts" className="block">
-              <Button
-                variant="ghost"
-                className={`w-full justify-start rounded-lg h-12 ${
-                  isActive('/hosts') 
-                    ? 'bg-yellow-100 text-black border border-yellow-300' 
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-black'
-                }`}
-              >
-                <Server className="h-5 w-5 mr-3" />
-                {isSidebarExpanded && "Хосты"}
-              </Button>
-            </Link>
-
-            <Link to="/scripts" className="block">
-              <Button
-                variant="ghost"
-                className={`w-full justify-start rounded-lg h-12 ${
-                  isActive('/scripts') 
-                    ? 'bg-yellow-100 text-black border border-yellow-300' 
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-black'
-                }`}
-              >
-                <FileCode className="h-5 w-5 mr-3" />
-                {isSidebarExpanded && "Проверки"}
-              </Button>
-            </Link>
-
-            {showScheduler && (
-              <Link to="/scheduler" className="block">
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start rounded-lg h-12 ${
-                    isActive('/scheduler') 
-                      ? 'bg-yellow-100 text-black border border-yellow-300' 
-                      : 'text-gray-700 hover:bg-gray-100 hover:text-black'
-                  }`}
-                >
-                  <Calendar className="h-5 w-5 mr-3" />
-                  {isSidebarExpanded && "Планировщик"}
-                </Button>
-              </Link>
-            )}
-
-            {/* Admin Section Separator */}
-            {isAdmin && (
-              <>
-                <div className="border-t border-gray-200 my-3"></div>
-                
-                <Link to="/logs" className="block">
-                  <Button
-                    variant="ghost"
-                    className={`w-full justify-start rounded-lg h-12 ${
-                      isActive('/logs') 
-                        ? 'bg-yellow-100 text-black border border-yellow-300' 
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-black'
-                    }`}
-                  >
-                    <FileText className="h-5 w-5 mr-3" />
-                    {isSidebarExpanded && "Логи системы"}
-                  </Button>
-                </Link>
-
-                <Link to="/admin" className="block">
-                  <Button
-                    variant="ghost"
-                    className={`w-full justify-start rounded-lg h-12 ${
-                      isActive('/admin') 
-                        ? 'bg-yellow-100 text-black border border-yellow-300' 
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-black'
-                    }`}
-                  >
-                    <Settings className="h-5 w-5 mr-3" />
-                    {isSidebarExpanded && "Админ-панель"}
-                  </Button>
-                </Link>
-
-                <Link to="/users" className="block">
-                  <Button
-                    variant="ghost"
-                    className={`w-full justify-start rounded-lg h-12 ${
-                      isActive('/users') 
-                        ? 'bg-yellow-100 text-black border border-yellow-300' 
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-black'
-                    }`}
-                  >
-                    <User className="h-5 w-5 mr-3" />
-                    {isSidebarExpanded && "Пользователи"}
-                  </Button>
-                </Link>
-
-                <Link to="/roles" className="block">
-                  <Button
-                    variant="ghost"
-                    className={`w-full justify-start rounded-lg h-12 ${
-                      isActive('/roles') 
-                        ? 'bg-yellow-100 text-black border border-yellow-300' 
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-black'
-                    }`}
-                  >
-                    <Shield className="h-5 w-5 mr-3" />
-                    {isSidebarExpanded && "Роли"}
-                  </Button>
-                </Link>
-              </>
-            )}
-          </div>
-
-          {/* Sidebar Toggle Button */}
-          <div className="px-3 pt-2 border-t border-gray-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-              className="w-full justify-center text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg"
-            >
-              {isSidebarExpanded ? (
-                <>
-                  <ChevronLeft className="h-4 w-4" />
-                  <span className="ml-2">Свернуть</span>
-                </>
-              ) : (
-                <ChevronRightIcon className="h-4 w-4" />
+<div className="m-0 p-0 w-full">
+  {/* Первая строка шапки - FIXED */}
+{/* Обертка для всего приложения */}
+<div className="m-0 p-0 w-full min-h-screen bg-gray-50">
+  {/* Первая строка шапки */}
+  {/* Первая строка шапки - FIXED */}
+  <nav className="fixed top-0 left-0 right-0 z-50 w-full"> {/* ← ДОБАВИЛ w-full */}
+    <div className="bg-gray-50 border-b border-gray-200 w-full"> {/* ← И здесь w-full */}
+      <div className="max-w-7xl mx-auto px-6 w-full"> {/* ← И здесь w-full */}
+        <div className="flex items-center justify-between h-16">
+          <Link to="/" className="flex items-center gap-3">
+            <img src="/logo.png" alt="OSIB" className="h-14 w-14 object-contain" />
+            <span className="text-2xl font-bold text-gray-800">Инструмент автоматизации ОСИБ</span>
+          </Link>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <User className="h-4 w-4 text-gray-500" />
+              <span className="text-gray-700 font-medium">{user?.full_name}</span>
+              {user?.is_admin && (
+                <Badge className="bg-yellow-400 text-white text-xs border-0">adm</Badge>
               )}
+            </div>
+            <Button 
+              className="bg-yellow-400 hover:bg-gray-50 text-black"
+              size="sm"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              Выйти
             </Button>
           </div>
         </div>
-      </nav>
+      </div>
+    </div>
+  </nav>
 
-      {/* Main Content Area */}
-      <main className={`${contentMargin} pt-16 min-h-screen transition-all duration-300`}>
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          {/* Breadcrumb Navigation */}
-          {location.pathname !== '/' && (
-            <nav className="flex items-center gap-2 mb-6 text-sm text-gray-600">
-              <Link 
-                to="/" 
-                className="flex items-center gap-1 hover:text-yellow-600 transition-colors"
+  {/* Вторая строка шапки */}
+  <div className="fixed top-16 left-0 right-0 z-40 w-full"> 
+    <div className="bg-yellow-400 shadow-md rounded-b-lg header-div"> 
+      <div className="max-w-7xl mx-auto px-6 w-full content-div"> 
+        <div className="flex items-center justify-between h-12">
+          {/* Основные пункты меню слева */}
+          <div className="flex items-center gap-1">
+            <Link to="/">
+              <Button
+                variant={isActive('/') ? "default" : "ghost"}
+                data-testid="nav-projects"
+                className={`h-12 px-4 font-medium ${
+                  isActive('/') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                }`}
               >
-                <Home className="h-4 w-4" />
-                Главная
+                <Briefcase className="mr-3 h-5 w-5" /> Проекты
+              </Button>
+            </Link>
+            <Link to="/hosts">
+              <Button
+                variant={isActive('/hosts') ? "default" : "ghost"}
+                data-testid="nav-hosts"
+                className={`h-12 px-4 font-medium ${
+                  isActive('/hosts') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                }`}
+              >
+                <Server className="mr-3 h-5 w-5" /> Хосты
+              </Button>
+            </Link>
+            <Link to="/scripts">
+              <Button
+                variant={isActive('/scripts') ? "default" : "ghost"}
+                data-testid="nav-scripts"
+                className={`h-12 px-4 font-medium ${
+                  isActive('/scripts') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                }`}
+              >
+                <FileCode className="mr-3 h-5 w-5" /> Проверки
+              </Button>
+            </Link>
+            {showScheduler && (
+              <Link to="/scheduler">
+                <Button
+                  variant={isActive('/scheduler') ? "default" : "ghost"}
+                  data-testid="nav-scheduler"
+                  className={`h-12 px-4 font-medium ${
+                    isActive('/scheduler') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                  }`}
+                >
+                  <Calendar className="mr-3 h-8 w-8" /> Планировщик
+                </Button>
               </Link>
-              <ChevronRight className="h-4 w-4" />
-              <span className="text-gray-900 font-medium">
-                {getPageTitle(location.pathname)}
-              </span>
-            </nav>
-          )}
-          
-          {/* Page Content */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            {children}
+            )}
+            {isAdmin && (
+              <Link to="/logs">
+                <Button
+                  variant={isActive('/logs') ? "default" : "ghost"}
+                  data-testid="nav-logs"
+                  className={`h-12 px-4 py-3 font-medium ${
+                    isActive('/logs') ? 'bg-white text-black' : 'text-black hover:bg-white'
+                  }`}
+                >
+                  <FileText className="mr-3 h-8 w-8" /> Логи
+                </Button>
+              </Link>
+            )}
+          </div>
+
+          {/* Выпадающее меню справа */}
+          <div className="relative group">
+            <button className="flex items-center justify-center text-black hover:bg-white hover:text-black h-12 w-12 rounded-md transition-colors">
+              <Menu className="h-8 w-8" />
+            </button>
+            <div className="absolute right-0 top-full mt-1 w-56 bg-white border-2 border-gray-300 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+              <Link to="/admin">
+                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
+                  <Settings className="mr-3 h-5 w-5" /> Админ-панель
+                </div>
+              </Link>
+              <div className="border-t-2 border-gray-200 my-1"></div>
+              <Link to="/users">
+                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
+                  <User className="mr-3 h-5 w-5" /> Пользователи
+                </div>
+              </Link>
+              <div className="border-t-2 border-gray-200 my-1"></div>
+              <Link to="/roles">
+                <div className="flex items-center px-4 py-3 text-base font-medium text-gray-800 hover:bg-gray-100 cursor-pointer">
+                  <Shield className="mr-3 h-5 w-5" /> Роли
+                </div>
+              </Link>
+            </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
-  );
-};
+  </div>
 
-// Helper function to get page titles
-const getPageTitle = (pathname) => {
-  const titles = {
-    '/': 'Проекты',
-    '/hosts': 'Хосты',
-    '/scripts': 'Проверки',
-    '/scheduler': 'Планировщик',
-    '/logs': 'Логи системы',
-    '/admin': 'Админ-панель',
-    '/users': 'Пользователи',
-    '/roles': 'Роли и разрешения',
-    '/new': 'Новый проект',
-    '/execute': 'Запуск проверок',
-    '/history': 'История выполнений'
-  };
-  
-  // For dynamic routes like /projectId/execute
-  if (pathname.match(/\/.+\/execute/)) return 'Запуск проекта';
-  if (pathname.match(/\/.+\/results/)) return 'Результаты проекта';
-  
-  return titles[pathname] || 'Страница';
+  {/* Основной контент */}
+  <div className="pt-32">
+    <div className="max-w-7xl mx-auto px-6 content-div">
+      {children}
+    </div>
+  </div>
+</div>
+
+</div>
+  );
 };
 
 // Wrapper components for project pages with routing
