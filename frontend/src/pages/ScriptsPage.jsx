@@ -11,9 +11,11 @@ import { FileCode, Plus, Edit, Trash2, HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from '../config/api';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export default function ScriptsPage() {
   const { hasPermission, isAdmin, user } = useAuth();
+  const { canEditScript, canDeleteScript, canCreateScript } = usePermissions();
   const [scripts, setScripts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
@@ -131,20 +133,6 @@ export default function ScriptsPage() {
     setFormCategoryId("");
     setFormSystems([]);
     setEditingScript(null);
-  };
-
-  const canEditScript = (script) => {
-    if (isAdmin) return true;
-    if (hasPermission('checks_edit_all')) return true;
-    if (script.created_by === user?.id && hasPermission('checks_edit_own')) return true;
-    return false;
-  };
-
-  const canDeleteScript = (script) => {
-    if (isAdmin) return true;
-    if (hasPermission('checks_delete_all')) return true;
-    if (script.created_by === user?.id && hasPermission('checks_delete_own')) return true;
-    return false;
   };
 
   const openEditDialog = async (script) => {
@@ -304,9 +292,12 @@ export default function ScriptsPage() {
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} data-testid="add-script-btn">
-              <Plus className="mr-2 h-4 w-4" /> Добавить проверку
-            </Button>
+            {canCreateScript() && (
+              <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} data-testid="add-script-btn">
+                <Plus className="mr-2 h-4 w-4" /> Добавить проверку
+              </Button>
+            )}            
+
           </DialogTrigger>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>

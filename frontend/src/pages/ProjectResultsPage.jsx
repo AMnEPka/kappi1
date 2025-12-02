@@ -17,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { ChevronLeft, CheckCircle, XCircle, Eye, Download, BarChart3, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
@@ -86,6 +85,9 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const fetchProjectAndSessions = async () => {
     try {
       setLoading(true);
+      console.log('Запрашиваем проект с ID:', projectId);
+      console.log('Токен пользователя:', localStorage.getItem('token'));
+
       const [projectRes, sessionsRes, hostsRes] = await Promise.all([
         api.get(`/api/projects/${projectId}`),
         api.get(`/api/projects/${projectId}/sessions`),
