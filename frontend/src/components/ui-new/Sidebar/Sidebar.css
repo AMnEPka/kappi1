@@ -18,6 +18,11 @@
   width: 5rem;
 }
 
+svg .md3-sidebar-collapsed {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .md3-sidebar-content {
   display: flex;
   flex-direction: column;
@@ -54,3 +59,32 @@
   color: var(--md-sys-color-on-primary-container);
 }
 
+/* Центрирование кнопок в свернутом сайдбаре */
+.md3-sidebar-collapsed .md3-sidebar-button {
+  display: flex !important;
+  justify-content: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 0.75rem !important; /* или var(--md-sys-spacing-3) */
+  width: 3rem !important; /* фиксированная ширина */
+  min-width: 3rem !important;
+  max-width: 3rem !important;
+}
+
+/* Центрирование иконок внутри кнопок */
+.md3-sidebar-collapsed .md3-sidebar-button .md3-icon {
+  margin: 0 !important;
+  display: block !important;
+}
+
+/* Обычное состояние (развернутый сайдбар) */
+.md3-sidebar-expanded .md3-sidebar-button {
+  justify-content: flex-start !important;
+  width: 100% !important;
+  padding: 0.75rem 1rem !important; /* или var(--md-sys-spacing-3) var(--md-sys-spacing-4) */
+}
+
+/* Если кнопки содержат текст и иконку */
+.md3-sidebar-expanded .md3-sidebar-button .md3-icon {
+  margin-right: 0.75rem !important; /* отступ между иконкой и текстом */
+}

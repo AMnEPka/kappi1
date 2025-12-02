@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Server, 
-  FileCode, 
-  Briefcase, 
+  FileTerminal, 
   LogOut, 
-  User, 
+  Users, 
+  User,
   Shield, 
-  Menu, 
   Calendar, 
   FileText, 
   Settings,
@@ -15,7 +14,7 @@ import {
   Home,
   ChevronLeft,
 } from "lucide-react";
-import { Button, Badge, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui-new';
+import { Button, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui-new';
 import { useAuth } from '@/contexts/AuthContext';
 import './MainLayout.css';
 
@@ -64,9 +63,13 @@ export const MainLayout = ({ children }) => {
               </div>
               <span className="md3-app-bar-user-name">{user?.full_name}</span>
               {user?.is_admin && (
-                <Badge variant="tonal" className="md3-app-bar-user-badge">
-                  adm
-                </Badge>
+                <div className="md3-app-bar-user-badge" title="Администратор">
+                  <img 
+                    src="/images/admin2.svg"
+                    alt="Admin"
+                    className="w-5 h-5"
+                  />
+                </div>
               )}
             </div>
             
@@ -111,7 +114,7 @@ export const MainLayout = ({ children }) => {
               variant={isActive('/scripts') ? "tonal" : "text"}
               className={`md3-sidebar-button ${isActive('/scripts') ? 'md3-sidebar-button-active' : ''}`}
             >
-              <FileCode className="md3-icon" />
+              <FileTerminal className="md3-icon" />
               {isSidebarExpanded && "Проверки"}
             </Button>
           </Link>
@@ -158,7 +161,7 @@ export const MainLayout = ({ children }) => {
                   variant={isActive('/users') ? "tonal" : "text"}
                   className={`md3-sidebar-button ${isActive('/users') ? 'md3-sidebar-button-active' : ''}`}
                 >
-                  <User className="md3-icon" />
+                  <Users className="md3-icon" />
                   {isSidebarExpanded && "Пользователи"}
                 </Button>
               </Link>
