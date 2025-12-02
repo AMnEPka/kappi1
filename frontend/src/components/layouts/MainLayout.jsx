@@ -198,19 +198,23 @@ export const MainLayout = ({ children }) => {
       {/* Main Content */}
       <main className={`md3-main-content ${sidebarWidth}`}>
         <div className="md3-page-container">
-          {/* Breadcrumb Navigation */}
-          {location.pathname !== '/' && (
-            <nav className="md3-breadcrumb">
-              <Link to="/" className="md3-breadcrumb-link">
-                <Home className="md3-icon-sm" />
-                Главная
-              </Link>
-              <ChevronRight className="md3-breadcrumb-separator md3-icon-sm" />
-              <span className="md3-breadcrumb-current">
-                {getPageTitle(location.pathname)}
-              </span>
-            </nav>
-          )}
+          {/* Breadcrumb Navigation - Всегда показываем полный путь */}
+          <nav className="md3-breadcrumb">
+            <Link to="/" className="md3-breadcrumb-link">
+              <Home className="md3-icon-sm" />
+              Главная
+            </Link>
+            
+            {/* Показываем разделитель и текущую страницу, если это не главная */}
+            {location.pathname !== '/' && (
+              <>
+                <ChevronRight className="md3-breadcrumb-separator md3-icon-sm" />
+                <span className="md3-breadcrumb-current">
+                  {getPageTitle(location.pathname)}
+                </span>
+              </>
+            )}
+          </nav>
           
           {/* Page Content */}
           <div className="md3-page-content">
@@ -244,4 +248,3 @@ const getPageTitle = (pathname) => {
   
   return titles[pathname] || 'Страница';
 };
-

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -139,19 +138,15 @@ const CategoriesPage = () => {
                         {[
                           // Emoji иконки
                           { type: 'emoji', value: '🐧', name: 'Linux' },
+                          { type: 'emoji', value: '🟦', name: 'Windows' },
+                          { type: 'emoji', value: '☸️', name: 'Kubernetes' },
+                          { type: 'emoji', value: '🐳', name: 'Docker' },
                           { type: 'emoji', value: '🗄️', name: 'Сервер' },
                           { type: 'emoji', value: '💻', name: 'Ноутбук' },
                           { type: 'emoji', value: '🖥️', name: 'Компьютер' },
                           { type: 'emoji', value: '🔒', name: 'Безопасность' },
                           { type: 'emoji', value: '🌐', name: 'Сеть' },
                           { type: 'emoji', value: '📊', name: 'Мониторинг' },
-
-                          // PNG иконки
-                          { type: 'png', value: './icons/windows.png', name: 'Windows' },
-                          { type: 'png', value: './icons/k8s.png', name: 'Kubernetes' },
-
-                          // Дополнительные emoji
-                          { type: 'emoji', value: '🐳', name: 'Docker' },
                           { type: 'emoji', value: '☁️', name: 'Облако' },
                           { type: 'emoji', value: '🚀', name: 'Запуск' },
                           { type: 'emoji', value: '🔧', name: 'Настройка' },
