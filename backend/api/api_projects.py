@@ -10,6 +10,7 @@ This module contains endpoints for:
 from fastapi import APIRouter, HTTPException, Depends  # pyright: ignore[reportMissingImports]
 from typing import List
 from datetime import datetime
+import traceback
 
 from config.config_init import db
 from models.project_models import Project, ProjectCreate, ProjectUpdate, ProjectTask, ProjectTaskCreate, ProjectTaskUpdate
@@ -81,6 +82,15 @@ async def get_projects(current_user: User = Depends(get_current_user)):
 @router.get("/projects/{project_id}", response_model=Project)
 async def get_project(project_id: str, current_user: User = Depends(get_current_user)):
     """Get project by ID"""
+    # Сначала проверяем глобальное право на просмотр всех результатов
+    if current_user.is_admin or await has_permission(current_user, 'results_view_all'):
+        # Пользователь может видеть все проекты - пропускаем проверку can_access_project
+        project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+        if not project:
+            raise HTTPException(status_code=404, detail="Проект не найден")
+        return Project(**parse_from_mongo(project))
+    
+    # Если нет глобального права - проверяем доступ к конкретному проекту
     if not await can_access_project(current_user, project_id):
         raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
     
@@ -223,22 +233,87 @@ async def delete_project_task(project_id: str, task_id: str, current_user: User 
 @router.get("/projects/{project_id}/users")
 async def get_project_users(project_id: str, current_user: User = Depends(get_current_user)):
     """Get users with access to project"""
-    project = await db.projects.find_one({"id": project_id})
-    if not project:
-        raise HTTPException(status_code=404, detail="Проект не найден")
-    
-    # Only project creator or admin can view access list
-    if project.get('created_by') != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Нет доступа к проекту")
-    
-    # Get project access records
-    access_records = await db.project_access.find({"project_id": project_id}).to_list(1000)
-    user_ids = [rec['user_id'] for rec in access_records]
-    
-    # Get user details
-    users = await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "username": 1, "full_name": 1}).to_list(1000) if user_ids else []
-    
-    return {"users": users}
+    try:
+        # 1. Найти проект
+        project = await db.projects.find_one({"id": project_id})
+        
+        if not project:
+            raise HTTPException(status_code=404, detail="Проект не найден")
+        
+        # 2. Проверить права доступа
+        has_access = False
+        
+        # Проверка: является ли пользователь создателем
+        if project.get('created_by') == current_user.id:
+            has_access = True
+        # Проверка: является ли пользователь администратором
+        elif current_user.is_admin:
+            has_access = True
+        # Проверка: есть ли доступ в таблице project_access
+        else:
+            try:
+                access_record = await db.project_access.find_one({
+                    "project_id": project_id,
+                    "user_id": current_user.id
+                })
+                has_access = access_record is not None
+            except Exception as e:
+                has_access = False
+        
+        if not has_access:
+            raise HTTPException(
+                status_code=403, 
+                detail="Нет доступа к проекту"
+            )
+        
+        # 3. Получить все записи о доступе к проекту
+        try:
+            access_records = await db.project_access.find({"project_id": project_id}).to_list(1000)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ошибка при получении записей доступа: {str(e)}")
+        
+        if not access_records:
+            return {"users": []}
+        
+        # 4. Собрать ID всех пользователей с доступом
+        user_ids = []
+        for rec in access_records:
+            if 'user_id' in rec:
+                user_ids.append(rec['user_id'])
+        
+        if not user_ids:
+            return {"users": []}
+        
+        # 5. Получить информацию о пользователях
+        try:
+            users = []
+            for user_id in user_ids:
+                user = await db.users.find_one(
+                    {"id": user_id},
+                    {"_id": 0, "id": 1, "username": 1, "full_name": 1, "email": 1}
+                )
+                if user:
+                    users.append(user)
+            
+            # 6. Добавить информацию о роли
+            project_creator_id = project.get('created_by')
+            for user in users:
+                if user['id'] == project_creator_id:
+                    user['role'] = 'creator'
+                else:
+                    user['role'] = 'member'
+            
+            return {"users": users}
+            
+        except Exception as e:
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Ошибка при получении данных пользователей: {str(e)}")
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {type(e).__name__}")
 
 @router.post("/projects/{project_id}/users/{user_id}")
 async def grant_project_access(project_id: str, user_id: str, current_user: User = Depends(get_current_user)):

@@ -20,7 +20,7 @@ import {
 import { ChevronLeft, CheckCircle, XCircle, Eye, Download, BarChart3, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
-
+import { usePermissions } from '@/hooks/usePermissions';
 
 export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [searchParams, setSearchParams] = useSearchParams(); // ← Добавьте этот хук
@@ -35,7 +35,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const navigate = useNavigate();
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonMode, setComparisonMode] = useState("last2");  
-  
+  const { canViewAllResults } = usePermissions();
 
   useEffect(() => {
     fetchProjectAndSessions();
@@ -87,6 +87,12 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       setLoading(true);
       console.log('Запрашиваем проект с ID:', projectId);
       console.log('Токен пользователя:', localStorage.getItem('token'));
+
+      
+      // ... в useEffect или перед fetchProjectAndSessions
+      if (!canViewAllResults()) {
+          console.log('!!!!!!!!!!!!!!!! cant view all results');
+      }      
 
       const [projectRes, sessionsRes, hostsRes] = await Promise.all([
         api.get(`/api/projects/${projectId}`),
@@ -263,45 +269,56 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       {/* Session selector */}
       {sessions.length > 0 && (
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Выбор запуска</CardTitle>
-            <CardDescription>Просмотр результатов конкретного запуска проекта</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <Select value={selectedSession} onValueChange={handleSessionChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Выберите запуск" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sessions.map((session, index) => (
-                      <SelectItem key={session.session_id} value={session.session_id}>
-                        {index === 0 ? '🆕 ' : ''}
-                        {formatDate(session.executed_at)} 
-                        {' - '}
-                        Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={handleExportToExcel}
-                disabled={!selectedSession}
-                variant="yellow"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Экспорт в Excel
-              </Button>
-              <Button
-                onClick={() => setShowComparison(!showComparison)}
-                variant={showComparison ? "default" : "outline"}
-              >
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Сравнение запусков
-              </Button>
-            </div>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            Выбор запуска
+          </CardTitle>
+          <CardDescription>
+            Просмотр результатов конкретного запуска проекта
+          </CardDescription>
+        </div>
+        <Button
+          onClick={handleExportToExcel}
+          disabled={!selectedSession}
+          variant={showComparison ? "default" : "outline"}
+          size="sm"
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          <span className="hidden sm:inline">Экспорт в Excel</span>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <Select value={selectedSession} onValueChange={handleSessionChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Выберите запуск" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.map((session, index) => (
+                  <SelectItem key={session.session_id} value={session.session_id}>
+                    {index === 0 ? '🆕 ' : ''}
+                    {formatDate(session.executed_at)} 
+                    {' - '}
+                    Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => setShowComparison(!showComparison)}
+            variant={showComparison ? "default" : "outline"}
+            size="sm"
+            className="gap-2 whitespace-nowrap"
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span>Сравнение запусков</span>
+          </Button>
+        </div>
+
 
             {/* Модальное окно сравнения */}
             {showComparison && (

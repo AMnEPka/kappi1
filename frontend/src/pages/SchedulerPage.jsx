@@ -383,27 +383,67 @@ const SchedulerPage = () => {
               {form.job_type === "one_time" && (
                 <div className="space-y-2">
                   <Label>Дата и время запуска</Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <DateTimePicker
-                        value={form.run_at}
-                        onChange={(value) => setForm({ ...form, run_at: value })}
-                        required
-                      />
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <DateTimePicker
+                      value={form.run_at}
+                      onChange={(value) => setForm({ ...form, run_at: value })}
+                      required
+                    />
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="icon"
                       onClick={() => {
-                        const now = new Date();
-                        now.setMinutes(now.getMinutes() + 2);
-                        setForm({ ...form, run_at: now.toISOString() });
+                        const baseTime = form.run_at ? new Date(form.run_at) : new Date();
+                        baseTime.setHours(baseTime.getHours() + 1);
+                        setForm({ ...form, run_at: baseTime.toISOString() });
                       }}
-                      className="whitespace-nowrap"
+                      className="h-7 w-7"
+                      title="Прибавить 1 час"
                     >
-                      Сегодня +2 мин
+                      <span className="text-xs">+1h</span>
                     </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        const baseTime = form.run_at ? new Date(form.run_at) : new Date();
+                        baseTime.setHours(baseTime.getHours() + 8);
+                        setForm({ ...form, run_at: baseTime.toISOString() });
+                      }}
+                      className="h-7 w-7"
+                      title="Прибавить 8 часов"
+                    >
+                      <span className="text-xs">+8h</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        const baseTime = form.run_at ? new Date(form.run_at) : new Date();
+                        baseTime.setDate(baseTime.getDate() + 1);
+                        setForm({ ...form, run_at: baseTime.toISOString() });
+                      }}
+                      className="h-7 w-7"
+                      title="Прибавить 1 сутки"
+                    >
+                      <span className="text-xs">+24h</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        setForm({ ...form, run_at: null });
+                      }}
+                      className="h-7 w-7"
+                      title="Очистить дату и время"
+                    >
+                      <span className="text-xs">✕</span>
+                    </Button>
+                                    
                   </div>
                 </div>
               )}
@@ -710,7 +750,7 @@ const SchedulerPage = () => {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => {
-                                              navigate(`/projects/${job.project_id}/results?session=${run.session_id}&returnTo=scheduler`);
+                                              navigate(`/${job.project_id}/results?session=${run.session_id}&returnTo=scheduler`);
                                             }}
                                             className="whitespace-nowrap"
                                           >

@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse, FileResponse # pyright: ignore[
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials # pyright: ignore[reportMissingImports]
 from starlette.middleware.cors import CORSMiddleware # pyright: ignore[reportMissingImports]
 from motor.motor_asyncio import AsyncIOMotorClient # pyright: ignore[reportMissingImports]
-import asyncio, logging, json
+import asyncio, json
 import os
 import uuid
 from typing import List, Optional, Dict, Any
@@ -12,13 +12,12 @@ import contextlib
 from openpyxl import Workbook  # pyright: ignore[reportMissingModuleSource]
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment  # pyright: ignore[reportMissingModuleSource]
 import tempfile
-from typing import Tuple  # pyright: ignore[reportMissingModuleSource]
 
 from config.config_init import *
 from models.models_init import *
 from services.services_init import *
 from utils.db_utils import prepare_for_mongo, parse_from_mongo
-from utils.audit_utils import log_audit, _persist_audit_log
+from utils.audit_utils import log_audit
 from scheduler.scheduler_utils import parse_datetime_param as _parse_datetime_param, calculate_next_run as _calculate_next_run, normalize_run_times as _normalize_run_times, next_daily_occurrence as _next_daily_occurrence
 from scheduler.scheduler_worker import scheduler_worker
 from api import api_router as auth_api_router
@@ -44,8 +43,6 @@ async def get_permissions_list():
         "groups": PERMISSION_GROUPS
     }
 
-
-
 # Project Execution with Real-time Updates (SSE)
 @api_router.get("/projects/{project_id}/execute")
 async def execute_project(project_id: str, token: Optional[str] = None, skip_audit_log: bool = False):
@@ -69,14 +66,16 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
     project_doc = await db.projects.find_one({"id": project_id})
     project_name = project_doc.get('name') if project_doc else "Неизвестный проект"
         
-    log_audit(
-        "23",
-        user_id=current_user.id,
-        username=current_user.username,
-        details={
-            "project_name": project_name
-        }
-    )
+    if not skip_audit_log:
+        log_audit(
+            "23",  # Код события: запуск проекта
+            user_id=current_user.id,
+            username=current_user.username,
+            details={
+                "project_id": project_id,
+                "project_name": project_name
+            }
+        )
     
     async def event_generator():
         try:
@@ -550,7 +549,6 @@ async def get_session_executions(project_id: str, session_id: str, current_user:
     # )
     
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
-
 
 # API Routes - Execution (Legacy single-script execution)
 @api_router.post("/execute")
