@@ -298,231 +298,240 @@ export default function ScriptsPage() {
             )}            
 
           </DialogTrigger>
+
+
+
+          
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" modal={false}>
             <DialogHeader>
               <DialogTitle>{editingScript ? "Редактировать проверку" : "Новая проверка"}</DialogTitle>
               <DialogDescription>Создайте проверку для конкретной системы</DialogDescription>
             </DialogHeader>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                {/* Левый столбец */}
-                <div className="space-y-4">
-                
-                  <div>
-                    <Label>Категория</Label>
-                    <SelectNative
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                    >
-                      <option value="all">Все категории</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.icon} {cat.name}
-                        </option>
-                      ))}
-                    </SelectNative>
-                  </div>
 
-                  <div>
-                    <Label>Система</Label>
-                    <SelectNative
-                      value={selectedSystem}
-                      onChange={(e) => setSelectedSystem(e.target.value)}
-                      disabled={selectedCategory === "all"}
-                    >
-                      <option value="all">
-                        {selectedCategory !== "all" ? "Все системы категории" : "Сначала выберите категорию"}
-                      </option>
-                      {systems.map((sys) => (
-                        <option key={sys.id} value={sys.id}>
-                          {sys.name}
-                        </option>
-                      ))}
-                    </SelectNative>
-                  </div>
-                  
-                  <div>
-                    <Label>Название проверки</Label>
-                    <Input
-                      data-testid="script-name-input"
-                      placeholder="Проверка версии ядра"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label>Описание</Label>
-                    <Input
-                      value={formData.description}
-                      onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      placeholder="Опционально"
-                    />
-                  </div>
 
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Label>Команда</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="h-4 w-4 text-gray-500 cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <div className="text-xs text-gray-500 mt-1 space-y-1">
-                              <p className="font-semibold">Для Windows команда пишется на PowerShell Scripting Language</p>
-                              <p className="font-semibold">Для Linux команда пишется на Bash</p>
-                              <p className="font-semibold">Команда должна получать вывод в терминал - файл ('cat /etc/passwd') или другой результат ('dir c:\windows')</p>
-                              <p className="font-semibold">Доступ к результату команды из скрипта-обработчика: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <Textarea
-                      data-testid="script-content-input"
-                      value={formData.content}
-                      onChange={(e) => setFormData({...formData, content: e.target.value})}
-                      placeholder="cat /etc/hostname"
-                      rows={2}
-                      className="font-mono text-sm"
-                      required
-                    />                    
-                  </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="has_reference_files"
-                      checked={formData.has_reference_files}
-                      onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
-                    />
-                    <div className="flex items-center gap-1">
-                      <Label htmlFor="has_reference_files" className="cursor-pointer">
-                        Предусмотрены эталонные файлы
-                      </Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="h-3 w-3 text-gray-500 cursor-help ml-1" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <div className="text-xs text-gray-500 space-y-2">
-                              <p className="font-semibold">Включите, если для этой проверки нужны эталонные файлы</p>
-                              <p>Например: список доменных УЗ на хосте, список разрешенных групп</p>
-                              <p className="font-semibold">Эталонные файлы будут доступны в переменной: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </div>
-                  
-                </div>
+  <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="grid grid-cols-2 gap-4">
+      {/* Левый столбец */}
+      <div className="space-y-4">
+      
+        <div>
+          <Label>Категория</Label>
+          <SelectNative
+            value={formCategoryId} // ← ИСПРАВЛЕНО
+            onChange={(e) => handleCategoryChangeInForm(e.target.value)}
+            required
+          >
+            <option value="">Выберите категорию...</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.icon} {cat.name}
+              </option>
+            ))}
+          </SelectNative>
+        </div>
 
-                {/* Правый столбец */}
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Label>Скрипт-обработчик</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-4 w-4 rounded-full"
-                            >
-                              <HelpCircle className="h-3 w-3 text-gray-500" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            {getTooltipContent()}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <Textarea
-                      value={formData.processor_script}
-                      onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
-                      placeholder={getPlaceholder()}
-                      rows={10}
-                      className="font-mono text-sm"
-                    />
-                  </div>
+        <div>
+          <Label>Система</Label>
+          <SelectNative
+            value={formData.system_id} // ← ИСПРАВЛЕНО
+            onChange={(e) => setFormData({...formData, system_id: e.target.value})}
+            required
+            disabled={!formCategoryId}
+          >
+            <option value="">
+              {formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"}
+            </option>
+            {formSystems.map((sys) => (
+              <option key={sys.id} value={sys.id}>
+                {sys.name}
+              </option>
+            ))}
+          </SelectNative>
+        </div>
+        
+        <div>
+          <Label>Название проверки</Label>
+          <Input
+            data-testid="script-name-input"
+            placeholder="Проверка версии ядра"
+            value={formData.name}
+            onChange={(e) => setFormData({...formData, name: e.target.value})}
+            required
+          />
+        </div>
+        
+        <div>
+          <Label>Описание</Label>
+          <Input
+            value={formData.description}
+            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            placeholder="Опционально"
+          />
+        </div>
 
-                  <div>
-                    <Label>Описание методики испытания (опционально)</Label>
-                    <Textarea
-                      value={formData.test_methodology}
-                      onChange={(e) => setFormData({...formData, test_methodology: e.target.value})}
-                      placeholder="Данные из ПМИ (для формирования отчета)"
-                      rows={3}
-                    />
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Label>Команда</Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-gray-500 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <div className="text-xs text-gray-500 mt-1 space-y-1">
+                    <p className="font-semibold">Для Windows команда пишется на PowerShell Scripting Language</p>
+                    <p className="font-semibold">Для Linux команда пишется на Bash</p>
+                    <p className="font-semibold">Команда должна получать вывод в терминал - файл ('cat /etc/passwd') или другой результат ('dir c:\windows')</p>
+                    <p className="font-semibold">Доступ к результату команды из скрипта-обработчика: <code className="bg-gray-100 px-1 rounded">$CHECK_OUTPUT</code></p>
                   </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <Textarea
+            data-testid="script-content-input"
+            value={formData.content}
+            onChange={(e) => setFormData({...formData, content: e.target.value})}
+            placeholder="cat /etc/hostname"
+            rows={2}
+            className="font-mono text-sm"
+            required
+          />                    
+        </div>
 
-                  <div>
-                    <Label>Критерий успешного прохождения испытания (опционально)</Label>
-                    <Textarea
-                      value={formData.success_criteria}
-                      onChange={(e) => setFormData({...formData, success_criteria: e.target.value})}
-                      placeholder="Данные из ПМИ (для формирования отчета)"
-                      rows={3}
-                    />
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="has_reference_files"
+            checked={formData.has_reference_files}
+            onCheckedChange={(checked) => setFormData({...formData, has_reference_files: checked})}
+          />
+          <div className="flex items-center gap-1">
+            <Label htmlFor="has_reference_files" className="cursor-pointer">
+              Предусмотрены эталонные файлы
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3 w-3 text-gray-500 cursor-help ml-1" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <div className="text-xs text-gray-500 space-y-2">
+                    <p className="font-semibold">Включите, если для этой проверки нужны эталонные файлы</p>
+                    <p>Например: список доменных УЗ на хосте, список разрешенных групп</p>
+                    <p className="font-semibold">Эталонные файлы будут доступны в переменной: <code className="bg-gray-100 px-1 rounded">$ETALON_INPUT</code></p>
                   </div>
-                </div>
-              </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </div>
+      </div>
 
-              {/* Кнопки в одну строку */}
-              <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Отмена
-                </Button>
-                <Button type="submit" data-testid="save-script-btn">
-                  {editingScript ? "Обновить" : "Создать"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
+      {/* Правый столбец */}
+      <div className="space-y-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Label>Скрипт-обработчик</Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-4 w-4 rounded-full"
+                  >
+                    <HelpCircle className="h-3 w-3 text-gray-500" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  {getTooltipContent()}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <Textarea
+            value={formData.processor_script}
+            onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
+            placeholder={getPlaceholder()}
+            rows={10}
+            className="font-mono text-sm"
+          />
+        </div>
+
+        <div>
+          <Label>Описание методики испытания (опционально)</Label>
+          <Textarea
+            value={formData.test_methodology}
+            onChange={(e) => setFormData({...formData, test_methodology: e.target.value})}
+            placeholder="Данные из ПМИ (для формирования отчета)"
+            rows={3}
+          />
+        </div>
+
+        <div>
+          <Label>Критерий успешного прохождения испытания (опционально)</Label>
+          <Textarea
+            value={formData.success_criteria}
+            onChange={(e) => setFormData({...formData, success_criteria: e.target.value})}
+            placeholder="Данные из ПМИ (для формирования отчета)"
+            rows={3}
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Кнопки в одну строку */}
+    <div className="flex justify-end gap-2 pt-4">
+      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+        Отмена
+      </Button>
+      <Button type="submit" data-testid="save-script-btn">
+        {editingScript ? "Обновить" : "Создать"}
+      </Button>
+    </div>
+  </form>
+</DialogContent>
         </Dialog>
       </div>
 
-      <div>
-        <Label>Категория</Label>
-        <SelectNative
-          value={formCategoryId}
-          onChange={(e) => handleCategoryChangeInForm(e.target.value)}
-          required
-        >
-          <option value="">Выберите категорию...</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.icon} {cat.name}
+      {/* После заголовка и перед таблицей добавьте: */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div>
+          <Label>Категория</Label>
+          <SelectNative
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            <option value="all">Все категории</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.icon} {cat.name}
+              </option>
+            ))}
+          </SelectNative>
+        </div>
+
+        <div>
+          <Label>Система</Label>
+          <SelectNative
+            value={selectedSystem}
+            onChange={(e) => setSelectedSystem(e.target.value)}
+            disabled={selectedCategory === "all"}
+          >
+            <option value="all">
+              {selectedCategory !== "all" ? "Все системы категории" : "Сначала выберите категорию"}
             </option>
-          ))}
-        </SelectNative>
+            {systems.map((sys) => (
+              <option key={sys.id} value={sys.id}>
+                {sys.name}
+              </option>
+            ))}
+          </SelectNative>
+        </div>
       </div>
 
-      <div>
-        <Label>Система</Label>
-        <SelectNative
-          value={formData.system_id}
-          onChange={(e) => setFormData({...formData, system_id: e.target.value})}
-          required
-          disabled={!formCategoryId}
-        >
-          <option value="">
-            {formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"}
-          </option>
-          {formSystems.map((sys) => (
-            <option key={sys.id} value={sys.id}>
-              {sys.name}
-            </option>
-          ))}
-        </SelectNative>
-      </div>
 
       <div className="overflow-x-auto">
         {scripts.length === 0 ? (
