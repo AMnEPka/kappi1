@@ -3,18 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectNative } from "@/components/ui/select-native";
+//import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { FileCode, Plus, Edit, Trash2, HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAuth } from "@/contexts/AuthContext";
 import { api } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
 
 export default function ScriptsPage() {
-  const { hasPermission, isAdmin, user } = useAuth();
   const { canEditScript, canDeleteScript, canCreateScript } = usePermissions();
   const [scripts, setScripts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -299,7 +298,7 @@ export default function ScriptsPage() {
             )}            
 
           </DialogTrigger>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" modal={false}>
             <DialogHeader>
               <DialogTitle>{editingScript ? "Редактировать проверку" : "Новая проверка"}</DialogTitle>
               <DialogDescription>Создайте проверку для конкретной системы</DialogDescription>
@@ -309,37 +308,38 @@ export default function ScriptsPage() {
               <div className="grid grid-cols-2 gap-4">
                 {/* Левый столбец */}
                 <div className="space-y-4">
+                
                   <div>
                     <Label>Категория</Label>
-                    <Select value={formCategoryId} onValueChange={handleCategoryChangeInForm} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите категорию..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SelectNative
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                    >
+                      <option value="all">Все категории</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.icon} {cat.name}
+                        </option>
+                      ))}
+                    </SelectNative>
                   </div>
 
                   <div>
                     <Label>Система</Label>
-                    <Select 
-                      value={formData.system_id} 
-                      onValueChange={(value) => setFormData({...formData, system_id: value})}
-                      required
-                      disabled={!formCategoryId}
+                    <SelectNative
+                      value={selectedSystem}
+                      onChange={(e) => setSelectedSystem(e.target.value)}
+                      disabled={selectedCategory === "all"}
                     >
-                      <SelectTrigger data-testid="script-system-select">
-                        <SelectValue placeholder={formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {formSystems.map((sys) => (
-                          <SelectItem key={sys.id} value={sys.id}>{sys.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <option value="all">
+                        {selectedCategory !== "all" ? "Все системы категории" : "Сначала выберите категорию"}
+                      </option>
+                      {systems.map((sys) => (
+                        <option key={sys.id} value={sys.id}>
+                          {sys.name}
+                        </option>
+                      ))}
+                    </SelectNative>
                   </div>
                   
                   <div>
@@ -489,40 +489,39 @@ export default function ScriptsPage() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <Label>Категория</Label>
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger>
-              <SelectValue placeholder="Все категории" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все категории</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.icon} {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div>
+        <Label>Категория</Label>
+        <SelectNative
+          value={formCategoryId}
+          onChange={(e) => handleCategoryChangeInForm(e.target.value)}
+          required
+        >
+          <option value="">Выберите категорию...</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.icon} {cat.name}
+            </option>
+          ))}
+        </SelectNative>
+      </div>
 
-        <div>
-          <Label>Система</Label>
-          <Select value={selectedSystem} onValueChange={setSelectedSystem} disabled={selectedCategory === "all"}>
-            <SelectTrigger>
-              <SelectValue placeholder={selectedCategory !== "all" ? "Все системы категории" : "Сначала выберите категорию"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все системы</SelectItem>
-              {systems.map((sys) => (
-                <SelectItem key={sys.id} value={sys.id}>
-                  {sys.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div>
+        <Label>Система</Label>
+        <SelectNative
+          value={formData.system_id}
+          onChange={(e) => setFormData({...formData, system_id: e.target.value})}
+          required
+          disabled={!formCategoryId}
+        >
+          <option value="">
+            {formCategoryId ? "Выберите систему..." : "Сначала выберите категорию"}
+          </option>
+          {formSystems.map((sys) => (
+            <option key={sys.id} value={sys.id}>
+              {sys.name}
+            </option>
+          ))}
+        </SelectNative>
       </div>
 
       <div className="overflow-x-auto">

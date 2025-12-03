@@ -680,7 +680,7 @@ const SchedulerPage = () => {
                             </div>
                             
                             <div className="relative group">
-                              <Button variant="ghost" size="sm" onClick={() => toggleHistory(job.id)} title="История">
+                              <Button variant="ghost" size="sm" onClick={() => toggleHistory(job.id)} title="История выполнения">
                                 <HistoryIcon className="h-4 w-4" />
                               </Button>
                             </div>
