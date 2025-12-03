@@ -33,17 +33,17 @@ async def create_host(host_input: HostCreate, current_user: User = Depends(get_c
     
     ip_address_value = host_obj.hostname if host_obj.hostname else "не указан"
 
-    log_audit(
-        "15",
-        user_id=current_user.id,
-        username=current_user.username,
-        details={
-            "host_id": host_obj.id, 
-            "host_name": host_obj.name, 
-            "ip_address": ip_address_value,
-            "updated_by": current_user.username
-        }
-    )
+    # log_audit(
+    #     "15",
+    #     user_id=current_user.id,
+    #     username=current_user.username,
+    #     details={
+    #         "host_id": host_obj.id, 
+    #         "host_name": host_obj.name, 
+    #         "ip_address": ip_address_value,
+    #         "updated_by": current_user.username
+    #     }
+    # )
     return host_obj
 
 
@@ -132,16 +132,16 @@ async def update_host(host_id: str, host_update: HostUpdate, current_user: User 
     updated_host = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     
     # Логирование редактирования хоста
-    log_audit(
-        "16",  # Редактирование хоста
-        user_id=current_user.id,
-        username=current_user.username,
-        details={
-            "host_id": host_id,
-            "host_name": host.name,
-            "ip_address": host.hostname
-        }
-    )
+    # log_audit(
+    #     "16",  # Редактирование хоста
+    #     user_id=current_user.id,
+    #     username=current_user.username,
+    #     details={
+    #         "host_id": host_id,
+    #         "host_name": host.name,
+    #         "ip_address": host.hostname
+    #     }
+    # )
     
     return Host(**parse_from_mongo(updated_host))
 
@@ -164,15 +164,15 @@ async def delete_host(host_id: str, current_user: User = Depends(get_current_use
     result = await db.hosts.delete_one({"id": host_id})
     
     # Логирование удаления хоста
-    log_audit(
-        "17",  # Удаление хоста
-        user_id=current_user.id,
-        username=current_user.username,
-        details={
-            "host_name": host.get('name'),
-            "hostname": host.get('hostname'),
-            "deleted_by": current_user.username
-        }
-    )
+    # log_audit(
+    #     "17",  # Удаление хоста
+    #     user_id=current_user.id,
+    #     username=current_user.username,
+    #     details={
+    #         "host_name": host.get('name'),
+    #         "hostname": host.get('hostname'),
+    #         "deleted_by": current_user.username
+    #     }
+    # )
     
     return {"message": "Хост удален"}

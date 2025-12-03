@@ -33,9 +33,9 @@ const EVENT_OPTIONS = [
   { value: "14", label: "Удаление системы" },
   
   // Хосты
-  { value: "15", label: "Создание хоста" },
-  { value: "16", label: "Редактирование хоста" },
-  { value: "17", label: "Удаление хоста" },
+  // { value: "15", label: "Создание хоста" },
+  // { value: "16", label: "Редактирование хоста" },
+  // { value: "17", label: "Удаление хоста" },
   
   // Проверки
   { value: "18", label: "Создание проверки" },
@@ -100,23 +100,18 @@ const formatEventDetails = (eventNumber, details) => {
         
       case "5": // Удаление пользователя
         return `Удаленный пользователь: ${detailsObj.username}
-ФИО: ${detailsObj.full_name}
-Администратор: ${detailsObj.is_admin ? 'Да' : 'Нет'}`;  
+ФИО: ${detailsObj.deleted_full_name}`;  
 
       case "6": // Создание роли
         return `Роль: ${detailsObj.role_name}
 Прав: ${detailsObj.permissions_ratio}`;
 
       case "7": // Редактирование роли
-        return `Роль: ${detailsObj.role_name}
-Прав было: ${detailsObj.old_permissions_ratio}
-Прав стало: ${detailsObj.new_permissions_ratio}`;
+        return `Роль: ${detailsObj.role_name}`;
 
       case "8": // Удаление роли
-        return `Роль: ${detailsObj.role_name}
-Прав в роли: ${detailsObj.permissions_count}
-Затронуто пользователей: ${detailsObj.affected_users_count}`;
-
+        return `Роль: ${detailsObj.role_name}`;
+        
       case "9": // Создание категории
         return `Категория: ${detailsObj.category_name}`;
 
@@ -137,17 +132,17 @@ const formatEventDetails = (eventNumber, details) => {
       case "14": // Удаление системы
         return `Система: ${detailsObj.system_name}`;
               
-      case "15": // Создание хоста
-        return `Название: ${detailsObj.host_name}
-Адрес: ${detailsObj.ip_address}`;
+//       case "15": // Создание хоста
+//         return `Название: ${detailsObj.host_name}
+// Адрес: ${detailsObj.ip_address}`;
         
-      case "16": // Редактирование хоста
-        return `Название: ${detailsObj.host_name}
-Адрес: ${detailsObj.ip_address}`;
+//       case "16": // Редактирование хоста
+//         return `Название: ${detailsObj.host_name}
+// Адрес: ${detailsObj.ip_address}`;
 
-      case "17": // Удаление хоста
-        return `Хост: ${detailsObj.host_name}
-Адрес: ${detailsObj.hostname}`;
+//       case "17": // Удаление хоста
+//         return `Хост: ${detailsObj.host_name}
+// Адрес: ${detailsObj.hostname}`;
         
       case "18": // Создание проверки
         return `Название: ${detailsObj.script_name}

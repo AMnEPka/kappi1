@@ -54,11 +54,8 @@ async def create_user(user_input: UserCreate, current_user: User = Depends(get_c
         user_id=current_user.id,
         username=current_user.username,
         details={
-            "new_user_id": str(user.id),
             "username": user_input.username,
-            "target_full_name": user_input.full_name,
-            "new_is_admin": user_input.is_admin,
-            "created_by": current_user.username
+            "target_full_name": user_input.full_name
         }
     )
     
@@ -157,10 +154,8 @@ async def delete_user(user_id: str, current_user: User = Depends(get_current_use
         user_id=current_user.id,
         username=current_user.username,
         details={
-            "deleted_user_id": user_id,
             "deleted_username": user.username,
             "deleted_full_name": user.full_name,
-            "deleted_by": current_user.username,
             "data_reassigned_to": admin_id
         }
     )
@@ -189,13 +184,11 @@ async def change_user_password(user_id: str, password_data: PasswordResetRequest
     
     # Логирование смены пароля
     log_audit(
-        "6",  # Смена пароля
+        "4",  # Смена пароля
         user_id=current_user.id,
         username=current_user.username,
         details={
-            "target_user_id": user_id,
-            "target_username": user.username,
-            "changed_by": current_user.username
+            "target_username": user.username
         }
     )
     
@@ -250,10 +243,7 @@ async def update_user_roles(user_id: str, role_ids: List[str], current_user: Use
         user_id=current_user.id,
         username=current_user.username,
         details={
-            "target_user_id": user_id,
-            "target_username": user_doc.get('username'),
-            "role_ids": role_ids,
-            "changed_by": current_user.username
+            "target_username": user_doc.get('username')
         }
     )
     
@@ -296,13 +286,11 @@ async def create_role(role_input: RoleCreate, current_user: User = Depends(get_c
     
     # Логирование создания роли
     log_audit(
-        "8",  # Создание роли
+        "6", # Создание роли
         user_id=current_user.id,
         username=current_user.username,
         details={
-            "role_name": role.name,
-            "permissions": role.permissions,
-            "created_by": current_user.username
+            "role_name": role.name
         }
     )
     
@@ -379,13 +367,11 @@ async def delete_role(role_id: str, current_user: User = Depends(get_current_use
     
     # Логирование удаления роли
     log_audit(
-        "25",  # Удаление роли
+        "8",  # Удаление роли
         user_id=current_user.id,
         username=current_user.username,
         details={
-            "role_id": role_id,
-            "role_name": role_doc.get('name'),
-            "deleted_by": current_user.username
+            "role_name": role_doc.get('name')
         }
     )
     

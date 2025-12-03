@@ -72,7 +72,6 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
             user_id=current_user.id,
             username=current_user.username,
             details={
-                "project_id": project_id,
                 "project_name": project_name
             }
         )
@@ -535,19 +534,6 @@ async def get_session_executions(project_id: str, session_id: str, current_user:
         {"_id": 0}
     ).sort("executed_at", 1).to_list(1000)
 
-        # Получаем имя проекта
-    project_doc = await db.projects.find_one({"id": project_id})
-    project_name = project_doc.get('name') if project_doc else "Неизвестный проект"    
-    
-    # log_audit( 
-    #     "25", # просмотр результатов проекта
-    #     user_id=current_user.id,
-    #     username=current_user.username,
-    #     details={
-    #         "project_name": project_id
-    #         }
-    # )
-    
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
 # API Routes - Execution (Legacy single-script execution)

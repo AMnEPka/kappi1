@@ -122,8 +122,7 @@ async def delete_category(category_id: str, current_user: User = Depends(get_cur
         user_id=current_user.id,
         username=current_user.username,
         details={
-            "category_name": category.get('name'),
-            "deleted_by": current_user.username
+            "category_name": category.get('name')
         }
     )
     
@@ -156,8 +155,7 @@ async def create_system(category_id: str, system_input: SystemCreate, current_us
         username=current_user.username,
         details={
             "system_name": system_input.name,
-            "category_name": category.get('name'),
-            "created_by": current_user.username
+            "category_name": category.get('name')
         }
     )
     

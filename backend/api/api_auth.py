@@ -91,7 +91,7 @@ async def login(login_data: LoginRequest, request: Request):
     )
     
     log_audit(
-        "1",
+        "1", # Успешный вход
         user_id=user.id,
         username=user.username,
         details={
