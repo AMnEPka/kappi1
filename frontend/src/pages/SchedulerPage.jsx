@@ -9,6 +9,7 @@ import { api } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon, CheckCircle, XCircle, Loader2, Plus, X} from "lucide-react";
 import { useNavigate } from 'react-router-dom';
+import { SelectNative } from "@/components/ui/select-native";
 import DateTimePicker from '../components/ui/datetime-picker';
 
 const JOB_TYPES = [
@@ -27,9 +28,9 @@ const statusMap = {
 
 const runStatusMap = {
   running: { label: "Выполняется", showResults: false },
-  success: { label: "Успешно", showResults: true },
-  paused:  { label: "Пауза", showResults: false },
-  failed:  { label: "Ошибка", showResults: true }
+  success: { label: "Успешно выполнено", showResults: true },
+  paused:  { label: "Приостановлено", showResults: false },
+  failed:  { label: "Ошибка выполнения", showResults: true }
 };
 
 const statusIcons = {
@@ -347,8 +348,7 @@ const SchedulerPage = () => {
                     </div>
                   ) : (
                     // При создании - обычный выбор
-                    <select
-                      className="w-full h-10 border rounded px-3"
+                    <SelectNative
                       value={form.project_id}
                       onChange={(e) => setForm({ ...form, project_id: e.target.value })}
                       required
@@ -359,7 +359,7 @@ const SchedulerPage = () => {
                           {project.name}
                         </option>
                       ))}
-                    </select>
+                    </SelectNative>
                   )}
                 </div>
               </div>
@@ -666,6 +666,7 @@ const SchedulerPage = () => {
                                 variant="ghost" 
                                 size="sm" 
                                 onClick={() => !isOneTimeCompleted && handleEdit(job)} 
+                                title="Редактировать"
                                 disabled={isOneTimeCompleted}
                                 className={isOneTimeCompleted ? "opacity-50 cursor-not-allowed" : ""}
                               >

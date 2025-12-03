@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Server, ChevronLeft, ChevronRight, Check, Plus, Trash2, HelpCircle, Loader2, EthernetPort, Upload, Edit } from "lucide-react";
+import { Server, ChevronLeft, ChevronRight, Check, Plus, Trash2, HelpCircle, Loader2, EthernetPort, Upload, Edit, Save, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,10 +43,24 @@ export default function ProjectWizard({ onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState([]);
   const { user: currentUser } = useAuth();
+  const [systemCheckTemplates, setSystemCheckTemplates] = useState({});
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Функция для обновления шаблонов при выборе проверок
+  const updateSystemCheckTemplate = (systemId, scriptIds) => {
+    setSystemCheckTemplates(prev => ({
+      ...prev,
+      [systemId]: [...scriptIds] // Сохраняем копию массива
+    }));
+  };
+
+  // Функция для получения шаблона проверок для системы
+  const getSystemCheckTemplate = (systemId) => {
+    return systemCheckTemplates[systemId] || [];
+  };
 
   const fetchData = async () => {
     try {
@@ -94,15 +108,89 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const handleAddSystemToHost = (hostId) => {
+    const updatedTasks = [...(projectData.tasks || [])];
+    const taskIndex = updatedTasks.findIndex(t => t.host_id === hostId);
+    
+    if (taskIndex !== -1) {
+      const task = updatedTasks[taskIndex];
+      const host = getHostById(hostId);
+      
+      // Находим доступные системы, которые еще не выбраны для этого хоста
+      const availableSystems = systems.filter(sys => {
+        // Фильтр по ОС
+        const systemOsType = sys.os_type;
+        const hostConnectionType = host?.connection_type;
+        if (hostConnectionType === 'ssh') return systemOsType === 'linux';
+        if (hostConnectionType === 'winrm') return systemOsType === 'windows';
+        return true;
+      }).filter(sys => !task.systems.some(existingSystem => existingSystem.system_id === sys.id));
+      
+      if (availableSystems.length > 0) {
+        // Берем первую доступную систему
+        const firstAvailableSystem = availableSystems[0];
+        
+        // Получаем сохраненный шаблон проверок для этой системы
+        const savedScriptIds = getSystemCheckTemplate(firstAvailableSystem.id);
+        
+        // Получаем доступные проверки для системы
+        const availableScripts = getScriptsBySystemId(firstAvailableSystem.id);
+        
+        // Фильтруем сохраненные проверки, оставляя только доступные
+        const validSavedScriptIds = savedScriptIds.filter(scriptId => 
+          availableScripts.some(script => script.id === scriptId)
+        );
+        
+        const newSystem = {
+          system_id: firstAvailableSystem.id,
+          script_ids: validSavedScriptIds.length > 0 ? validSavedScriptIds : []
+        };
+        
+        const updatedSystems = [...task.systems, newSystem];
+        
+        updatedTasks[taskIndex] = {
+          ...task,
+          systems: updatedSystems
+        };
+        
+        setProjectData(prev => ({
+          ...prev,
+          tasks: updatedTasks
+        }));
+      }
+    }
+  };
+
+  const applyTemplateToAllHosts = (systemId, scriptIds) => {
+    const updatedTasks = [...(projectData.tasks || [])];
+    
+    updatedTasks.forEach((task, taskIndex) => {
+      const updatedSystems = [...task.systems];
+      
+      updatedSystems.forEach((system, systemIndex) => {
+        if (system.system_id === systemId) {
+          const availableScripts = getScriptsBySystemId(systemId);
+          const validScriptIds = scriptIds.filter(scriptId => 
+            availableScripts.some(script => script.id === scriptId)
+          );
+          
+          updatedSystems[systemIndex] = {
+            ...system,
+            script_ids: validScriptIds
+          };
+        }
+      });
+      
+      updatedTasks[taskIndex] = {
+        ...task,
+        systems: updatedSystems
+      };
+    });
+    
     setProjectData(prev => ({
       ...prev,
-      tasks: prev.tasks.map(task =>
-        task.host_id === hostId
-          ? { ...task, systems: [...task.systems, { system_id: '', script_ids: [] }] }
-          : task
-      ),
+      tasks: updatedTasks
     }));
-  };
+  };  
 
   const handleRemoveSystemFromHost = (hostId, systemIndex) => {
     setProjectData(prev => ({
@@ -116,41 +204,78 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const handleTaskSystemChange = (hostId, systemIndex, systemId) => {
-    setProjectData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task => {
-        if (task.host_id === hostId) {
-          const newSystems = [...task.systems];
-          newSystems[systemIndex] = { system_id: systemId, script_ids: [] };
-          return { ...task, systems: newSystems };
-        }
-        return task;
-      }),
-    }));
+    const updatedTasks = [...(projectData.tasks || [])];
+    const taskIndex = updatedTasks.findIndex(t => t.host_id === hostId);
+    
+    if (taskIndex !== -1) {
+      const task = updatedTasks[taskIndex];
+      const updatedSystems = [...task.systems];
+      const system = updatedSystems[systemIndex];
+      
+      // Получаем сохраненный шаблон проверок для этой системы
+      const savedScriptIds = getSystemCheckTemplate(systemId);
+      
+      // Получаем доступные проверки для новой системы
+      const availableScripts = getScriptsBySystemId(systemId);
+      
+      // Фильтруем сохраненные проверки, оставляя только те, которые доступны для этой системы
+      const validSavedScriptIds = savedScriptIds.filter(scriptId => 
+        availableScripts.some(script => script.id === scriptId)
+      );
+      
+      // Обновляем систему с сохраненными проверками, если они есть
+      updatedSystems[systemIndex] = {
+        ...system,
+        system_id: systemId,
+        script_ids: validSavedScriptIds.length > 0 ? validSavedScriptIds : []
+      };
+      
+      updatedTasks[taskIndex] = {
+        ...task,
+        systems: updatedSystems
+      };
+      
+      setProjectData(prev => ({
+        ...prev,
+        tasks: updatedTasks
+      }));
+    }
   };
 
   const handleTaskScriptToggle = (hostId, systemIndex, scriptId) => {
-    setProjectData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task => {
-        if (task.host_id === hostId) {
-          const newSystems = task.systems.map((system, idx) => {
-            if (idx === systemIndex) {
-              const isSelected = system.script_ids.includes(scriptId);
-              return {
-                ...system,
-                script_ids: isSelected
-                  ? system.script_ids.filter(id => id !== scriptId)
-                  : [...system.script_ids, scriptId]
-              };
-            }
-            return system;
-          });
-          return { ...task, systems: newSystems };
-        }
-        return task;
-      }),
-    }));
+    const updatedTasks = [...(projectData.tasks || [])];
+    const taskIndex = updatedTasks.findIndex(t => t.host_id === hostId);
+    
+    if (taskIndex !== -1) {
+      const task = updatedTasks[taskIndex];
+      const updatedSystems = [...task.systems];
+      const system = updatedSystems[systemIndex];
+      
+      const isCurrentlySelected = system.script_ids.includes(scriptId);
+      const updatedScriptIds = isCurrentlySelected
+        ? system.script_ids.filter(id => id !== scriptId)
+        : [...system.script_ids, scriptId];
+      
+      updatedSystems[systemIndex] = {
+        ...system,
+        script_ids: updatedScriptIds
+      };
+      
+      updatedTasks[taskIndex] = {
+        ...task,
+        systems: updatedSystems
+      };
+      
+      setProjectData(prev => ({
+        ...prev,
+        tasks: updatedTasks
+      }));
+      
+      // Обновляем шаблон при изменении проверок
+      if (system.system_id) {
+        updateSystemCheckTemplate(system.system_id, updatedScriptIds);
+      }
+    }
   };
 
   const canProceedToStep2 = () => {
@@ -939,22 +1064,41 @@ export default function ProjectWizard({ onNavigate }) {
     }));
   };
 
-  const handleSelectAllScripts = (hostId, systemIndex, system, scripts) => {
-  const allSelected = scripts.every(script => 
-    system.script_ids.includes(script.id)
-  );
-
-  // Переключаем каждую проверку по отдельности через существующую функцию
-  scripts.forEach(script => {
-    const isCurrentlySelected = system.script_ids.includes(script.id);
+  const handleSelectAllScripts = (hostId, systemIndex, system, availableScripts) => {
+    const updatedTasks = [...(projectData.tasks || [])];
+    const taskIndex = updatedTasks.findIndex(t => t.host_id === hostId);
     
-    // Если все выбраны - снимаем выделение со всех
-    // Если не все выбраны - добавляем только те, которые не выбраны
-    if (allSelected || !isCurrentlySelected) {
-      handleTaskScriptToggle(hostId, systemIndex, script.id);
+    if (taskIndex !== -1) {
+      const task = updatedTasks[taskIndex];
+      const updatedSystems = [...task.systems];
+      const currentSystem = updatedSystems[systemIndex];
+      
+      const allScriptIds = availableScripts.map(script => script.id);
+      const isAllSelected = allScriptIds.every(id => currentSystem.script_ids.includes(id));
+      
+      const updatedScriptIds = isAllSelected ? [] : allScriptIds;
+      
+      updatedSystems[systemIndex] = {
+        ...currentSystem,
+        script_ids: updatedScriptIds
+      };
+      
+      updatedTasks[taskIndex] = {
+        ...task,
+        systems: updatedSystems
+      };
+      
+      setProjectData(prev => ({
+        ...prev,
+        tasks: updatedTasks
+      }));
+      
+      // Обновляем шаблон
+      if (currentSystem.system_id) {
+        updateSystemCheckTemplate(currentSystem.system_id, updatedScriptIds);
+      }
     }
-  });
-};
+  };
 
   const renderStep3 = () => {
     // Функция для получения хоста по ID
@@ -1140,6 +1284,19 @@ export default function ProjectWizard({ onNavigate }) {
                                 ))}
                               </div>
                             )}
+                            {system.system_id && system.script_ids.length > 0 && (
+                              <div className="mt-2 flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => applyTemplateToAllHosts(system.system_id, system.script_ids)}
+                                  className="text-xs"
+                                >
+                                  <Copy className="h-3 w-3 mr-1" />
+                                  Применить выбранный набор проверок ко всем хостам с "{selectedSystem.name}"
+                                </Button>
+                              </div>
+                            )}                            
                           </div>
                         )}
                       </div>

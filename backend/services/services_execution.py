@@ -323,7 +323,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
 
         
         # Build result message - only command output and final status
-        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Вывод обработчика ===\n{output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
         
         return ExecutionResult(
             host_id=host.id,
