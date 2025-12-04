@@ -1,48 +1,23 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
+__pycache__
+*.pyc
+*.pyo
+*.pyd
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
+*.so
 *.egg
-
-# Virtual Environment
-venv/
-env/
-ENV/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
+*.egg-info
+dist
+build
+.git
+.gitignore
+*.md
+README*
+.env
+.venv
+venv
+ENV
 *.log
-
-# Database
-*.db
-*.sqlite
-
-# Environment
-.env.local
-.env.*.local
+.pytest_cache
+.coverage
+htmlcov
+.DS_Store
