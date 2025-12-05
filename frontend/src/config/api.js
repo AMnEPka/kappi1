@@ -3,7 +3,8 @@ import axios from 'axios';
 // Dynamically construct API URL based on current host
 // This works from localhost and any host in local network
 const { protocol, hostname } = window.location;
-const API_URL = process.env.REACT_APP_BACKEND_URL || `${protocol}//${hostname}:8001`;
+const API_URL = process.env.REACT_APP_BACKEND_URL || '/';
+const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:415/ws';
 
 console.log('🚀 API URL configured:', API_URL); 
 

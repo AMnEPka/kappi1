@@ -8,7 +8,6 @@ import { Badge } from "../components/ui/badge";
 import { Checkbox } from "../components/ui/checkbox";
 import { PlusCircle, Edit, Trash2, Key, User, Shield, Lock } from "lucide-react";
 import { toast } from "sonner";
-import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
