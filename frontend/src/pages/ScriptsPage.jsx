@@ -284,7 +284,7 @@ export default function ScriptsPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Проверки</h1>
-          <p className="text-slate-600 mt-1">Управление проверками для систем</p>
+          <p className="text-slate-600 mt-1">Создание, редактирование и удаление проверок</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);

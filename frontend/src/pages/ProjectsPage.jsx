@@ -193,7 +193,7 @@ const fetchProjectUsers = async (projectId) => {
     <div>
       <h1 className="text-3xl font-bold">Проекты</h1>
       <p className="text-gray-600 mt-1">
-        Проекты агрегируют исполнение групп проверок на разных хостах
+        Проекты агрегируют массовое исполнение проверок на разных хостах
       </p>
     </div>
     {canCreateProjects && (

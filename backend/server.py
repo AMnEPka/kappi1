@@ -2,7 +2,6 @@ from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Depends
 from fastapi.responses import StreamingResponse, FileResponse # pyright: ignore[reportMissingImports]
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials # pyright: ignore[reportMissingImports]
 from starlette.middleware.cors import CORSMiddleware # pyright: ignore[reportMissingImports]
-from motor.motor_asyncio import AsyncIOMotorClient # pyright: ignore[reportMissingImports]
 import asyncio, json
 import os
 import uuid

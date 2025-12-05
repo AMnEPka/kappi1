@@ -20,6 +20,8 @@ code {
     monospace;
 }
 
+
+
 /* Smooth transitions for interactive elements */
 button {
   transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;

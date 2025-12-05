@@ -10,8 +10,6 @@ const AdminPage = () => {
   const { hasPermission, hasAnyPermission } = useAuth();
   
   const canManageCategories = hasPermission('categories_manage');
-  const canManageUsers = hasPermission('users_manage');
-  const canManageRoles = hasPermission('roles_manage');
 
   if (!hasAnyPermission(['categories_manage', 'users_manage', 'roles_manage'])) {
     return (
