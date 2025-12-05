@@ -68,7 +68,7 @@ async def get_host(host_id: str, current_user: User = Depends(get_current_user))
     """Get host by ID"""
     host = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     if not host:
-        raise HTTPException(status_code=404, detail="Хост не найден")
+        raise HTTPException(status_code=404, detail="Хост не найден 1")
     
     # Check access
     if not await has_permission(current_user, 'hosts_edit_all'):
@@ -83,7 +83,7 @@ async def test_host_connection(host_id: str):
     """Test SSH connection to host"""
     host_doc = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     if not host_doc:
-        raise HTTPException(status_code=404, detail="Хост не найден")
+        raise HTTPException(status_code=404, detail="Хост не найден 2")
     
     host = Host(**parse_from_mongo(host_doc))
     
@@ -104,7 +104,7 @@ async def update_host(host_id: str, host_update: HostUpdate, current_user: User 
     # Check if host exists and get owner
     host_doc = await db.hosts.find_one({"id": host_id})
     if not host_doc:
-        raise HTTPException(status_code=404, detail="Хост не найден")
+        raise HTTPException(status_code=404, detail="Хост не найден 3")
     
     host = Host(**host_doc)
     
@@ -152,7 +152,7 @@ async def delete_host(host_id: str, current_user: User = Depends(get_current_use
     # Check if host exists and get owner
     host = await db.hosts.find_one({"id": host_id})
     if not host:
-        raise HTTPException(status_code=404, detail="Хост не найден")
+        raise HTTPException(status_code=404, detail="Хост не найден 4")
     
     # Check permissions
     is_owner = host.get('created_by') == current_user.id

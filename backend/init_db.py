@@ -26,6 +26,19 @@ async def init_database():
     """Initialize database with admin user and default roles"""
     
     print("🚀 Initializing database...")
+
+    # Создать коллекции если их нет (для MongoDB 4.4)
+    collections_to_create = [
+        'hosts', 'executions', 'project_access', 'project_tasks',
+        'scheduler_jobs', 'scheduler_runs', 'user_roles'
+    ]    
+    
+    existing_collections = await db.list_collection_names()
+    
+    for coll_name in collections_to_create:
+        if coll_name not in existing_collections:
+            await db.create_collection(coll_name)
+            print(f"✅ Created collection: {coll_name}")
     
     # Check if admin already exists
     existing_admin = await db.users.find_one({"username": "admin"})

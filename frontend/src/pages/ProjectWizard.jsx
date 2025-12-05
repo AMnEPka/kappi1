@@ -15,12 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Server, ChevronLeft, ChevronRight, Check, Plus, Trash2, HelpCircle, Loader2, EthernetPort, Upload, Edit, Save, Copy } from "lucide-react";
+import { Server, ChevronLeft, ChevronRight, Check, Plus, Trash2, HelpCircle, Loader2, Upload, Edit, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
-
-
 
 export default function ProjectWizard({ onNavigate }) {
   const [step, setStep] = useState(1);
@@ -30,24 +28,85 @@ export default function ProjectWizard({ onNavigate }) {
     hosts: [],
     tasks: [], // { host_id, systems: [{ system_id, script_ids, reference_data: {script_id: text} }] }
     accessUserIds: [], // List of user IDs who will have access to this project
+    hostsList: [] // Список хостов проекта
   });
 
-
-    
-
-  const [hosts, setHosts] = useState([]);
+  const [hosts, setHosts] = useState([]); // Все хосты из базы
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
   const [scripts, setScripts] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState([]);
   const { user: currentUser } = useAuth();
   const [systemCheckTemplates, setSystemCheckTemplates] = useState({});
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+// Замените текущий useEffect на:
+useEffect(() => {
+  const loadData = async () => {
+    // Ждем пока пользователь авторизуется
+    if (!currentUser) {
+      console.log('⏳ Ждем авторизации пользователя...');
+      return;
+    }
+    
+    console.log('👤 Пользователь авторизован:', currentUser.username);
+    console.log('🔑 Токен есть:', !!localStorage.getItem('token'));
+    
+    // Даем небольшую задержку
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Теперь загружаем данные
+    await fetchData();
+  };
+  
+  loadData();
+}, [currentUser]); // Зависимость от currentUser, а не пустой массив
+
+  // API функции для работы с хостами
+  const saveHostToDatabase = async (hostData) => {
+    try {
+      console.log('📨 Отправка POST /api/hosts:', hostData);
+      const response = await api.post('/api/hosts', hostData);
+      console.log('📬 Ответ от сервера:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Ошибка в saveHostToDatabase:', error);
+      console.error('🔍 Детали:', error.response?.data);
+      throw error;
+    }
+  };
+
+  const updateHostInDatabase = async (hostId, hostData) => {
+    try {
+      const response = await api.put(`/api/hosts/${hostId}`, hostData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating host:', error);
+      throw error;
+    }
+  };
+
+  const deleteHostFromDatabase = async (hostId) => {
+    try {
+      await api.delete(`/api/hosts/${hostId}`);
+    } catch (error) {
+      console.error('Error deleting host:', error);
+      throw error;
+    }
+  };
+
+  const fetchAllHosts = async () => {
+    try {
+      const response = await api.get('/api/hosts');
+      setHosts(response.data);
+    } catch (error) {
+      console.error('Error fetching hosts:', error);
+      // Не показываем ошибку, если это 500 из-за отсутствия auth_type
+      if (error.response?.status !== 500) {
+        toast.error("Не удалось загрузить хосты");
+      }
+    }
+  };
 
   // Функция для обновления шаблонов при выборе проверок
   const updateSystemCheckTemplate = (systemId, scriptIds) => {
@@ -64,20 +123,44 @@ export default function ProjectWizard({ onNavigate }) {
 
   const fetchData = async () => {
     try {
-      const [hostsRes, categoriesRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
-        api.get(`/api/hosts`),
+      console.log('🔍 fetchData вызывается');
+      
+      // Пробуем получить хосты отдельно
+      console.log('🔄 Запрашиваем хосты...');
+      const hostsRes = await api.get(`/api/hosts`);
+      console.log('✅ Ответ хостов:', {
+        status: hostsRes.status,
+        data: hostsRes.data,
+        dataIsArray: Array.isArray(hostsRes.data),
+        dataLength: Array.isArray(hostsRes.data) ? hostsRes.data.length : 'N/A'
+      });
+      
+      // Сохраняем в состояние
+      setHosts(hostsRes.data);
+      console.log('📊 Хосты сохранены в состояние:', hostsRes.data?.length || 0);
+      
+      // Остальные запросы...
+      const [categoriesRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
         api.get(`/api/categories`),
         api.get(`/api/systems`),
         api.get(`/api/scripts`),
         api.get(`/api/users`),
       ]);
-      setHosts(hostsRes.data);
+      
       setCategories(categoriesRes.data);
       setSystems(systemsRes.data);
       setScripts(scriptsRes.data);
       setUsers(usersRes.data);
+      
+      console.log('✨ Все данные загружены');
+      
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('❌ Ошибка в fetchData:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        stack: error.stack
+      });
       toast.error("Не удалось загрузить данные");
     }
   };
@@ -387,8 +470,26 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const getHostById = (hostId) => {
-    console.log('Searching for host:', hostId, 'in:', projectData.hostsList);
-    return hosts.find(h => h.id === hostId);
+    
+    console.log('📂 В projectData.hostsList:', projectData.hostsList?.length || 0, 'хостов');
+    console.log('📂 В глобальном hosts:', hosts.length, 'хостов');
+    
+    // Сначала ищем в хостах проекта
+    const projectHost = projectData.hostsList?.find(h => h.id === hostId);
+    if (projectHost) {
+      console.log('✅ Найден в projectData.hostsList:', projectHost.name);
+      return projectHost;
+    }
+    
+    // Потом ищем в глобальных хостах
+    const globalHost = hosts.find(h => h.id === hostId);
+    if (globalHost) {
+      console.log('✅ Найден в глобальном hosts:', globalHost.name);
+      return globalHost;
+    }
+    
+    console.log('❌ Хост не найден нигде');
+    return null;
   };
 
   const getSystemById = (systemId) => {
@@ -571,24 +672,49 @@ export default function ProjectWizard({ onNavigate }) {
     const handleSubmitHost = async (e) => {
       e.preventDefault();
       try {
-        const isEditing = !!editingHost;
-        const newHost = {
-          ...formData,
-          id: isEditing ? editingHost.id : `host-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        console.log('🚀 Начинаем сохранение хоста...');
+        console.log('📋 Данные формы:', formData);
+
+        const hostToSave = {
+          name: formData.name,
+          hostname: formData.hostname,
+          port: formData.port,
+          username: formData.username,
+          auth_type: formData.auth_type,
+          password: formData.password,
+          ssh_key: formData.ssh_key,
+          connection_type: formData.connection_type
         };
     
-        let updatedHosts;
-        if (isEditing) {
-          updatedHosts = projectHosts.map(h => h.id === editingHost.id ? newHost : h);
+        console.log('🔑 Хост для сохранения:', hostToSave);
+        let savedHost;
+        
+        if (editingHost && editingHost.id) {
+          // Обновление существующего хоста
+          savedHost = await updateHostInDatabase(editingHost.id, hostToSave);
         } else {
-          updatedHosts = [...projectHosts, newHost];
+          // Создание нового хоста
+          savedHost = await saveHostToDatabase(hostToSave);
+        }
+        
+        console.log('✅ Ответ от сервера:', savedHost);
+
+        // Обновляем локальное состояние
+        let updatedHosts;
+        if (editingHost) {
+          updatedHosts = projectHosts.map(h => h.id === savedHost.id ? savedHost : h);
+        } else {
+          updatedHosts = [...projectHosts, savedHost];
         }
     
         handleHostsUpdate(updatedHosts);
-    
+        
+        // Обновляем список всех хостов
+        await fetchAllHosts();
+        
         setIsHostDialogOpen(false);
         resetForm();
-        toast.success(isEditing ? "Хост обновлен" : "Хост добавлен");
+        toast.success(editingHost ? "Хост обновлен" : "Хост добавлен");
       } catch (error) {
         console.error('Error saving host:', error);
         toast.error("Ошибка сохранения хоста");
@@ -596,13 +722,31 @@ export default function ProjectWizard({ onNavigate }) {
     };
   
     const handleDeleteHost = async (hostId) => {
-      const host = projectHosts.find(h => h.id === hostId);
-      if (!host) return;
+      try {
+        const host = projectHosts.find(h => h.id === hostId);
+        if (!host) return;
   
-      // Удаляем хост из списка хостов проекта
-      const updatedHosts = projectHosts.filter(h => h.id !== hostId);
-      onHostsChange(updatedHosts);
-      toast.success("Хост удален");
+        // Удаляем хост из базы данных
+        await deleteHostFromDatabase(hostId);
+        
+        // Удаляем хост из списка хостов проекта
+        const updatedHosts = projectHosts.filter(h => h.id !== hostId);
+        onHostsChange(updatedHosts);
+        
+        // Обновляем список всех хостов
+        await fetchAllHosts();
+        
+        toast.success("Хост удален");
+      } catch (error) {
+        console.error('❌ Ошибка сохранения хоста:', error);
+        console.error('🔍 Детали ошибки:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          statusText: error.response?.statusText
+        });
+        toast.error("Ошибка сохранения хоста: " + (error.response?.data || error.message));
+      }
     };
   
     const handleHostsUpdate = (updatedHostsList) => {
@@ -665,34 +809,56 @@ export default function ProjectWizard({ onNavigate }) {
         setImportProgress({ current: 0, total: hostsData.length });
         
         const newHosts = [];
-        const newHostIds = [];
         
         for (let i = 0; i < hostsData.length; i++) {
           const hostData = hostsData[i];
-          const newHost = {
+          
+          // ВАЖНО: Сохраняем хост в базу данных
+          const hostToSave = {
             ...hostData,
-            id: `imported-${Date.now()}-${i}`
+            // Убедитесь что есть auth_type
+            auth_type: hostData.auth_type || 'password'
           };
-          newHosts.push(newHost);
-          newHostIds.push(newHost.id); // Сохраняем ID для добавления в выбранные
+          
+          try {
+            // Сохраняем в базу
+            const savedHost = await saveHostToDatabase(hostToSave);
+            newHosts.push(savedHost);
+            
+            console.log(`✅ Хост ${i+1} сохранен в базу:`, savedHost.id);
+            
+          } catch (error) {
+            console.error(`❌ Ошибка сохранения хоста ${i+1}:`, error);
+            // Создаем временный хост, но помечаем его
+            const tempHost = {
+              ...hostData,
+              id: `temp-${Date.now()}-${i}`,
+              _isTemp: true,
+              auth_type: hostData.auth_type || 'password'
+            };
+            newHosts.push(tempHost);
+            toast.error(`Хост ${i+1}: не сохранен в базу`);
+          }
           
           setImportProgress({ current: i + 1, total: hostsData.length });
           
           // Задержка для визуализации прогресса
           if (i < hostsData.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
         
         // Добавляем импортированные хосты к существующим хостам проекта
         const updatedHosts = [...projectHosts, ...newHosts];
-        const updatedSelectedHosts = [...(projectData.hosts || []), ...newHostIds];
-        onHostsChange(updatedHosts, updatedSelectedHosts);
+        onHostsChange(updatedHosts);
+        
+        // Обновляем список всех хостов
+        await fetchAllHosts();
         
         await new Promise(resolve => setTimeout(resolve, 500));
         setImportDialogOpen(false);
         
-        toast.success(`Импортировано хостов: ${newHosts.length} `);
+        toast.success(`Импортировано хостов: ${newHosts.length}`);
         
       } catch (error) {
         console.error('Ошибка импорта файла:', error);
@@ -1051,17 +1217,28 @@ export default function ProjectWizard({ onNavigate }) {
   );
 
   const initializeTasksFromHosts = (hostsList) => {
-    if (!hostsList || hostsList.length === 0) return [];
+    console.log('🔄 Создаем задачи для хостов:', hostsList);
+    
+    if (!hostsList || hostsList.length === 0) {
+      console.log('⚠️ Нет хостов для создания задач');
+      return [];
+    }
   
-    return hostsList.map(host => ({
-      host_id: host.id,
-      systems: [
-        {
-          system_id: "",
-          script_ids: []
-        }
-      ]
-    }));
+    const tasks = hostsList.map(host => {
+      console.log(`   - Хост: ${host.name} (${host.id})`);
+      return {
+        host_id: host.id,
+        systems: [
+          {
+            system_id: "",
+            script_ids: []
+          }
+        ]
+      };
+    });
+    
+    console.log('✅ Созданы задачи:', tasks);
+    return tasks;
   };
 
   const handleSelectAllScripts = (hostId, systemIndex, system, availableScripts) => {
@@ -1101,12 +1278,14 @@ export default function ProjectWizard({ onNavigate }) {
   };
 
   const renderStep3 = () => {
-    // Функция для получения хоста по ID
-    const getHostById = (hostId) => {
-      const foundHost = projectData.hostsList?.find(host => {
-        return host.id === hostId;
-      });
-      return foundHost;
+    console.log('🎯 Шаг 3: renderStep3 вызван');
+    console.log('📊 projectData.hostsList:', projectData.hostsList);
+    console.log('📊 projectData.tasks:', projectData.tasks);
+    console.log('📊 Глобальные hosts:', hosts);
+
+    // Функция для получения хоста по ID из projectData.hostsList
+    const getProjectHostById = (hostId) => {
+      return projectData.hostsList?.find(host => host.id === hostId);
     };
 
     return (
@@ -1118,10 +1297,11 @@ export default function ProjectWizard({ onNavigate }) {
         <CardContent>
           <div className="space-y-6">
             {projectData.tasks?.map((task, taskIndex) => {
-              const host = getHostById(task.host_id);
+              const host = getProjectHostById(task.host_id); // <-- Используем новую функцию
               
               if (!host) {
-                console.warn(`Хост с ID ${task.host_id} не найден`);
+                console.warn(`❌ Хост с ID ${task.host_id} не найден в projectData.hostsList`);
+                console.log('📋 Доступные хосты:', projectData.hostsList?.map(h => ({id: h.id, name: h.name})));
                 return null;
               }
 

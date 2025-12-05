@@ -14,6 +14,26 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from '../config/api';
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
+export const saveHost = async (hostData) => {
+  try {
+    const response = await api.post('/api/hosts', hostData);
+    return response.data;
+  } catch (error) {
+    console.error('Error saving host:', error);
+    throw error;
+  }
+};
+
+export const getHosts = async () => {
+  try {
+    const response = await api.get('/api/hosts');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching hosts:', error);
+    throw error;
+  }
+};
+
 export default function HostsPage() {
   const { hasPermission, isAdmin, user } = useAuth();
   const [hosts, setHosts] = useState([]);

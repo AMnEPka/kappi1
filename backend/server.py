@@ -114,7 +114,7 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 # Get host
                 host_doc = await db.hosts.find_one({"id": task_obj.host_id}, {"_id": 0})
                 if not host_doc:
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'Хост не найден: {task_obj.host_id}'})}\n\n"
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Хост не найден 0: {task_obj.host_id}'})}\n\n"
                     failed_tasks += 1
                     continue
                 

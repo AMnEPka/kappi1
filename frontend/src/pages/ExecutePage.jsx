@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { Play } from "lucide-react";
 import { api } from '../config/api';
 
+
+
 export default function ExecutePage() {
   const navigate = useNavigate();
   const [scripts, setScripts] = useState([]);
