@@ -96,6 +96,23 @@ class HostUpdate(BaseModel):
     connection_type: Optional[str] = None
 
 
+class CheckGroup(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
+
+
+class CheckGroupCreate(BaseModel):
+    name: str
+
+
+class CheckGroupUpdate(BaseModel):
+    name: Optional[str] = None
+
+
 class Script(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -109,6 +126,7 @@ class Script(BaseModel):
     test_methodology: Optional[str] = None  # Описание методики испытания
     success_criteria: Optional[str] = None  # Критерий успешного прохождения испытания
     order: int = 0  # Порядок отображения
+    group_ids: List[str] = Field(default_factory=list)  # Список ID групп проверок
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = None
 
@@ -123,6 +141,7 @@ class ScriptCreate(BaseModel):
     test_methodology: Optional[str] = None
     success_criteria: Optional[str] = None
     order: int = 0
+    group_ids: List[str] = Field(default_factory=list)
 
 
 class ScriptUpdate(BaseModel):
@@ -135,3 +154,4 @@ class ScriptUpdate(BaseModel):
     test_methodology: Optional[str] = None
     success_criteria: Optional[str] = None
     order: Optional[int] = None
+    group_ids: Optional[List[str]] = None

@@ -35,12 +35,18 @@ export default function ScriptsPage() {
     has_reference_files: false,
     test_methodology: "",
     success_criteria: "",
-    order: 0
+    order: 0,
+    group_ids: []
   });
+  const [checkGroups, setCheckGroups] = useState([]);
+  const [isGroupsDialogOpen, setIsGroupsDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [groupFormData, setGroupFormData] = useState({ name: "" });
 
   useEffect(() => {
     fetchCategories();
     fetchScripts();
+    fetchCheckGroups();
   }, []);
 
   useEffect(() => {
@@ -86,6 +92,15 @@ export default function ScriptsPage() {
       setScripts(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки проверок");
+    }
+  };
+
+  const fetchCheckGroups = async () => {
+    try {
+      const response = await api.get(`/api/check-groups`);
+      setCheckGroups(response.data);
+    } catch (error) {
+      toast.error("Ошибка загрузки групп проверок");
     }
   };
 
@@ -139,11 +154,63 @@ export default function ScriptsPage() {
       has_reference_files: false,
       test_methodology: "",
       success_criteria: "",
-      order: 0
+      order: 0,
+      group_ids: []
     });
     setFormCategoryId("");
     setFormSystems([]);
     setEditingScript(null);
+  };
+
+  const resetGroupForm = () => {
+    setGroupFormData({ name: "" });
+    setEditingGroup(null);
+  };
+
+  const handleGroupSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingGroup) {
+        await api.put(`/api/check-groups/${editingGroup.id}`, groupFormData);
+        toast.success("Группа обновлена");
+      } else {
+        await api.post(`/api/check-groups`, groupFormData);
+        toast.success("Группа создана");
+      }
+      setIsGroupsDialogOpen(false);
+      resetGroupForm();
+      fetchCheckGroups();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Ошибка сохранения группы");
+    }
+  };
+
+  const handleGroupDelete = async (id) => {
+    const confirmed = await showConfirm(
+      "Удаление группы",
+      "Вы уверены, что хотите удалить эту группу? Проверки из этой группы не будут удалены, но связь с группой будет разорвана.",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
+      }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/check-groups/${id}`);
+      toast.success("Группа удалена");
+      fetchCheckGroups();
+    } catch (error) {
+      toast.error("Ошибка удаления группы");
+    }
+  };
+
+  const openGroupEditDialog = (group) => {
+    setEditingGroup(group);
+    setGroupFormData({ name: group.name });
+    setIsGroupsDialogOpen(true);
   };
 
   const openEditDialog = async (script) => {
@@ -157,7 +224,8 @@ export default function ScriptsPage() {
       has_reference_files: script.has_reference_files || false,
       test_methodology: script.test_methodology || "",
       success_criteria: script.success_criteria || "",
-      order: script.order || 0
+      order: script.order || 0,
+      group_ids: script.group_ids || []
     });
     
     // Load category and systems for editing
@@ -298,17 +366,26 @@ export default function ScriptsPage() {
           <h1 className="text-3xl font-bold">Проверки</h1>
           <p className="text-slate-600 mt-1">Создание, редактирование и удаление проверок</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            {canCreateScript() && (
-              <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} data-testid="add-script-btn">
-                <Plus className="mr-2 h-4 w-4" /> Добавить проверку
-              </Button>
-            )}            
-          </DialogTrigger>
+        <div className="flex gap-2">
+          {canCreateScript() && (
+            <Button 
+              variant="outline" 
+              onClick={() => { resetGroupForm(); setIsGroupsDialogOpen(true); }}
+            >
+              Группы проверок
+            </Button>
+          )}
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              {canCreateScript() && (
+                <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} data-testid="add-script-btn">
+                  <Plus className="mr-2 h-4 w-4" /> Добавить проверку
+                </Button>
+              )}            
+            </DialogTrigger>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" modal={false}>
             <DialogHeader>
               <DialogTitle>{editingScript ? "Редактировать проверку" : "Новая проверка"}</DialogTitle>
@@ -373,6 +450,35 @@ export default function ScriptsPage() {
                       onChange={(e) => setFormData({...formData, description: e.target.value})}
                       placeholder="Опционально"
                     />
+                  </div>
+
+                  <div>
+                    <Label>Добавить проверку в группы</Label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
+                      {checkGroups.length === 0 ? (
+                        <p className="text-sm text-slate-400">Нет групп. Создайте группы через кнопку "Группы проверок"</p>
+                      ) : (
+                        checkGroups.map((group) => (
+                          <div key={group.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`group-${group.id}`}
+                              checked={formData.group_ids?.includes(group.id) || false}
+                              onCheckedChange={(checked) => {
+                                const currentIds = formData.group_ids || [];
+                                if (checked) {
+                                  setFormData({...formData, group_ids: [...currentIds, group.id]});
+                                } else {
+                                  setFormData({...formData, group_ids: currentIds.filter(id => id !== group.id)});
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`group-${group.id}`} className="cursor-pointer text-sm">
+                              {group.name}
+                            </Label>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
 
                   <div>
@@ -499,7 +605,97 @@ export default function ScriptsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Check Groups Management Dialog */}
+      <Dialog open={isGroupsDialogOpen} onOpenChange={(open) => {
+        setIsGroupsDialogOpen(open);
+        if (!open) resetGroupForm();
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingGroup ? "Редактировать группу" : "Управление группами проверок"}</DialogTitle>
+            <DialogDescription>
+              {editingGroup ? "Измените название группы" : "Создайте, отредактируйте или удалите группы проверок"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingGroup ? (
+            <form onSubmit={handleGroupSubmit} className="space-y-4">
+              <div>
+                <Label>Название группы</Label>
+                <Input
+                  value={groupFormData.name}
+                  onChange={(e) => setGroupFormData({...groupFormData, name: e.target.value})}
+                  placeholder="Название группы"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => { resetGroupForm(); setIsGroupsDialogOpen(false); }}>
+                  Отмена
+                </Button>
+                <Button type="submit">
+                  Сохранить
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <form onSubmit={handleGroupSubmit} className="space-y-4 border-b pb-4">
+                <div>
+                  <Label>Новая группа</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={groupFormData.name}
+                      onChange={(e) => setGroupFormData({...groupFormData, name: e.target.value})}
+                      placeholder="Название группы"
+                      required
+                    />
+                    <Button type="submit">
+                      <Plus className="mr-2 h-4 w-4" /> Создать
+                    </Button>
+                  </div>
+                </div>
+              </form>
+
+              <div>
+                <Label className="mb-2 block">Существующие группы</Label>
+                {checkGroups.length === 0 ? (
+                  <p className="text-sm text-slate-400">Нет групп</p>
+                ) : (
+                  <div className="space-y-2">
+                    {checkGroups.map((group) => (
+                      <div key={group.id} className="flex items-center justify-between p-2 border rounded-md">
+                        <span className="text-sm">{group.name}</span>
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6" 
+                            onClick={() => openGroupEditDialog(group)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6" 
+                            onClick={() => handleGroupDelete(group.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div>
