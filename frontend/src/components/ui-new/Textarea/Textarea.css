@@ -1,0 +1,61 @@
+.md3-textarea-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--md-sys-spacing-1);
+}
+
+.md3-textarea {
+  width: 100%;
+  min-height: 3.5rem;
+  padding: var(--md-sys-spacing-4);
+  background-color: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-md);
+  font-family: var(--md-sys-typescale-body-large-font);
+  font-size: var(--md-sys-typescale-body-large-size);
+  font-weight: var(--md-sys-typescale-body-large-weight);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  color: var(--md-sys-color-on-surface);
+  resize: vertical;
+  transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  outline: none;
+}
+
+.md3-textarea::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.6;
+}
+
+.md3-textarea:hover {
+  border-color: var(--md-sys-color-on-surface);
+}
+
+.md3-textarea:focus {
+  border-color: var(--md-sys-color-primary);
+  border-width: 2px;
+  padding: calc(var(--md-sys-spacing-4) - 1px);
+}
+
+.md3-textarea:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-color: var(--md-sys-color-outline);
+}
+
+.md3-textarea-error {
+  border-color: var(--md-sys-color-error);
+}
+
+.md3-textarea-error:focus {
+  border-color: var(--md-sys-color-error);
+}
+
+.md3-textarea-error-text {
+  font-family: var(--md-sys-typescale-body-small-font, var(--md-sys-typescale-body-large-font));
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--md-sys-color-error);
+  padding: 0 var(--md-sys-spacing-4);
+}
+

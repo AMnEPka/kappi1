@@ -1,3 +1,7 @@
+@import './styles/material3.css';
+@import './styles/layout.css';
+@import './styles/components.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -113,3 +117,37 @@ code {
         border-bottom-color: inherit;
     }
 }
+
+.header-div {
+    width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.content-div {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+/* Решение проблемы смещения контента */
+html {
+    overflow-y: scroll;
+  }
+  
+  /* Дополнительно можно стилизовать скроллбар */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+  }

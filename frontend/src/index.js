@@ -1,6 +1,16 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@/index.css";
+// Import Material Design 3 component CSS files
+import "@/components/ui-new/Button/Button.css";
+import "@/components/ui-new/Card/Card.css";
+import "@/components/ui-new/Input/Input.css";
+import "@/components/ui-new/Textarea/Textarea.css";
+import "@/components/ui-new/Label/Label.css";
+import "@/components/ui-new/Badge/Badge.css";
+import "@/components/ui-new/AppBar/AppBar.css";
+import "@/components/ui-new/Sidebar/Sidebar.css";
+import "@/components/layouts/MainLayout.css";
 import App from "@/App";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -59,8 +69,8 @@ if (typeof window !== 'undefined' && window.ResizeObserver) {
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
-  <React.StrictMode>
+  <>
     <App />
     <Toaster />
-  </React.StrictMode>,
+  </>,
 );

@@ -1,0 +1,15 @@
+Изменения URL маршрутов:
+
+БЫЛО:
+- Создание проекта: /projects/new
+- Выполнение проекта: /projects/:id/execute
+- Результаты проекта: /projects/:id/results
+
+СТАЛО:
+- Создание проекта: /new
+- Выполнение проекта: /:id/execute
+- Результаты проекта: /:id/results
+
+Пример работы с проектом dcf4bbf3-a0bc-496c-ad27-1f121467a8ff:
+- Выполнение: http://localhost:3000/dcf4bbf3-a0bc-496c-ad27-1f121467a8ff/execute
+- Результаты: http://localhost:3000/dcf4bbf3-a0bc-496c-ad27-1f121467a8ff/results

@@ -1,32 +1,13 @@
-# Dependencies
-node_modules/
+node_modules
+build
+.git
+.gitignore
+*.md
+README*
+.env.local
+.env.development
+.env.test
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Production
-build/
-dist/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Environment
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Testing
-coverage/
-
-# Misc
-.eslintcache

@@ -1,0 +1,31 @@
+.md3-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--md-sys-spacing-2);
+  height: 1.5rem;
+  border-radius: var(--md-sys-shape-corner-sm);
+  font-family: var(--md-sys-typescale-label-small-font, var(--md-sys-typescale-label-large-font));
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1rem;
+  letter-spacing: 0.03125rem;
+  white-space: nowrap;
+}
+
+.md3-badge-filled {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.md3-badge-outlined {
+  background-color: transparent;
+  color: var(--md-sys-color-primary);
+  border: 1px solid var(--md-sys-color-outline);
+}
+
+.md3-badge-tonal {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
