@@ -9,9 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { HardDrive, Plus, Edit, Trash2 } from "lucide-react";
 import { api } from '../config/api';
+import { useDialog } from "@/hooks/useDialog";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 
 const SystemsPage = () => {
+  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [systems, setSystems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
@@ -79,14 +82,24 @@ const SystemsPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Удалить систему? Это удалит все связанные скрипты.")) {
-      try {
-        await api.delete(`/api/systems/${id}`);
-        toast.success("Система удалена");
-        fetchSystems();
-      } catch (error) {
-        toast.error(error.response?.data?.detail || "Ошибка удаления системы");
+    const confirmed = await showConfirm(
+      "Удаление системы",
+      "Удалить систему? Это удалит все связанные скрипты.",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
       }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/systems/${id}`);
+      toast.success("Система удалена");
+      fetchSystems();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Ошибка удаления системы");
     }
   };
 
@@ -268,6 +281,27 @@ const SystemsPage = () => {
           ))
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (dialogState.onCancel) {
+              dialogState.onCancel();
+            } else {
+              setDialogState(prev => ({ ...prev, open: false }));
+            }
+          }
+        }}
+        title={dialogState.title}
+        description={dialogState.description}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.onCancel ? dialogState.cancelText : undefined}
+        onConfirm={dialogState.onConfirm || (() => {})}
+        onCancel={dialogState.onCancel}
+        variant={dialogState.variant}
+      />
     </div>
   );
 };

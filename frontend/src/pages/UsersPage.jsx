@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
+import { useDialog } from "@/hooks/useDialog";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -23,6 +25,7 @@ export default function UsersPage() {
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedRoles, setSelectedRoles] = useState([]);
   const { hasPermission } = useAuth();
+  const { dialogState, setDialogState, showConfirm } = useDialog();
 
   const [formData, setFormData] = useState({
     username: '',
@@ -101,9 +104,17 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (userId) => {
-    if (!window.confirm('Вы уверены, что хотите удалить этого пользователя? Его данные будут переназначены на администратора.')) {
-      return;
-    }
+    const confirmed = await showConfirm(
+      "Удаление пользователя",
+      "Вы уверены, что хотите удалить этого пользователя? Его данные будут переназначены на администратора.",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
+      }
+    );
+
+    if (!confirmed) return;
 
     try {
       await api.delete(`/api/users/${userId}`);
@@ -436,6 +447,27 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (dialogState.onCancel) {
+              dialogState.onCancel();
+            } else {
+              setDialogState(prev => ({ ...prev, open: false }));
+            }
+          }
+        }}
+        title={dialogState.title}
+        description={dialogState.description}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.onCancel ? dialogState.cancelText : undefined}
+        onConfirm={dialogState.onConfirm || (() => {})}
+        onCancel={dialogState.onCancel}
+        variant={dialogState.variant}
+      />
     </div>
   );
 }
