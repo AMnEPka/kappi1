@@ -7,8 +7,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from "sonner";
 import { Folder, Plus, Edit, Trash2, Smile } from "lucide-react";
 import { api } from '../config/api';
+import { useDialog } from "@/hooks/useDialog";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const CategoriesPage = () => {
+  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [categories, setCategories] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -51,14 +54,24 @@ const CategoriesPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Удалить категорию? Это удалит все связанные системы.")) {
-      try {
-        await api.delete(`/api/categories/${id}`);
-        toast.success("Категория удалена");
-        fetchCategories();
-      } catch (error) {
-        toast.error(error.response?.data?.detail || "Ошибка удаления категории");
+    const confirmed = await showConfirm(
+      "Удаление категории",
+      "Удалить категорию? Это удалит все связанные системы.",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
       }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/categories/${id}`);
+      toast.success("Категория удалена");
+      fetchCategories();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Ошибка удаления категории");
     }
   };
 
@@ -258,6 +271,27 @@ const CategoriesPage = () => {
           ))
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (dialogState.onCancel) {
+              dialogState.onCancel();
+            } else {
+              setDialogState(prev => ({ ...prev, open: false }));
+            }
+          }
+        }}
+        title={dialogState.title}
+        description={dialogState.description}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.onCancel ? dialogState.cancelText : undefined}
+        onConfirm={dialogState.onConfirm || (() => {})}
+        onCancel={dialogState.onCancel}
+        variant={dialogState.variant}
+      />
     </div>
   );
 };
