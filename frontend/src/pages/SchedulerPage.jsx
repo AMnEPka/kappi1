@@ -829,7 +829,15 @@ const SchedulerPage = () => {
       {/* Кастомный диалог подтверждения */}
       <ConfirmationDialog
         open={confirmationDialog.open}
-        onOpenChange={(open) => setConfirmationDialog(prev => ({ ...prev, open }))}
+        onOpenChange={(open) => {
+          if (!open && confirmationDialog.onCancel) {
+            // Dialog is being closed externally (click outside or Escape)
+            // Call onCancel to resolve the Promise
+            confirmationDialog.onCancel();
+          } else {
+            setConfirmationDialog(prev => ({ ...prev, open }));
+          }
+        }}
         title={confirmationDialog.title}
         description={confirmationDialog.description}
         confirmText={confirmationDialog.confirmText || "ОК"}

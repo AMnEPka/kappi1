@@ -125,17 +125,6 @@ async def update_scheduler_job(job_id: str, job_update: SchedulerJobUpdate, curr
     project = await db.projects.find_one({"id": job.project_id})
     project_name = project.get('name') if project else "Неизвестный проект"
 
-    # ДЕБАГ: вывести все поля проекта
-    print("=== DEBUG PROJECT FIELDS ===")
-    print(f"Project ID: {job.project_id}")
-    if project:
-        print("All project fields:")
-        for key, value in project.items():
-            print(f"  {key}: {value}")
-    else:
-        print("Project not found!")
-    print("===========================")    
-    
     changed = False
     updated_fields = []
     now = datetime.now(timezone.utc)
