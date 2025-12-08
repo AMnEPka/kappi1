@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Folder, Plus, Edit, Trash2 } from "lucide-react";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { Folder, Plus, Edit, Trash2, Smile } from "lucide-react";
+import { api } from '../config/api';
+import { useDialog } from "@/hooks/useDialog";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const CategoriesPage = () => {
+  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [categories, setCategories] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -20,6 +20,7 @@ const CategoriesPage = () => {
     icon: "📁",
     description: ""
   });
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -27,7 +28,7 @@ const CategoriesPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${API}/categories`);
+      const response = await api.get(`/api/categories`);
       setCategories(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки категорий");
@@ -38,10 +39,10 @@ const CategoriesPage = () => {
     e.preventDefault();
     try {
       if (editingCategory) {
-        await axios.put(`${API}/categories/${editingCategory.id}`, formData);
+        await api.put(`/api/categories/${editingCategory.id}`, formData);
         toast.success("Категория обновлена");
       } else {
-        await axios.post(`${API}/categories`, formData);
+        await api.post(`/api/categories`, formData);
         toast.success("Категория создана");
       }
       setIsDialogOpen(false);
@@ -53,14 +54,24 @@ const CategoriesPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Удалить категорию? Это удалит все связанные системы.")) {
-      try {
-        await axios.delete(`${API}/categories/${id}`);
-        toast.success("Категория удалена");
-        fetchCategories();
-      } catch (error) {
-        toast.error(error.response?.data?.detail || "Ошибка удаления категории");
+    const confirmed = await showConfirm(
+      "Удаление категории",
+      "Удалить категорию? Это удалит все связанные системы.",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
       }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/categories/${id}`);
+      toast.success("Категория удалена");
+      fetchCategories();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Ошибка удаления категории");
     }
   };
 
@@ -116,12 +127,91 @@ const CategoriesPage = () => {
               
               <div>
                 <Label>Иконка (emoji)</Label>
-                <Input
-                  value={formData.icon}
-                  onChange={(e) => setFormData({...formData, icon: e.target.value})}
-                  placeholder="🐧 🪟 🗄️"
-                  maxLength={2}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={formData.icon}
+                    onChange={(e) => setFormData({...formData, icon: e.target.value})}
+                    placeholder=""
+                    maxLength={2}
+                    className="flex-1"
+                  />
+                  <div className="relative">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsIconPickerOpen(!isIconPickerOpen)}
+                    >
+                      <Smile className="h-4 w-4 mr-2" />
+                      Выбрать
+                    </Button>
+                    
+                  {isIconPickerOpen && (
+                    <div className="absolute top-full right-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-3">
+                      <div className="grid grid-cols-8 gap-1 mb-2">
+                        {[
+                          // Emoji иконки
+                          { type: 'emoji', value: '🐧', name: 'Linux' },
+                          { type: 'emoji', value: '🟦', name: 'Windows' },
+                          { type: 'emoji', value: '☸️', name: 'Kubernetes' },
+                          { type: 'emoji', value: '🐳', name: 'Docker' },
+                          { type: 'emoji', value: '🗄️', name: 'Сервер' },
+                          { type: 'emoji', value: '💻', name: 'Ноутбук' },
+                          { type: 'emoji', value: '🖥️', name: 'Компьютер' },
+                          { type: 'emoji', value: '🔒', name: 'Безопасность' },
+                          { type: 'emoji', value: '🌐', name: 'Сеть' },
+                          { type: 'emoji', value: '📊', name: 'Мониторинг' },
+                          { type: 'emoji', value: '☁️', name: 'Облако' },
+                          { type: 'emoji', value: '🚀', name: 'Запуск' },
+                          { type: 'emoji', value: '🔧', name: 'Настройка' },
+                        ].map((icon) => (
+                          <button
+                            key={icon.type === 'emoji' ? icon.value : icon.value}
+                            type="button"
+                            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-lg"
+                            onClick={() => {
+                              // Сохраняем тип и значение иконки
+                              setFormData({
+                                ...formData, 
+                                icon: icon.type === 'emoji' ? icon.value : icon.value,
+                                iconType: icon.type
+                              });
+                              setIsIconPickerOpen(false);
+                            }}
+                            title={icon.name}
+                          >
+                            {icon.type === 'emoji' ? (
+                              <span className="text-lg">{icon.value}</span>
+                            ) : (
+                              <img 
+                                src={icon.value} 
+                                alt={icon.name}
+                                className="w-5 h-5 object-contain"
+                                onError={(e) => {
+                                  // Fallback если изображение не загрузилось
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'block';
+                                }}
+                              />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFormData({...formData, icon: '', iconType: ''});
+                          setIsIconPickerOpen(false);
+                        }}
+                        className="w-full text-xs"
+                      >
+                        Очистить
+                      </Button>
+                    </div>
+                  )}
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -181,6 +271,27 @@ const CategoriesPage = () => {
           ))
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (dialogState.onCancel) {
+              dialogState.onCancel();
+            } else {
+              setDialogState(prev => ({ ...prev, open: false }));
+            }
+          }
+        }}
+        title={dialogState.title}
+        description={dialogState.description}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.onCancel ? dialogState.cancelText : undefined}
+        onConfirm={dialogState.onConfirm || (() => {})}
+        onCancel={dialogState.onCancel}
+        variant={dialogState.variant}
+      />
     </div>
   );
 };

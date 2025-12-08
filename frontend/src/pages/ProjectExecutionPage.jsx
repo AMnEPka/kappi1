@@ -2,11 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Textarea } from "../components/ui/textarea";
-import { ChevronLeft, Play, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Badge } from "../components/ui/badge";
+import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import { api } from '../config/api';
 
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
@@ -21,6 +20,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [hosts, setHosts] = useState([]);
   const [systems, setSystems] = useState([]);
   const [scripts, setScripts] = useState([]);
+  const [projectUsers, setProjectUsers] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [editedTasks, setEditedTasks] = useState({});
   const eventSourceRef = useRef(null);
@@ -42,20 +42,23 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   }, [logs]);
 
   const fetchProject = async () => {
-    try {
-      const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/projects/${projectId}`),
-        axios.get(`${API_URL}/api/projects/${projectId}/tasks`),
-        axios.get(`${API_URL}/api/hosts`),
-        axios.get(`${API_URL}/api/systems`),
-        axios.get(`${API_URL}/api/scripts`)
-      ]);
+  try {
+			const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
+				api.get(`/api/projects/${projectId}`),          
+				api.get(`/api/projects/${projectId}/tasks`),      
+				api.get('/api/hosts'),                          
+				api.get('/api/systems'),                        
+				api.get('/api/scripts'),                         
+				api.get(`/api/projects/${projectId}/users`)
+			]);
       
       setProject(projectRes.data);
       setTasks(tasksRes.data);
       setHosts(hostsRes.data);
       setSystems(systemsRes.data);
       setScripts(scriptsRes.data);
+      // Ensure projectUsers is always an array
+      setProjectUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
       
       // Initialize edited tasks
       const tasksMap = {};
@@ -82,7 +85,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
     try {
       // Update each modified task
       const updates = Object.values(editedTasks).map(task => 
-        axios.put(`${API_URL}/api/projects/${projectId}/tasks/${task.id}`, {
+        api.put(`/api/projects/${projectId}/tasks/${task.id}`, {
           script_ids: task.script_ids,
           reference_data: task.reference_data
         })
@@ -91,7 +94,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       await Promise.all(updates);
       
       // Refresh tasks
-      const tasksRes = await axios.get(`${API_URL}/api/projects/${projectId}/tasks`);
+      const tasksRes = await api.get(`/api/projects/${projectId}/tasks`);
       setTasks(tasksRes.data);
       
       setEditMode(false);
@@ -132,7 +135,10 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
       // Connect to SSE for real-time updates (EventSource uses GET by default)
       // The backend endpoint will start execution when first connected
-      const eventSource = new EventSource(`${API_URL}/api/projects/${projectId}/execute`);
+      // Dynamically construct backend URL to work from any host in local network
+      const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      const token = localStorage.getItem('token');
+      const eventSource = new EventSource(`${backendUrl}/api/projects/${projectId}/execute?token=${token}`);
       eventSourceRef.current = eventSource;
 
       eventSource.onmessage = (event) => {
@@ -192,12 +198,17 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       };
 
       eventSource.onerror = (error) => {
-        console.error('SSE error:', error);
         eventSource.close();
         setExecuting(false);
         
         if (logs.length === 0) {
           toast.error("Не удалось подключиться к серверу");
+                    
+          // Используем api вместо fetch
+          api.get(`/api/projects/${projectId}/execution-failed`)
+            .catch(logError => {
+              console.error('Failed to log execution failure:', logError);
+            });
         }
       };
 
@@ -286,17 +297,15 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
   if (!project) {
     return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
         <Button variant="outline" onClick={() => onNavigate('projects')}>
           <ChevronLeft className="mr-2 h-4 w-4" />
           Назад
@@ -314,6 +323,27 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
           </Button>
         )}
       </div>
+
+      {/* Users with access */}
+      {projectUsers.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center text-base">
+              <Users className="mr-2 h-4 w-4" />
+              Пользователи с доступом ({projectUsers.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {projectUsers.map(user => (
+                <Badge key={user.id} variant="secondary" className="px-3 py-1">
+                  {user.full_name}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       {stats.total > 0 && (

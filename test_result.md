@@ -210,9 +210,9 @@ frontend:
     implemented: true
     working: true
     file: "/app/frontend/src/pages/ProjectExecutionPage.jsx"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
@@ -220,6 +220,12 @@ frontend:
       - working: true
         agent: "testing"
         comment: "✅ TESTED: Project execution page loads correctly at /projects/:id/execute route. Shows proper loading state when project doesn't exist. Page structure is correct with back button, project title area, stats cards, and logs section. Ready for real project execution testing once projects can be created."
+      - working: false
+        agent: "user"
+        comment: "❌ ISSUE: SSE connection to /api/projects/{id}/execute returns 404. EventSource uses relative URL '/api/projects/{id}/execute' which doesn't route correctly to backend."
+      - working: true
+        agent: "main"
+        comment: "✅ FIXED: 1) Updated api.js to use REACT_APP_BACKEND_URL from .env instead of hardcoded port 8001. 2) Updated ProjectExecutionPage to pass full backend URL and auth token as query parameter to EventSource. 3) Added get_current_user_from_token() function to handle token-based auth for SSE (EventSource doesn't support custom headers). 4) Modified /api/projects/{id}/execute endpoint to accept token via query parameter. SSE should now connect properly."
   
   - task: "Project results page"
     implemented: true
@@ -258,10 +264,30 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Logs page event filtering with exclusion functionality"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+recent_changes:
+  - Added creator_username to Project model and API response
+  - Fixed Executor role permissions (removed results_view_all)
+  - Projects filtering works correctly: users see only their projects + granted access + curators see all
+  - Execute button hidden for users without projects_execute permission
+
+frontend:
+  - task: "Logs page event filtering with exclusion functionality"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/LogsPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented new exclusion functionality for logs page. Added minus icons to event type buttons that allow excluding categories from display. Users can now click minus icon to exclude events (button turns red) or click button name to select events (button turns blue). Status text shows 'Все события кроме: ...' for exclusions and 'Выбрано: ...' for selections."
 
 agent_communication:
   - agent: "main"
@@ -270,3 +296,11 @@ agent_communication:
     message: "✅ BACKEND TESTING COMPLETE: All 4 backend tasks tested successfully with 89.6% pass rate (43/48 tests). Project system fully functional - CRUD operations, SSE execution, results retrieval, and legacy compatibility all working. Minor issues found: 1) SSE error handling returns 200 instead of 404 for non-existent projects (sends error via SSE stream - acceptable), 2) Cascade delete returns empty arrays instead of 404 (also acceptable behavior), 3) Task creation accepts invalid IDs (validation happens at execution time - acceptable). All core functionality verified working correctly."
   - agent: "testing"
     message: "🔍 FRONTEND EXPRESS TESTING COMPLETE: 4/5 tasks working correctly. ✅ Projects list page, execution page, results page, and navigation all functional. ❌ CRITICAL: Project wizard has routing issues - intermittent redirects prevent form completion. This blocks project creation flow. Main agent should investigate React Router configuration or component lifecycle issues in ProjectWizard.jsx."
+  - agent: "main"
+    message: "🔧 RBAC FIX: Fixed permission issue where non-admin users (Executor, Curator, Project Manager) couldn't view hosts and scripts. Modified /api/hosts and /api/scripts endpoints to allow viewing for users with 'projects_create', 'projects_execute', or 'results_view_all' permissions. Users can now view all hosts/scripts but still cannot edit unless they have specific edit permissions. Ready for testing with non-admin users."
+  - agent: "main"
+    message: "🔒 RBAC UI PERMISSIONS: Implemented granular permission checks for UI buttons. 1) Access button visible only to admins 2) Edit/Delete buttons for hosts shown only if user has corresponding permissions (hosts_edit_all/own, hosts_delete_all/own) 3) Edit/Delete buttons for scripts shown only if user has corresponding permissions (checks_edit_all/own, checks_delete_all/own) 4) Ownership checks implemented - users can edit/delete only their own resources unless they have _all permissions. This provides proper UI-level access control matching backend permissions."
+  - agent: "main"
+    message: "🔧 SSE ROUTING FIX: Fixed 404 error on project execution. Root cause: 1) api.js was using hardcoded port 8001 2) EventSource was using relative URL 3) EventSource doesn't support Authorization headers. Solution: 1) Updated api.js and ProjectExecutionPage to use dynamic URL based on window.location (works from localhost and any host in local network) 2) Modified SSE endpoint to accept token via query parameter 3) Added get_current_user_from_token() auth function for SSE 4) Removed unused getBackendUrl() function from AuthContext. Now works: localhost:3000 → localhost:8001, 192.168.1.x:3000 → 192.168.1.x:8001. In production, REACT_APP_BACKEND_URL from .env takes precedence."
+  - agent: "main"
+    message: "📝 LOGS PAGE ENHANCEMENT: Added new event exclusion functionality to logs page. Each event type button now has a minus icon that allows users to exclude specific event categories from display. When exclusion is active, buttons turn red and status shows 'Все события кроме: [excluded events]'. Users can switch between inclusion (blue buttons, 'Выбрано: [selected events]') and exclusion modes. Reset button clears all filters. Ready for testing."

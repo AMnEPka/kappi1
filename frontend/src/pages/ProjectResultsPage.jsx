@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -16,13 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { ChevronLeft, CheckCircle, XCircle, Eye, Download } from "lucide-react";
+import { ChevronLeft, CheckCircle, XCircle, Eye, Download, BarChart3, X } from "lucide-react";
 import { toast } from "sonner";
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import { api } from '../config/api';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export default function ProjectResultsPage({ projectId, onNavigate }) {
+  const [searchParams, setSearchParams] = useSearchParams(); // ← Добавьте этот хук
   const [project, setProject] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -31,6 +32,10 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [hosts, setHosts] = useState({});
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonMode, setComparisonMode] = useState("last2");  
+  const { canViewAllResults } = usePermissions();
 
   useEffect(() => {
     fetchProjectAndSessions();
@@ -42,13 +47,57 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     }
   }, [selectedSession]);
 
+  const handleBack = () => {
+    const returnTo = searchParams.get('returnTo');
+    
+    if (returnTo === 'scheduler') {
+      navigate('/scheduler');
+    } else {
+      navigate('/');
+    }
+  };
+
+  const getComparisonSessions = () => {
+    switch (comparisonMode) {
+      case "last2":
+        return sessions.slice(0, 2);
+      case "last5":
+        return sessions.slice(0, 5);
+      case "all":
+        return sessions;
+      default:
+        return sessions.slice(0, 5);
+    }
+  };  
+
+  // эффект для обработки параметра URL
+  useEffect(() => {
+    const sessionFromUrl = searchParams.get('session');
+    if (sessionFromUrl && sessions.length > 0) {
+      // Проверяем что сессия существует в списке
+      const sessionExists = sessions.some(session => session.session_id === sessionFromUrl);
+      if (sessionExists) {
+        setSelectedSession(sessionFromUrl);
+      }
+    }
+  }, [sessions, searchParams]);  
+
   const fetchProjectAndSessions = async () => {
     try {
       setLoading(true);
+      console.log('Запрашиваем проект с ID:', projectId);
+      console.log('Токен пользователя:', localStorage.getItem('token'));
+
+      
+      // ... в useEffect или перед fetchProjectAndSessions
+      if (!canViewAllResults()) {
+          console.log('!!!!!!!!!!!!!!!! cant view all results');
+      }      
+
       const [projectRes, sessionsRes, hostsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/projects/${projectId}`),
-        axios.get(`${API_URL}/api/projects/${projectId}/sessions`),
-        axios.get(`${API_URL}/api/hosts`),
+        api.get(`/api/projects/${projectId}`),
+        api.get(`/api/projects/${projectId}/sessions`),
+        api.get(`/api/hosts`),
       ]);
 
       setProject(projectRes.data);
@@ -76,8 +125,8 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
 
   const fetchSessionExecutions = async (sessionId) => {
     try {
-      const response = await axios.get(
-        `${API_URL}/api/projects/${projectId}/sessions/${sessionId}/executions`
+      const response = await api.get(
+        `/api/projects/${projectId}/sessions/${sessionId}/executions`
       );
       
       setExecutions(response.data);
@@ -128,8 +177,8 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     }
 
     try {
-      const response = await axios.get(
-        `${API_URL}/api/projects/${projectId}/sessions/${selectedSession}/export-excel`,
+      const response = await api.get(
+        `/api/projects/${projectId}/sessions/${selectedSession}/export-excel`,
         {
           responseType: 'blob',
         }
@@ -171,32 +220,41 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     }
   };
 
+  // Обновите функцию изменения сессии чтобы обновлять URL
+  const handleSessionChange = (sessionId) => {
+    setSelectedSession(sessionId);
+    // Обновляем параметр URL
+    if (sessionId) {
+      searchParams.set('session', sessionId);
+      setSearchParams(searchParams);
+    } else {
+      searchParams.delete('session');
+      setSearchParams(searchParams);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">Загрузка...</div>
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <div className="text-gray-500">Загрузка...</div>
       </div>
     );
   }
 
   if (!project) {
     return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-gray-500">Проект не найден</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-gray-500">Проект не найден</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" onClick={() => onNavigate('projects')}>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="outline" onClick={handleBack}>
           <ChevronLeft className="mr-2 h-4 w-4" />
           Назад
         </Button>
@@ -211,38 +269,184 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       {/* Session selector */}
       {sessions.length > 0 && (
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Выбор запуска</CardTitle>
-            <CardDescription>Просмотр результатов конкретного запуска проекта</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <Select value={selectedSession} onValueChange={setSelectedSession}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Выберите запуск" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sessions.map((session, index) => (
-                      <SelectItem key={session.session_id} value={session.session_id}>
-                        {index === 0 ? '🆕 ' : ''}
-                        {formatDate(session.executed_at)} 
-                        {' - '}
-                        Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            Выбор запуска
+          </CardTitle>
+          <CardDescription>
+            Просмотр результатов конкретного запуска проекта
+          </CardDescription>
+        </div>
+        <Button
+          onClick={handleExportToExcel}
+          disabled={!selectedSession}
+          variant={showComparison ? "default" : "outline"}
+          size="sm"
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          <span className="hidden sm:inline">Экспорт в Excel</span>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <Select value={selectedSession} onValueChange={handleSessionChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Выберите запуск" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.map((session, index) => (
+                  <SelectItem key={session.session_id} value={session.session_id}>
+                    {index === 0 ? '🆕 ' : ''}
+                    {formatDate(session.executed_at)} 
+                    {' - '}
+                    Проверок - Пройдено: {session.passed_count}/{session.total_checks}. Не пройдено: {session.failed_count}/{session.total_checks}. Ошибок: {session.error_count}/{session.total_checks}; Требует участия оператора: {session.operator_count}/{session.total_checks}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => setShowComparison(!showComparison)}
+            variant={showComparison ? "default" : "outline"}
+            size="sm"
+            className="gap-2 whitespace-nowrap"
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span>Сравнение запусков</span>
+          </Button>
+        </div>
+
+
+            {/* Модальное окно сравнения */}
+            {showComparison && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+                  {/* Крестик закрытия над формой */}
+                  <div className="flex justify-end p-1">
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => setShowComparison(false)}
+                      className="h-8 w-8 rounded-full bg-white border shadow-sm hover:bg-gray-50"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Контент с вертикальным скроллом */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <div className="mb-6" align="center">
+                      <h3 className="text-lg font-semibold mb-2">Сравнение запусков проекта</h3>
+                      <Select 
+                        value={comparisonMode} 
+                        onValueChange={(value) => setComparisonMode(value)}
+                      >
+                        <SelectTrigger className="w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="last2">2 последних запуска</SelectItem>
+                          <SelectItem value="last5">5 последних запусков</SelectItem>
+                          <SelectItem value="all">Все запуски</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Гистограмма по статусам */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium">Распределение по статусам</h4>
+                      <div className="space-y-2">
+                        {getComparisonSessions().map((session, index) => (
+                          <div key={session.session_id} className="flex items-center gap-4 p-2 bg-gray-50 rounded">
+                            {/* Дата слева */}
+                            <div className="w-48 text-sm font-medium text-gray-700 whitespace-nowrap">
+                              {formatDate(session.executed_at)}
+                            </div>
+                            
+                            {/* График по центру */}
+                            <div className="flex-1 min-w-0"> {/* Добавлено min-w-0 чтобы предотвратить переполнение */}
+                              <div className="flex h-6 bg-gray-200 rounded overflow-hidden">
+                                <div 
+                                  className="bg-green-600 transition-all flex items-center justify-center"
+                                  style={{ width: `${(session.passed_count / session.total_checks) * 100}%` }}
+                                  title={`Выполнено: ${session.passed_count}`}
+                                >
+                                  {session.passed_count > 0 && (
+                                    <span className="text-white text-xs font-medium">
+                                      {session.passed_count}
+                                    </span>
+                                  )}
+                                </div>
+                                <div 
+                                  className="bg-yellow-600 transition-all flex items-center justify-center"
+                                  style={{ width: `${(session.failed_count / session.total_checks) * 100}%` }}
+                                  title={`Не выполнено: ${session.failed_count}`}
+                                >
+                                  {session.failed_count > 0 && (
+                                    <span className="text-white text-xs font-medium">
+                                      {session.failed_count}
+                                    </span>
+                                  )}
+                                </div>
+                                <div 
+                                  className="bg-blue-600 transition-all flex items-center justify-center"
+                                  style={{ width: `${(session.operator_count / session.total_checks) * 100}%` }}
+                                  title={`Оператор: ${session.operator_count}`}
+                                >
+                                  {session.operator_count > 0 && (
+                                    <span className="text-white text-xs font-medium">
+                                      {session.operator_count}
+                                    </span>
+                                  )}
+                                </div>
+                                <div 
+                                  className="bg-red-600 transition-all flex items-center justify-center"
+                                  style={{ width: `${(session.error_count / session.total_checks) * 100}%` }}
+                                  title={`Ошибки: ${session.error_count}`}
+                                >
+                                  {session.error_count > 0 && (
+                                    <span className="text-white text-xs font-medium">
+                                      {session.error_count}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Общее количество справа */}
+                            <div className="w-20 text-sm font-medium text-gray-700 text-right whitespace-nowrap">
+                              {session.total_checks}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Легенда */}
+                    <div className="flex gap-6 justify-center mt-6 text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-600 rounded"></div>
+                        <span>Выполнено</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-yellow-600 rounded"></div>
+                        <span>Не выполнено</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-blue-600 rounded"></div>
+                        <span>Оператор</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-600 rounded"></div>
+                        <span>Ошибки</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <Button
-                onClick={handleExportToExcel}
-                disabled={!selectedSession}
-                variant="yellow"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Экспорт в Excel
-              </Button>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}

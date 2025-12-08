@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,11 +8,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { HardDrive, Plus, Edit, Trash2 } from "lucide-react";
+import { api } from '../config/api';
+import { useDialog } from "@/hooks/useDialog";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 const SystemsPage = () => {
+  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [systems, setSystems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
@@ -37,7 +38,7 @@ const SystemsPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${API}/categories`);
+      const response = await api.get(`/api/categories`);
       setCategories(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки категорий");
@@ -47,9 +48,9 @@ const SystemsPage = () => {
   const fetchSystems = async () => {
     try {
       const url = selectedCategoryFilter && selectedCategoryFilter !== "all"
-        ? `${API}/systems?category_id=${selectedCategoryFilter}`
-        : `${API}/systems`;
-      const response = await axios.get(url);
+        ? `/api/systems?category_id=${selectedCategoryFilter}`
+        : `/api/systems`;
+      const response = await api.get(url);
       setSystems(response.data);
     } catch (error) {
       toast.error("Ошибка загрузки систем");
@@ -58,12 +59,18 @@ const SystemsPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.category_id) {
+      toast.error("Выберите категорию");
+      return;
+    }
+    
     try {
       if (editingSystem) {
-        await axios.put(`${API}/systems/${editingSystem.id}`, formData);
+        await api.put(`/api/systems/${editingSystem.id}`, formData);
         toast.success("Система обновлена");
       } else {
-        await axios.post(`${API}/systems`, formData);
+        await api.post(`/api/categories/${formData.category_id}/systems`, formData);
         toast.success("Система создана");
       }
       setIsDialogOpen(false);
@@ -75,14 +82,24 @@ const SystemsPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Удалить систему? Это удалит все связанные скрипты.")) {
-      try {
-        await axios.delete(`${API}/systems/${id}`);
-        toast.success("Система удалена");
-        fetchSystems();
-      } catch (error) {
-        toast.error(error.response?.data?.detail || "Ошибка удаления системы");
+    const confirmed = await showConfirm(
+      "Удаление системы",
+      "Удалить систему? Это удалит все связанные скрипты.",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
       }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/systems/${id}`);
+      toast.success("Система удалена");
+      fetchSystems();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Ошибка удаления системы");
     }
   };
 
@@ -264,6 +281,27 @@ const SystemsPage = () => {
           ))
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (dialogState.onCancel) {
+              dialogState.onCancel();
+            } else {
+              setDialogState(prev => ({ ...prev, open: false }));
+            }
+          }
+        }}
+        title={dialogState.title}
+        description={dialogState.description}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.onCancel ? dialogState.cancelText : undefined}
+        onConfirm={dialogState.onConfirm || (() => {})}
+        onCancel={dialogState.onCancel}
+        variant={dialogState.variant}
+      />
     </div>
   );
 };

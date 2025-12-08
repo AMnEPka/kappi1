@@ -1,0 +1,101 @@
+# Offline Production Docker Compose
+# Используется с готовыми образами, сохраненными через save-images.sh
+# Запуск: docker compose -f docker-compose.offline.yml up -d
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: ssh-runner-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    environment:
+      - MONGO_INITDB_DATABASE=ssh_runner_db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/ssh_runner_db --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ssh-runner-network
+
+  # FastAPI Backend
+  backend:
+    image: ssh-runner-backend:latest
+    container_name: ssh-runner-backend
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=ssh_runner_db
+      - CORS_ORIGINS=*
+      - PYTHONPATH=/app
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
+    volumes:
+      - backend_logs:/app/logs
+    command: uvicorn server:app --host 0.0.0.0 --port 8001 --workers 4
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/hosts"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ssh-runner-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # React Frontend (Production Build with Nginx)
+  frontend:
+    image: ssh-runner-frontend:latest
+    container_name: ssh-runner-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - ssh-runner-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ssh-runner-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ssh-runner-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  backend_logs:
+    driver: local
+
+networks:
+  ssh-runner-network:
+    driver: bridge

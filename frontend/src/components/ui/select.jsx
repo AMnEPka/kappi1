@@ -14,16 +14,25 @@ const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) 
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      "flex h-10 w-full items-center justify-between rounded-md border-2 border-input bg-background px-3 py-2 text-sm",
+      "focus:outline-none focus:border-ring disabled:cursor-not-allowed disabled:opacity-50",
+      "box-border will-change-auto", // box-border и will-change для стабильности
       className
     )}
+    style={{
+      // Явно указываем box-sizing и убираем переходы
+      boxSizing: 'border-box',
+      transition: 'border-color 0.2s', // Только цвет границы, не размер
+    }}
     {...props}>
-    {children}
+    <span className="truncate flex-1 text-left pr-2">
+      {children}
+    </span>
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
+      <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
-))
+));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
 
 const SelectScrollUpButton = React.forwardRef(({ className, ...props }, ref) => (

@@ -1,0 +1,88 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:4.4
+    container_name: ssh-runner-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    environment:
+      - MONGO_INITDB_DATABASE=ssh_runner_db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/ssh_runner_db --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ssh-runner-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    container_name: ssh-runner-backend
+    restart: unless-stopped
+    ports:
+      - "435:435"   # Поменяли порт на 435
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=ssh_runner_db
+      - CORS_ORIGINS=*
+      - PYTHONPATH=/app
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true      
+    volumes:
+      - ./backend:/app/backend
+      - /app/backend/__pycache__
+    command: uvicorn server:app --host 0.0.0.0 --port 435 --reload  # Поменяли порт на 435
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:435/api/hosts"]  # Поменяли порт на 435
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ssh-runner-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: ssh-runner-frontend
+    restart: unless-stopped
+    ports:
+      - "415:415"   # Поменяли порт на 415
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:435  # Обновили ссылку на backend
+      - REACT_APP_WS_URL=ws://localhost:435/ws     # Обновили ссылку на websocket
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - FAST_REFRESH=true      
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+      - /app/frontend/build
+    stdin_open: true
+    tty: true
+    networks:
+      - ssh-runner-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+
+networks:
+  ssh-runner-network:
+    driver: bridge

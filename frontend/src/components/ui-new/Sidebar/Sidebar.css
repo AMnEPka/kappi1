@@ -1,0 +1,90 @@
+.md3-sidebar {
+  position: fixed;
+  top: 4rem;
+  left: 0;
+  bottom: 0;
+  z-index: 900;
+  background-color: var(--md-sys-color-surface);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  transition: width var(--md-sys-motion-duration-medium4) var(--md-sys-motion-easing-standard);
+  overflow: hidden;
+}
+
+.md3-sidebar-expanded {
+  width: 16rem;
+}
+
+.md3-sidebar-collapsed {
+  width: 5rem;
+}
+
+svg .md3-sidebar-collapsed {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.md3-sidebar-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--md-sys-spacing-2);
+  gap: var(--md-sys-spacing-1);
+  overflow-y: auto;
+}
+
+.md3-sidebar-item {
+  display: flex;
+  align-items: center;
+  padding: var(--md-sys-spacing-3) var(--md-sys-spacing-4);
+  border-radius: var(--md-sys-shape-corner-lg);
+  cursor: pointer;
+  transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  position: relative;
+}
+
+.md3-sidebar-item:hover {
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+
+.md3-sidebar-item-active {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.md3-sidebar-item-active:hover {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+/* Центрирование кнопок в свернутом сайдбаре */
+.md3-sidebar-collapsed .md3-sidebar-button {
+  display: flex !important;
+  justify-content: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 0.75rem !important; /* или var(--md-sys-spacing-3) */
+  width: 3rem !important; /* фиксированная ширина */
+  min-width: 3rem !important;
+  max-width: 3rem !important;
+}
+
+/* Центрирование иконок внутри кнопок */
+.md3-sidebar-collapsed .md3-sidebar-button .md3-icon {
+  margin: 0 !important;
+  display: block !important;
+}
+
+/* Обычное состояние (развернутый сайдбар) */
+.md3-sidebar-expanded .md3-sidebar-button {
+  justify-content: flex-start !important;
+  width: 100% !important;
+  padding: 0.75rem 1rem !important; /* или var(--md-sys-spacing-3) var(--md-sys-spacing-4) */
+}
+
+/* Если кнопки содержат текст и иконку */
+.md3-sidebar-expanded .md3-sidebar-button .md3-icon {
+  margin-right: 0.75rem !important; /* отступ между иконкой и текстом */
+}

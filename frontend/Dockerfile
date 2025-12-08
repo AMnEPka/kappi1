@@ -1,5 +1,5 @@
 # Frontend Dockerfile for SSH Script Runner
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app/frontend
@@ -17,10 +17,10 @@ RUN npm install
 COPY . .
 
 # Expose port
-EXPOSE 3000
+EXPOSE 415
 
 # Set environment to development
 ENV NODE_ENV=development
 
 # Run the application
-CMD ["npm", "start"]
+CMD ["sh", "-c", "PORT=415 HOST=0.0.0.0 npm start"]
