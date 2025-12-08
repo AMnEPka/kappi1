@@ -8,6 +8,7 @@ import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta, time, date
 import contextlib
+import traceback
 from openpyxl import Workbook  # pyright: ignore[reportMissingModuleSource]
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment  # pyright: ignore[reportMissingModuleSource]
 import tempfile
@@ -337,12 +338,14 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 
                 except Exception as e:
                     failed_tasks += 1
+                    # Log the full stack trace server-side for debugging
+                    logger.error(f"Error executing scripts on host '{host.name}': {str(e)}\n{traceback.format_exc()}")
                     await db.project_tasks.update_one(
                         {"id": task_obj.id},
                         {"$set": {"status": "failed"}}
                     )
-                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': str(e)})}\n\n"
-            
+                    # Only send a generic error message to the client
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': 'An internal error occurred during task execution.'})}\n\n"
             # Send completion event (don't update project status - project is reusable)
             # completed_tasks = hosts that passed all preliminary checks
             successful_hosts = completed_tasks
@@ -350,8 +353,9 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
             yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks, 'successful_hosts': successful_hosts, 'session_id': session_id})}\n\n"
         
         except Exception as e:
-            logger.error(f"Error during project execution: {str(e)}")
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Ошибка: {str(e)}'})}\n\n"
+            logger.error(f"Error during project execution: {str(e)}\n{traceback.format_exc()}")
+            # Only send a generic error message to the client (in Russian to match original, but mask details)
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Произошла внутренняя ошибка выполнения.'})}\n\n"
     
     return StreamingResponse(
         event_generator(),
