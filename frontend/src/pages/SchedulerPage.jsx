@@ -11,6 +11,7 @@ import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, Hist
 import { useNavigate } from 'react-router-dom';
 import { SelectNative } from "@/components/ui/select-native";
 import DateTimePicker from '../components/ui/datetime-picker';
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const JOB_TYPES = [
   { value: "one_time", label: "Одиночный запуск" },
@@ -43,7 +44,14 @@ const statusIcons = {
 const formatDateTime = (value) => {
   if (!value) return "-";
   const date = new Date(value);
-  return date.toLocaleString("ru-RU");
+  const formatter = new Intl.DateTimeFormat('ru-RU', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return formatter.format(date);
 };
 
 const toInputDateTime = (value) => {
@@ -74,6 +82,16 @@ const SchedulerPage = () => {
     run_times: [""],
     recurrence_time: "10:00",
     recurrence_start_date: "",
+  });
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    open: false,
+    title: "",
+    description: "",
+    onConfirm: null,
+    onCancel: null,
+    variant: "default",
+    confirmText: "ОК",
+    cancelText: "Отмена",
   });
 
   useEffect(() => {
@@ -219,8 +237,41 @@ const SchedulerPage = () => {
     }
   };
 
+  // Функция для показа кастомного confirm
+  const showConfirm = (title, description, options = {}) => {
+    return new Promise((resolve) => {
+      setConfirmationDialog({
+        open: true,
+        title,
+        description,
+        onConfirm: () => {
+          setConfirmationDialog({ open: false, title: "", description: "", onConfirm: null, onCancel: null, variant: "default", confirmText: "ОК", cancelText: "Отмена" });
+          resolve(true);
+        },
+        onCancel: () => {
+          setConfirmationDialog({ open: false, title: "", description: "", onConfirm: null, onCancel: null, variant: "default", confirmText: "ОК", cancelText: "Отмена" });
+          resolve(false);
+        },
+        variant: options.variant || "default",
+        confirmText: options.confirmText || "Да",
+        cancelText: options.cancelText || "Отмена",
+      });
+    });
+  };
+
   const handleDelete = async (jobId) => {
-    if (!window.confirm("Удалить задание и историю запусков?")) return;
+    const confirmed = await showConfirm(
+      "Удаление задания",
+      "Удалить задание и историю запусков?",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
+      }
+    );
+
+    if (!confirmed) return;
+
     try {
       await api.delete(`/api/scheduler/jobs/${jobId}`);
       toast.success("Задание удалено");
@@ -774,6 +825,19 @@ const SchedulerPage = () => {
             </table>
           </div>
         )}
+
+      {/* Кастомный диалог подтверждения */}
+      <ConfirmationDialog
+        open={confirmationDialog.open}
+        onOpenChange={(open) => setConfirmationDialog(prev => ({ ...prev, open }))}
+        title={confirmationDialog.title}
+        description={confirmationDialog.description}
+        confirmText={confirmationDialog.confirmText || "ОК"}
+        cancelText={confirmationDialog.onCancel ? (confirmationDialog.cancelText || "Отмена") : undefined}
+        onConfirm={confirmationDialog.onConfirm || (() => {})}
+        onCancel={confirmationDialog.onCancel}
+        variant={confirmationDialog.variant}
+      />
     </div>
   );
 };
