@@ -13,6 +13,7 @@ import { SelectNative } from "@/components/ui/select-native";
 import DateTimePicker from '../components/ui/datetime-picker';
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
+
 const JOB_TYPES = [
   { value: "one_time", label: "Одиночный запуск" },
   { value: "multi_run", label: "Несколько запусков" },
@@ -64,7 +65,6 @@ const SchedulerPage = () => {
   const { hasPermission, isAdmin } = useAuth();
   const canSchedule = isAdmin || hasPermission("projects_execute");
   const navigate = useNavigate();
-  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [jobs, setJobs] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
