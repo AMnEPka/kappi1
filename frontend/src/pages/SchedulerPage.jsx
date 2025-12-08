@@ -11,6 +11,8 @@ import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, Hist
 import { useNavigate } from 'react-router-dom';
 import { SelectNative } from "@/components/ui/select-native";
 import DateTimePicker from '../components/ui/datetime-picker';
+import { useDialog } from "@/hooks/useDialog";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 const JOB_TYPES = [
   { value: "one_time", label: "Одиночный запуск" },
@@ -56,6 +58,7 @@ const SchedulerPage = () => {
   const { hasPermission, isAdmin } = useAuth();
   const canSchedule = isAdmin || hasPermission("projects_execute");
   const navigate = useNavigate();
+  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [jobs, setJobs] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -220,7 +223,18 @@ const SchedulerPage = () => {
   };
 
   const handleDelete = async (jobId) => {
-    if (!window.confirm("Удалить задание и историю запусков?")) return;
+    const confirmed = await showConfirm(
+      "Удаление задания",
+      "Удалить задание и историю запусков?",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
+      }
+    );
+
+    if (!confirmed) return;
+
     try {
       await api.delete(`/api/scheduler/jobs/${jobId}`);
       toast.success("Задание удалено");
@@ -774,6 +788,27 @@ const SchedulerPage = () => {
             </table>
           </div>
         )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (dialogState.onCancel) {
+              dialogState.onCancel();
+            } else {
+              setDialogState(prev => ({ ...prev, open: false }));
+            }
+          }
+        }}
+        title={dialogState.title}
+        description={dialogState.description}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.onCancel ? dialogState.cancelText : undefined}
+        onConfirm={dialogState.onConfirm || (() => {})}
+        onCancel={dialogState.onCancel}
+        variant={dialogState.variant}
+      />
     </div>
   );
 };

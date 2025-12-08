@@ -4,7 +4,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectNative } from "@/components/ui/select-native";
-//import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -12,9 +11,12 @@ import { FileCode, Plus, Edit, Trash2, HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useDialog } from "@/hooks/useDialog";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 export default function ScriptsPage() {
   const { canEditScript, canDeleteScript, canCreateScript } = usePermissions();
+  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [scripts, setScripts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
@@ -106,14 +108,24 @@ export default function ScriptsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Удалить проверку?")) {
-      try {
-        await api.delete(`/api/scripts/${id}`);
-        toast.success("Проверка удалена");
-        fetchScripts();
-      } catch (error) {
-        toast.error("Ошибка удаления проверки");
+    const confirmed = await showConfirm(
+      "Удаление проверки",
+      "Вы уверены, что хотите удалить эту проверку?",
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
       }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/scripts/${id}`);
+      toast.success("Проверка удалена");
+      fetchScripts();
+    } catch (error) {
+      toast.error("Ошибка удаления проверки");
     }
   };
 
@@ -609,6 +621,27 @@ export default function ScriptsPage() {
       </div>
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (dialogState.onCancel) {
+              dialogState.onCancel();
+            } else {
+              setDialogState(prev => ({ ...prev, open: false }));
+            }
+          }
+        }}
+        title={dialogState.title}
+        description={dialogState.description}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.onCancel ? dialogState.cancelText : undefined}
+        onConfirm={dialogState.onConfirm || (() => {})}
+        onCancel={dialogState.onCancel}
+        variant={dialogState.variant}
+      />
     </div>
   );
 }
