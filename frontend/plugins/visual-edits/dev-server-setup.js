@@ -29,31 +29,37 @@ function setupDevServer(config) {
     if (!devServer) throw new Error("webpack-dev-server not defined");
     devServer.app.use(express.json());
 
-    // CORS origin validation
+    // Более компактная версия с лучшей производительностью
     const isAllowedOrigin = (origin) => {
       if (!origin) return false;
 
-      // Allow localhost and 127.0.0.1 on any port
-      if (origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) {
-        return true;
-      }
+      const allowedPatterns = [
+        // localhost и loopback
+        /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|\[::1\])(:\d+)?$/i,
+        
+        // 10.0.0.0/8
+        /^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+        
+        // 172.16.0.0/12
+        /^https?:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+        
+        // 192.168.0.0/16
+        /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+        
+        // link-local 169.254.0.0/16
+        /^https?:\/\/169\.254\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+        
+        // Домены
+        /^https:\/\/([a-zA-Z0-9-]+\.)*emergent\.sh$/,
+        /^https:\/\/([a-zA-Z0-9-]+\.)*emergentagent\.com$/,
+        /^https:\/\/([a-zA-Z0-9-]+\.)*appspot\.com$/,
+        
+        // IPv6 локальные адреса
+        /^https?:\/\/\[fd[0-9a-f:]+?\](:\d+)?$/i,
+        /^https?:\/\/\[fe80[0-9a-f:]+?\](:\d+)?$/i,
+      ];
 
-      // Allow all emergent.sh subdomains
-      if (origin.match(/^https:\/\/([a-zA-Z0-9-]+\.)*emergent\.sh$/)) {
-        return true;
-      }
-
-      // Allow all emergentagent.com subdomains
-      if (origin.match(/^https:\/\/([a-zA-Z0-9-]+\.)*emergentagent\.com$/)) {
-        return true;
-      }
-
-      // Allow all appspot.com subdomains (for App Engine)
-      if (origin.match(/^https:\/\/([a-zA-Z0-9-]+\.)*appspot\.com$/)) {
-        return true;
-      }
-
-      return false;
+      return allowedPatterns.some(pattern => pattern.test(origin));
     };
 
     // ✅ Health check (no auth)
@@ -497,16 +503,37 @@ function setupDevServer(config) {
     });
 
     // Add OPTIONS handler for CORS preflight
-    devServer.app.options("/edit-file", (req, res) => {
-      const origin = req.get("Origin");
-      if (origin && isAllowedOrigin(origin)) {
-        res.header("Access-Control-Allow-Origin", origin);
-        res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
-        res.header("Access-Control-Allow-Headers", "Content-Type, x-api-key");
-        res.sendStatus(200);
-      } else {
-        res.sendStatus(403);
+    devServer.app.use((req, res, next) => {
+      // Если запрос начинается с /api/, пропускаем CORS настройку
+      // (пусть FastAPI сам обрабатывает CORS для API)
+      if (req.path.startsWith('/api/')) {
+        return next();
       }
+      
+      // Только для не-API запросов настраиваем CORS
+      const origin = req.get("Origin");
+      
+      if (origin && isAllowedOrigin(origin)) {
+        // Устанавливаем заголовки ТОЛЬКО ЕСЛИ ИХ ЕЩЁ НЕТ
+        if (!res.getHeader('Access-Control-Allow-Origin')) {
+          res.header("Access-Control-Allow-Origin", origin);
+        }
+        if (!res.getHeader('Access-Control-Allow-Methods')) {
+          res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        }
+        if (!res.getHeader('Access-Control-Allow-Headers')) {
+          res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-api-key");
+        }
+        if (!res.getHeader('Access-Control-Allow-Credentials')) {
+          res.header("Access-Control-Allow-Credentials", "true");
+        }
+      }
+      
+      if (req.method === "OPTIONS") {
+        return res.sendStatus(200);
+      }
+      
+      next();
     });
 
     return middlewares;
