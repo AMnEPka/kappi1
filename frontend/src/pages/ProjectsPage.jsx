@@ -9,6 +9,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { api } from '../config/api';
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useDialog } from "@/hooks/useDialog";
+import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 export default function ProjectsPage({ onNavigate }) {
   const [projects, setProjects] = useState([]);
@@ -20,6 +22,7 @@ export default function ProjectsPage({ onNavigate }) {
   const [loadingAccess, setLoadingAccess] = useState(false);
   const {hasPermission, isAdmin, user} = useAuth();
   const [userSearchTerm, setUserSearchTerm] = useState('');  
+  const { dialogState, setDialogState, showConfirm, showAlert } = useDialog();    
 
   useEffect(() => {
     fetchProjects();
@@ -57,8 +60,22 @@ export default function ProjectsPage({ onNavigate }) {
     }
   };
 
-  const handleDeleteProject = async (projectId) => {
-    if (!window.confirm('Вы уверены, что хотите удалить этот проект?')) {
+  const handleDeleteProject = async (projectId, projectName) => {
+
+    console.log('Кнопка удаления нажата:', projectId, projectName);
+    const confirmed = await showConfirm(
+      'Удаление проекта',
+      `Вы уверены, что хотите удалить проект <strong>"${projectName}"</strong>? Это действие нельзя отменить.`,
+      {
+        variant: "destructive",
+        confirmText: "Удалить",
+        cancelText: "Отмена"
+      }
+    );
+
+    console.log('Диалог закрыт. Результат:', confirmed);
+
+    if (!confirmed) {
       return;
     }
 
@@ -262,7 +279,7 @@ const fetchProjectUsers = async (projectId) => {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleDeleteProject(project.id)}
+                      onClick={() => handleDeleteProject(project.id, project.name)}
                       className="flex-shrink-0 text-black hover:bg-red-500">
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -418,6 +435,27 @@ const fetchProjectUsers = async (projectId) => {
     )}
   </DialogContent>
 </Dialog>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (dialogState.onCancel) {
+              dialogState.onCancel();
+            } else {
+              setDialogState(prev => ({ ...prev, open: false }));
+            }
+          }
+        }}
+        title={dialogState.title}
+        description={dialogState.description}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.onCancel ? dialogState.cancelText : undefined}
+        onConfirm={dialogState.onConfirm || (() => {})}
+        onCancel={dialogState.onCancel}
+        variant={dialogState.variant}
+      />
     </div>
   );
 }

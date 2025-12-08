@@ -64,6 +64,7 @@ const SchedulerPage = () => {
   const { hasPermission, isAdmin } = useAuth();
   const canSchedule = isAdmin || hasPermission("projects_execute");
   const navigate = useNavigate();
+  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [jobs, setJobs] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
