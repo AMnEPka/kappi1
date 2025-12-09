@@ -42,6 +42,7 @@ export default function ScriptsPage() {
   const [isGroupsDialogOpen, setIsGroupsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [groupFormData, setGroupFormData] = useState({ name: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -169,41 +170,75 @@ export default function ScriptsPage() {
 
   const handleGroupSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!groupFormData.name.trim() || isSubmitting) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
     try {
       if (editingGroup) {
-        await api.put(`/api/check-groups/${editingGroup.id}`, groupFormData);
+        // Обновление существующей группы
+        const response = await api.put(`/api/check-groups/${editingGroup.id}`, {
+          name: groupFormData.name
+        });
+        
+        const updatedGroup = response.data;
+        
+        // Обновляем локальное состояние
+        setCheckGroups(prev => prev.map(g => 
+          g.id === editingGroup.id ? updatedGroup : g
+        ));
+        
+        resetGroupForm();
+        setIsGroupsDialogOpen(false);
         toast.success("Группа обновлена");
       } else {
-        await api.post(`/api/check-groups`, groupFormData);
+        // Создание новой группы
+        const response = await api.post(`/api/check-groups`, {
+          name: groupFormData.name
+        });
+        
+        const newGroup = response.data;
+        
+        // Добавляем новую группу в список
+        setCheckGroups(prev => [...prev, newGroup]);
+        
+        // Сбрасываем только поле ввода, диалог остается открытым
+        setGroupFormData({ name: "" });
         toast.success("Группа создана");
       }
-      setIsGroupsDialogOpen(false);
-      resetGroupForm();
-      fetchCheckGroups();
     } catch (error) {
+      console.error("Ошибка при сохранении группы:", error);
       toast.error(error.response?.data?.detail || "Ошибка сохранения группы");
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  const handleGroupDelete = async (id) => {
+  
+  const handleGroupDelete = async (groupId) => {
     const confirmed = await showConfirm(
       "Удаление группы",
-      "Вы уверены, что хотите удалить эту группу? Проверки из этой группы не будут удалены, но связь с группой будет разорвана.",
+      "Вы уверены, что хотите удалить эту группу?",
       {
         variant: "destructive",
         confirmText: "Удалить",
         cancelText: "Отмена"
       }
     );
-
+  
     if (!confirmed) return;
-
+    
     try {
-      await api.delete(`/api/check-groups/${id}`);
+      await api.delete(`/api/check-groups/${groupId}`);
+      
+      // Обновляем локальное состояние
+      setCheckGroups(prev => prev.filter(g => g.id !== groupId));
       toast.success("Группа удалена");
-      fetchCheckGroups();
     } catch (error) {
-      toast.error("Ошибка удаления группы");
+      console.error("Ошибка при удалении группы:", error);
+      toast.error(error.response?.data?.detail || "Ошибка удаления группы");
     }
   };
 
@@ -453,33 +488,70 @@ export default function ScriptsPage() {
                   </div>
 
                   <div>
-                    <Label>Добавить проверку в группы</Label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
-                      {checkGroups.length === 0 ? (
-                        <p className="text-sm text-slate-400">Нет групп. Создайте группы через кнопку "Группы проверок"</p>
-                      ) : (
-                        checkGroups.map((group) => (
-                          <div key={group.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`group-${group.id}`}
-                              checked={formData.group_ids?.includes(group.id) || false}
-                              onCheckedChange={(checked) => {
-                                const currentIds = formData.group_ids || [];
-                                if (checked) {
-                                  setFormData({...formData, group_ids: [...currentIds, group.id]});
-                                } else {
-                                  setFormData({...formData, group_ids: currentIds.filter(id => id !== group.id)});
-                                }
-                              }}
-                            />
-                            <Label htmlFor={`group-${group.id}`} className="cursor-pointer text-sm">
-                              {group.name}
-                            </Label>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+  <Label>Добавить проверку в группы</Label>
+  <div className="space-y-2">
+    {checkGroups.length === 0 ? (
+      <p className="text-sm text-slate-400">Нет групп. Создайте группы через кнопку "Группы проверок"</p>
+    ) : (
+      <>
+        <select
+          className="w-full border rounded-md p-2 text-sm"
+          onChange={(e) => {
+            const groupId = e.target.value;
+            if (groupId && !formData.group_ids?.includes(groupId)) {
+              setFormData({
+                ...formData,
+                group_ids: [...(formData.group_ids || []), groupId]
+              });
+            }
+            e.target.value = ""; // Сбрасываем выбор
+          }}
+        >
+          <option value="">Выберите группу...</option>
+          {checkGroups
+            .filter(group => !formData.group_ids?.includes(group.id))
+            .map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))
+          }
+        </select>
+        
+        {/* Выбранные группы в виде тегов */}
+        <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md">
+          {formData.group_ids?.length > 0 ? (
+            formData.group_ids.map(groupId => {
+              const group = checkGroups.find(g => g.id === groupId);
+              return group ? (
+                <div 
+                  key={group.id} 
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {group.name}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        group_ids: formData.group_ids.filter(id => id !== group.id)
+                      });
+                    }}
+                    className="ml-1 text-blue-600 hover:text-blue-800"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null;
+            })
+          ) : (
+            <span className="text-slate-400 text-sm">Группы не выбраны</span>
+          )}
+        </div>
+      </>
+    )}
+  </div>
+</div>
 
                   <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -622,26 +694,32 @@ export default function ScriptsPage() {
           </DialogHeader>
 
           {editingGroup ? (
-            <form onSubmit={handleGroupSubmit} className="space-y-4">
-              <div>
-                <Label>Название группы</Label>
-                <Input
-                  value={groupFormData.name}
-                  onChange={(e) => setGroupFormData({...groupFormData, name: e.target.value})}
-                  placeholder="Название группы"
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => { resetGroupForm(); setIsGroupsDialogOpen(false); }}>
-                  Отмена
-                </Button>
-                <Button type="submit">
-                  Сохранить
-                </Button>
-              </div>
-            </form>
-          ) : (
+              <form onSubmit={handleGroupSubmit} className="space-y-4">
+                <div>
+                  <Label>Название группы</Label>
+                  <Input
+                    value={groupFormData.name}
+                    onChange={(e) => setGroupFormData({...groupFormData, name: e.target.value})}
+                    placeholder="Название группы"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => { resetGroupForm(); setIsGroupsDialogOpen(false); }}
+                    disabled={isSubmitting}
+                  >
+                    Отмена
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Сохранение..." : "Сохранить"}
+                  </Button>
+                </div>
+              </form>
+            ) : (
             <div className="space-y-4">
               <form onSubmit={handleGroupSubmit} className="space-y-4 border-b pb-4">
                 <div>
@@ -653,9 +731,9 @@ export default function ScriptsPage() {
                       placeholder="Название группы"
                       required
                     />
-                    <Button type="submit">
-                      <Plus className="mr-2 h-4 w-4" /> Создать
-                    </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Создание..." : "Создать"}
+                  </Button>
                   </div>
                 </div>
               </form>
@@ -742,76 +820,105 @@ export default function ScriptsPage() {
         ) : (
       <div className="overflow-hidden">
         <table className="w-full border-collapse table-fixed">
-        <colgroup>
-          <col className="w-[25%]"/><col className="w-[20%]"/><col className="w-[40%]"/><col className="w-[15%]"/>
-        </colgroup>
+          <colgroup>
+            <col className="w-[20%]"/>
+            <col className="w-[20%]"/>
+            <col className="w-[25%]"/>
+            <col className="w-[20%]"/>
+            <col className="w-[15%]"/>
+          </colgroup>
           <thead>
             <tr className="border-b border-slate-200">
               <th className="text-left py-1 px-4 text-slate-600 font-medium">Название</th>
               <th className="text-left py-1 px-4 text-slate-600 font-medium">Категория</th>
               <th className="text-left py-1 px-4 text-slate-600 font-medium">Описание</th>
+              <th className="text-left py-1 px-4 text-slate-600 font-medium">Группы</th>
               <th className="text-left py-1 px-4 text-slate-600 font-medium">Действия</th>
             </tr>
           </thead>
           <tbody>
-            {scripts.map((script) => (
-              <tr key={script.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`script-card-${script.id}`}>
-                <td className="py-1 px-4 overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 font-medium truncate">
-                      <FileCode className="h-4 w-4 text-slate-500 flex-shrink-0" />
-                      <span className="truncate">{script.name}</span>
+            {scripts.map((script) => {
+              // Находим группы для этой проверки
+              const scriptGroups = checkGroups.filter(group => 
+                script.group_ids?.includes(group.id)
+              );
+              
+              return (
+                <tr key={script.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`script-card-${script.id}`}>
+                  <td className="py-1 px-4 overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-medium truncate">
+                        <FileCode className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                        <span className="truncate">{script.name}</span>
+                      </div>
+                      {script.has_reference_files && (
+                        <div className="text-xs text-slate-400 flex-shrink-0 ml-2" title="Предусмотрены эталонные файлы">
+                          📝
+                        </div>
+                      )}
                     </div>
-                    {script.has_reference_files && (
-                      <div className="text-xs text-slate-400 flex-shrink-0 ml-2" title="Предусмотрены эталонные файлы">
-                        📝
+                  </td>
+                  <td className="py-1 px-4 text-sm text-slate-600 overflow-hidden">
+                    {script.category_name && (
+                      <div className="truncate">
+                        {script.category_icon} {script.category_name} → {script.system_name}
                       </div>
                     )}
-                  </div>
-                </td>
-                <td className="py-1 px-4 text-sm text-slate-600 overflow-hidden">
-                  {script.category_name && (
-                    <div className="truncate">
-                      {script.category_icon} {script.category_name} → {script.system_name}
+                  </td>
+                  <td className="py-1 px-4 text-sm text-slate-500">
+                    {script.description ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="truncate cursor-help text-left">
+                              {script.description}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="text-sm">
+                              {script.description}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td className="py-1 px-4 text-sm text-slate-500">
+                    {scriptGroups.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {scriptGroups.map(group => (
+                          <span 
+                            key={group.id} 
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200"
+                            title={group.name}
+                          >
+                            <span className="truncate max-w-[100px]">{group.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-sm">-</span>
+                    )}
+                  </td>
+                  <td className="py-1 px-4">
+                    <div className="flex gap-1">
+                      {canEditScript(script) && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}>
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {canDeleteScript(script) && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(script.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
-                  )}
-                </td>
-                <td className="py-1 px-4 text-sm text-slate-500">
-                  {script.description ? (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="truncate cursor-help text-left">
-                            {script.description}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <div className="text-sm">
-                            {script.description}
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="py-1 px-4">
-                  <div className="flex gap-1">
-                    {canEditScript(script) && (
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}>
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                    )}
-                    {canDeleteScript(script) && (
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(script.id)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
