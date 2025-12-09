@@ -3,7 +3,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
-import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users } from "lucide-react";
+import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
 
@@ -25,6 +25,10 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [editedTasks, setEditedTasks] = useState({});
   const eventSourceRef = useRef(null);
   const logsEndRef = useRef(null);
+  
+  // Состояние для отслеживания завершения начальных статусов
+  const [statusDone, setStatusDone] = useState(false);
+  const [infoDone, setInfoDone] = useState(false);
 
   useEffect(() => {
     fetchProject();
@@ -42,15 +46,15 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   }, [logs]);
 
   const fetchProject = async () => {
-  try {
-			const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
-				api.get(`/api/projects/${projectId}`),          
-				api.get(`/api/projects/${projectId}/tasks`),      
-				api.get('/api/hosts'),                          
-				api.get('/api/systems'),                        
-				api.get('/api/scripts'),                         
-				api.get(`/api/projects/${projectId}/users`)
-			]);
+    try {
+      const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
+        api.get(`/api/projects/${projectId}`),          
+        api.get(`/api/projects/${projectId}/tasks`),      
+        api.get('/api/hosts'),                          
+        api.get('/api/systems'),                        
+        api.get('/api/scripts'),                         
+        api.get(`/api/projects/${projectId}/users`)
+      ]);
       
       setProject(projectRes.data);
       setTasks(tasksRes.data);
@@ -132,6 +136,9 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       setExecuting(true);
       setLogs([]);
       setStats({ total: 0, completed: 0, failed: 0 });
+      // Сбрасываем состояния галочек при новом запуске
+      setStatusDone(false);
+      setInfoDone(false);
 
       // Connect to SSE for real-time updates (EventSource uses GET by default)
       // The backend endpoint will start execution when first connected
@@ -158,6 +165,19 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
             return [...prev, data];
           });
 
+          // Обработка завершения начальных статусов
+          if (data.type === 'status') {
+            // Сохраняем сообщение статуса
+          } else if (data.type === 'info') {
+            // Сохраняем сообщение информации
+          }
+          
+          // Когда начинается первое задание, ставим галочки
+          if (data.type === 'task_start' || data.type === 'check_network') {
+            if (!statusDone) setStatusDone(true);
+            if (!infoDone) setInfoDone(true);
+          }
+          
           // Update stats
           if (data.type === 'info') {
             const match = data.message.match(/Всего заданий: (\d+)/);
@@ -179,6 +199,10 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
             setExecuting(false);
             eventSource.close();
             
+            // Устанавливаем галочки при полном завершении
+            setStatusDone(true);
+            setInfoDone(true);
+            
             // Refresh project status
             fetchProject();
 
@@ -190,6 +214,9 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
           } else if (data.type === 'error') {
             setExecuting(false);
             eventSource.close();
+            // При ошибке тоже ставим галочки
+            setStatusDone(true);
+            setInfoDone(true);
             toast.error(`Ошибка: ${data.message}`);
           }
         } catch (error) {
@@ -200,6 +227,9 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       eventSource.onerror = (error) => {
         eventSource.close();
         setExecuting(false);
+        // При ошибке соединения ставим галочки
+        setStatusDone(true);
+        setInfoDone(true);
         
         if (logs.length === 0) {
           toast.error("Не удалось подключиться к серверу");
@@ -215,6 +245,9 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
     } catch (error) {
       console.error('Error starting execution:', error);
       setExecuting(false);
+      // При ошибке запуска ставим галочки
+      setStatusDone(true);
+      setInfoDone(true);
       toast.error("Не удалось запустить выполнение");
     }
   };
@@ -223,6 +256,10 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
     switch (type) {
       case 'status':
       case 'info':
+        // Используем кружок для начальных статусов и галочку при завершении
+        if ((type === 'status' && statusDone) || (type === 'info' && infoDone)) {
+          return <CheckCircle className="h-4 w-4 text-green-500" />;
+        }
         return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
       case 'task_start':
         return <Play className="h-4 w-4 text-blue-500" />;
@@ -247,7 +284,10 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const getLogMessage = (log) => {
     switch (log.type) {
       case 'status':
+        // Если статус завершен, показываем исходное сообщение
+        return log.message;
       case 'info':
+        return log.message;
       case 'error':
         return log.message;
       case 'task_start':
@@ -293,6 +333,24 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       default:
         return 'text-gray-300';
     }
+  };
+
+  // Функция для определения, какой компонент отображать в журнале
+  const getStatusIconComponent = (type) => {
+    if (type === 'status') {
+      return statusDone ? (
+        <CheckCircle className="h-4 w-4 text-green-500" />
+      ) : (
+        <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+      );
+    } else if (type === 'info') {
+      return infoDone ? (
+        <CheckCircle className="h-4 w-4 text-green-500" />
+      ) : (
+        <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+      );
+    }
+    return getLogIcon(type);
   };
 
   if (!project) {
@@ -514,7 +572,9 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
               <div className="space-y-1">
                 {logs.map((log, index) => (
                   <div key={index} className="flex items-start gap-2">
-                    <span className="flex-shrink-0 mt-0.5">{getLogIcon(log.type)}</span>
+                    <span className="flex-shrink-0 mt-0.5">
+                      {getStatusIconComponent(log.type)}
+                    </span>
                     <span className={getLogClassName(log)}>
                       {getLogMessage(log)}
                     </span>

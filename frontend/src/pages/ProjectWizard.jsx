@@ -36,9 +36,17 @@ export default function ProjectWizard({ onNavigate }) {
   const [systems, setSystems] = useState([]);
   const [scripts, setScripts] = useState([]);
   const [users, setUsers] = useState([]);
+  const [checkGroups, setCheckGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const { user: currentUser } = useAuth();
   const [systemCheckTemplates, setSystemCheckTemplates] = useState({});
+  const [checkSelectionModal, setCheckSelectionModal] = useState({
+    open: false,
+    hostId: null,
+    systemIndex: null,
+    systemId: null,
+    selectedScriptIds: []
+  });
 
 // Замените текущий useEffect на:
 useEffect(() => {
@@ -140,17 +148,19 @@ useEffect(() => {
       console.log('📊 Хосты сохранены в состояние:', hostsRes.data?.length || 0);
       
       // Остальные запросы...
-      const [categoriesRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
+      const [categoriesRes, systemsRes, scriptsRes, usersRes, checkGroupsRes] = await Promise.all([
         api.get(`/api/categories`),
         api.get(`/api/systems`),
         api.get(`/api/scripts`),
         api.get(`/api/users`),
+        api.get(`/api/check-groups`),
       ]);
       
       setCategories(categoriesRes.data);
       setSystems(systemsRes.data);
       setScripts(scriptsRes.data);
       setUsers(usersRes.data);
+      setCheckGroups(checkGroupsRes.data);
       
       console.log('✨ Все данные загружены');
       
@@ -1277,6 +1287,103 @@ useEffect(() => {
     }
   };
 
+  const openCheckSelectionModal = (hostId, systemIndex, systemId) => {
+    const task = projectData.tasks.find(t => t.host_id === hostId);
+    if (!task) return;
+    
+    const system = task.systems[systemIndex];
+    const currentScriptIds = system?.script_ids || [];
+    
+    setCheckSelectionModal({
+      open: true,
+      hostId,
+      systemIndex,
+      systemId,
+      selectedScriptIds: [...currentScriptIds]
+    });
+  };
+
+  const closeCheckSelectionModal = () => {
+    setCheckSelectionModal({
+      open: false,
+      hostId: null,
+      systemIndex: null,
+      systemId: null,
+      selectedScriptIds: []
+    });
+  };
+
+  const saveCheckSelection = () => {
+    const { hostId, systemIndex, selectedScriptIds } = checkSelectionModal;
+    
+    const updatedTasks = [...(projectData.tasks || [])];
+    const taskIndex = updatedTasks.findIndex(t => t.host_id === hostId);
+    
+    if (taskIndex !== -1) {
+      const task = updatedTasks[taskIndex];
+      const updatedSystems = [...task.systems];
+      const system = updatedSystems[systemIndex];
+      
+      updatedSystems[systemIndex] = {
+        ...system,
+        script_ids: selectedScriptIds
+      };
+      
+      updatedTasks[taskIndex] = {
+        ...task,
+        systems: updatedSystems
+      };
+      
+      setProjectData(prev => ({
+        ...prev,
+        tasks: updatedTasks
+      }));
+
+      // Обновляем шаблон
+      if (system.system_id) {
+        updateSystemCheckTemplate(system.system_id, selectedScriptIds);
+      }
+    }
+    
+    closeCheckSelectionModal();
+  };
+
+  const handleModalSelectAll = (availableScripts) => {
+    const allScriptIds = availableScripts.map(script => script.id);
+    const isAllSelected = allScriptIds.every(id => checkSelectionModal.selectedScriptIds.includes(id));
+    
+    setCheckSelectionModal(prev => ({
+      ...prev,
+      selectedScriptIds: isAllSelected ? [] : allScriptIds
+    }));
+  };
+
+  const handleModalGroupToggle = (groupId, availableScripts) => {
+    const groupScripts = availableScripts.filter(script => 
+      script.group_ids?.includes(groupId)
+    );
+    const groupScriptIds = groupScripts.map(s => s.id);
+    const isGroupSelected = groupScriptIds.every(id => 
+      checkSelectionModal.selectedScriptIds.includes(id)
+    );
+    
+    setCheckSelectionModal(prev => ({
+      ...prev,
+      selectedScriptIds: isGroupSelected
+        ? prev.selectedScriptIds.filter(id => !groupScriptIds.includes(id))
+        : [...new Set([...prev.selectedScriptIds, ...groupScriptIds])]
+    }));
+  };
+
+  const handleModalScriptToggle = (scriptId) => {
+    setCheckSelectionModal(prev => ({
+      ...prev,
+      selectedScriptIds: prev.selectedScriptIds.includes(scriptId)
+        ? prev.selectedScriptIds.filter(id => id !== scriptId)
+        : [...prev.selectedScriptIds, scriptId]
+    }));
+  };
+
   const renderStep3 = () => {
     console.log('🎯 Шаг 3: renderStep3 вызван');
     console.log('📊 projectData.hostsList:', projectData.hostsList);
@@ -1435,33 +1542,27 @@ useEffect(() => {
                             {availableScripts.length === 0 ? (
                               <p className="text-gray-500 text-sm mt-2">Нет доступных проверок для выбранной системы</p>
                             ) : (
-                              <div className="space-y-2 mt-2 max-h-48 overflow-y-auto p-2 border rounded">
-                                {/* Чекбокс "Выбрать все" */}
-                                <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
-                                  <Checkbox
-                                    checked={availableScripts.every(script => 
-                                      system.script_ids.includes(script.id)
-                                    )}
-                                    onCheckedChange={() => handleSelectAllScripts(task.host_id, systemIndex, system, availableScripts)}
-                                  />
-                                  <Label className="font-medium text-sm cursor-pointer">Выбрать все проверки</Label>
-                                </div>
-
-                                {/* Список проверок */}
-                                {availableScripts.map((script) => (
-                                  <div key={script.id} className="flex items-center space-x-2 p-1 hover:bg-gray-100 rounded">
-                                    <Checkbox
-                                      checked={system.script_ids.includes(script.id)}
-                                      onCheckedChange={() => handleTaskScriptToggle(task.host_id, systemIndex, script.id)}
-                                    />
-                                    <div className="flex-1">
-                                      <p className="font-medium text-sm">{script.name}</p>
-                                      {script.description && (
-                                        <p className="text-xs text-gray-500">{script.description}</p>
-                                      )}
-                                    </div>
+                              <div className="mt-2 space-y-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openCheckSelectionModal(task.host_id, systemIndex, system.system_id)}
+                                  className="w-full"
+                                >
+                                  Выбрать проверки ({system.script_ids.length} выбрано)
+                                </Button>
+                                {system.script_ids.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {system.script_ids.map(scriptId => {
+                                      const script = availableScripts.find(s => s.id === scriptId);
+                                      return script ? (
+                                        <Badge key={scriptId} variant="secondary" className="text-xs">
+                                          {script.name}
+                                        </Badge>
+                                      ) : null;
+                                    })}
                                   </div>
-                                ))}
+                                )}
                               </div>
                             )}
                             {system.system_id && system.script_ids.length > 0 && (
@@ -1829,6 +1930,152 @@ useEffect(() => {
       {step === 4 && renderStep4()}
       {step === 5 && renderStep5()}
       {step === 6 && renderStep6()}
+
+      {/* Check Selection Modal */}
+      <Dialog open={checkSelectionModal.open} onOpenChange={(open) => {
+        if (!open) closeCheckSelectionModal();
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Выбор проверок</DialogTitle>
+            <DialogDescription>
+              Выберите проверки для системы. Можно выбрать группы или отдельные проверки.
+            </DialogDescription>
+          </DialogHeader>
+
+          {checkSelectionModal.systemId && (() => {
+            const availableScripts = getScriptsBySystemId(checkSelectionModal.systemId);
+            const scriptsByGroup = {};
+            const ungroupedScripts = [];
+
+            // Группируем проверки по группам
+            availableScripts.forEach(script => {
+              if (script.group_ids && script.group_ids.length > 0) {
+                script.group_ids.forEach(groupId => {
+                  if (!scriptsByGroup[groupId]) {
+                    scriptsByGroup[groupId] = [];
+                  }
+                  scriptsByGroup[groupId].push(script);
+                });
+              } else {
+                ungroupedScripts.push(script);
+              }
+            });
+
+            // Удаляем дубликаты из групп
+            Object.keys(scriptsByGroup).forEach(groupId => {
+              scriptsByGroup[groupId] = Array.from(
+                new Map(scriptsByGroup[groupId].map(s => [s.id, s])).values()
+              );
+            });
+
+            const allSelected = availableScripts.every(script => 
+              checkSelectionModal.selectedScriptIds.includes(script.id)
+            );
+
+            return (
+              <div className="space-y-4">
+                {/* Select All Checkbox */}
+                <div className="flex items-center space-x-2 pb-3 border-b">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={() => handleModalSelectAll(availableScripts)}
+                  />
+                  <Label className="font-medium cursor-pointer">
+                    Выбрать все проверки ({availableScripts.length})
+                  </Label>
+                </div>
+
+                {/* Groups */}
+                {Object.keys(scriptsByGroup).length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold">Группы проверок</Label>
+                    {Object.entries(scriptsByGroup).map(([groupId, groupScripts]) => {
+                      const group = checkGroups.find(g => g.id === groupId);
+                      if (!group) return null;
+
+                      const groupScriptIds = groupScripts.map(s => s.id);
+                      const isGroupSelected = groupScriptIds.every(id => 
+                        checkSelectionModal.selectedScriptIds.includes(id)
+                      );
+                      const isGroupPartiallySelected = groupScriptIds.some(id => 
+                        checkSelectionModal.selectedScriptIds.includes(id)
+                      ) && !isGroupSelected;
+
+                      return (
+                        <div key={groupId} className="border rounded-lg p-3 space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={isGroupSelected}
+                              onCheckedChange={() => handleModalGroupToggle(groupId, availableScripts)}
+                              className={isGroupPartiallySelected ? "data-[state=checked]:bg-gray-400" : ""}
+                            />
+                            <Label className="font-medium cursor-pointer">
+                              {group.name} ({groupScripts.length} проверок)
+                              {isGroupPartiallySelected && (
+                                <span className="text-xs text-gray-500 ml-1">(частично выбрано)</span>
+                              )}
+                            </Label>
+                          </div>
+                          <div className="ml-6 space-y-1">
+                            {groupScripts.map(script => (
+                              <div key={script.id} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
+                                <Checkbox
+                                  checked={checkSelectionModal.selectedScriptIds.includes(script.id)}
+                                  onCheckedChange={() => handleModalScriptToggle(script.id)}
+                                />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{script.name}</p>
+                                  {script.description && (
+                                    <p className="text-xs text-gray-500">{script.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Ungrouped Scripts */}
+                {ungroupedScripts.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Проверки без группы</Label>
+                    <div className="border rounded-lg p-3 space-y-1">
+                      {ungroupedScripts.map(script => (
+                        <div key={script.id} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
+                          <Checkbox
+                            checked={checkSelectionModal.selectedScriptIds.includes(script.id)}
+                            onCheckedChange={() => handleModalScriptToggle(script.id)}
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{script.name}</p>
+                            {script.description && (
+                              <p className="text-xs text-gray-500">{script.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button variant="outline" onClick={closeCheckSelectionModal}>
+                    Отмена
+                  </Button>
+                  <Button onClick={saveCheckSelection}>
+                    Сохранить ({checkSelectionModal.selectedScriptIds.length} выбрано)
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

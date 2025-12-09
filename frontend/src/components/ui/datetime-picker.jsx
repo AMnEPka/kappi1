@@ -12,15 +12,29 @@ const DateTimePicker = ({ value, onChange, required = false, className = "" }) =
 
   useEffect(() => {
     if (value) {
-      const [datePart, timePart] = value.split('T');
+      // Простое исправление - удаляем 'Z' и разбиваем
+      const cleanValue = value.replace(/Z$/, '');
+      const [datePart, timeWithMs] = cleanValue.split('T');
+      
+      // Отрезаем миллисекунды, оставляя только HH:mm
+      const timePart = timeWithMs ? timeWithMs.split('.')[0] : '00:00';
+      
       setDate(datePart);
-      setTime(timePart || '00:00');
+      setTime(timePart);
+    } else {
+      setDate('');
+      setTime('00:00');
     }
   }, [value]);
 
   const handleApply = () => {
     if (date && time) {
-      const dateTimeString = `${date}T${time}`;
+      // Добавляем секунды, если их нет
+      const timeWithSeconds = time.includes(':') ? 
+        (time.split(':').length === 2 ? `${time}:00` : time) : 
+        `${time}:00:00`;
+      
+      const dateTimeString = `${date}T${timeWithSeconds}`;
       onChange(dateTimeString);
       setIsOpen(false);
     }
