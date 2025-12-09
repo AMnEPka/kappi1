@@ -125,6 +125,7 @@ async def create_script_alt(script_input: ScriptCreate, current_user: User = Dep
     await require_permission(current_user, 'checks_create')
     
     # Verify system exists
+    system = None
     if script_input.system_id:
         system = await db.systems.find_one({"id": script_input.system_id})
         if not system:
@@ -132,7 +133,7 @@ async def create_script_alt(script_input: ScriptCreate, current_user: User = Dep
     
     # Get category name
     category_name = ""
-    if system.get('category_id'):
+    if system and system.get('category_id'):
         category = await db.categories.find_one({"id": system['category_id']})
         if category:
             category_name = category.get('name', '')
@@ -148,7 +149,7 @@ async def create_script_alt(script_input: ScriptCreate, current_user: User = Dep
         username=current_user.username,
         details={
             "script_name": script_obj.name,
-            "system_name": system.get('name'),
+            "system_name": system.get('name') if system else "",
             "category_name": category_name
         }
     )

@@ -203,9 +203,15 @@ async def update_system(system_id: str, system_update: SystemUpdate, current_use
     if not current_system:
         raise HTTPException(status_code=404, detail="Система не найдена")
     
-    # If category_id is being updated, verify it exists
+    # If category_id is being updated, verify it exists and get the new category
+    # Otherwise, get the current category for logging
     if 'category_id' in update_data:
         category = await db.categories.find_one({"id": update_data['category_id']})
+        if not category:
+            raise HTTPException(status_code=404, detail="Категория не найдена")
+    else:
+        # Get current category for logging when category_id is not being updated
+        category = await db.categories.find_one({"id": current_system.get('category_id')})
         if not category:
             raise HTTPException(status_code=404, detail="Категория не найдена")
     

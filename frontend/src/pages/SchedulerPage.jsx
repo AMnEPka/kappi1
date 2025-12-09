@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/config/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon, CheckCircle, XCircle, Loader2, Plus, X} from "lucide-react";
+import { CalendarClock, PauseCircle, PlayCircle, RefreshCw, Repeat, Trash2, History as HistoryIcon, CheckCircle, XCircle, Loader2, Plus, X, Clock} from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { SelectNative } from "@/components/ui/select-native";
 import DateTimePicker from '../components/ui/datetime-picker';
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+
 
 const JOB_TYPES = [
   { value: "one_time", label: "Одиночный запуск" },
@@ -64,7 +65,6 @@ const SchedulerPage = () => {
   const { hasPermission, isAdmin } = useAuth();
   const canSchedule = isAdmin || hasPermission("projects_execute");
   const navigate = useNavigate();
-  const { dialogState, setDialogState, showConfirm } = useDialog();
   const [jobs, setJobs] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -446,6 +446,22 @@ const SchedulerPage = () => {
                       variant="outline"
                       size="icon"
                       onClick={() => {
+                        // Установить ТЕКУЩЕЕ время
+                        const currentTime = new Date();
+                        currentTime.setMinutes(currentTime.getMinutes() + 1);
+                        setForm({ ...form, run_at: currentTime.toISOString() });
+                      }}
+                      className="h-7 w-7"
+                      title="Установить текущее время"
+                    >
+                      <Clock/>
+                    </Button>  
+                         
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
                         const baseTime = form.run_at ? new Date(form.run_at) : new Date();
                         baseTime.setHours(baseTime.getHours() + 1);
                         setForm({ ...form, run_at: baseTime.toISOString() });
@@ -453,7 +469,7 @@ const SchedulerPage = () => {
                       className="h-7 w-7"
                       title="Прибавить 1 час"
                     >
-                      <span className="text-xs">+1h</span>
+                      <span className="text-xxs">+1ч</span>
                     </Button>
                     <Button
                       type="button"
@@ -467,7 +483,7 @@ const SchedulerPage = () => {
                       className="h-7 w-7"
                       title="Прибавить 8 часов"
                     >
-                      <span className="text-xs">+8h</span>
+                      <span className="text-xxs">+8ч</span>
                     </Button>
                     <Button
                       type="button"
@@ -481,7 +497,7 @@ const SchedulerPage = () => {
                       className="h-7 w-7"
                       title="Прибавить 1 сутки"
                     >
-                      <span className="text-xs">+24h</span>
+                      <span className="text-xxs">+24ч</span>
                     </Button>
                     <Button
                       type="button"
@@ -726,7 +742,7 @@ const SchedulerPage = () => {
                               </Button>
                               {isOneTimeCompleted && (
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                  Недоступно для завершенных одиночных запусков
+                                  Редактирование недоступно для завершенных одиночных запусков
                                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                                 </div>
                               )}
@@ -830,7 +846,15 @@ const SchedulerPage = () => {
       {/* Кастомный диалог подтверждения */}
       <ConfirmationDialog
         open={confirmationDialog.open}
-        onOpenChange={(open) => setConfirmationDialog(prev => ({ ...prev, open }))}
+        onOpenChange={(open) => {
+          if (!open && confirmationDialog.onCancel) {
+            // Dialog is being closed externally (click outside or Escape)
+            // Call onCancel to resolve the Promise
+            confirmationDialog.onCancel();
+          } else {
+            setConfirmationDialog(prev => ({ ...prev, open }));
+          }
+        }}
         title={confirmationDialog.title}
         description={confirmationDialog.description}
         confirmText={confirmationDialog.confirmText || "ОК"}
