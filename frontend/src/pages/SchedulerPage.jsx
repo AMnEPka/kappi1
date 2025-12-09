@@ -469,7 +469,7 @@ const SchedulerPage = () => {
                       className="h-7 w-7"
                       title="Прибавить 1 час"
                     >
-                      <span className="text-xs">+1h</span>
+                      <span className="text-xxs">+1ч</span>
                     </Button>
                     <Button
                       type="button"
@@ -483,7 +483,7 @@ const SchedulerPage = () => {
                       className="h-7 w-7"
                       title="Прибавить 8 часов"
                     >
-                      <span className="text-xs">+8h</span>
+                      <span className="text-xxs">+8ч</span>
                     </Button>
                     <Button
                       type="button"
@@ -497,7 +497,7 @@ const SchedulerPage = () => {
                       className="h-7 w-7"
                       title="Прибавить 1 сутки"
                     >
-                      <span className="text-xs">+24h</span>
+                      <span className="text-xxs">+24ч</span>
                     </Button>
                     <Button
                       type="button"
