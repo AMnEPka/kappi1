@@ -751,18 +751,16 @@ export default function ScriptsPage() {
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-6 w-6" 
                             onClick={() => openGroupEditDialog(group)}
                           >
-                            <Edit className="h-3 w-3" />
+                            <Edit className="text-black-600" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-6 w-6" 
                             onClick={() => handleGroupDelete(group.id)}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="text-red-600" />
                           </Button>
                         </div>
                       </div>
@@ -905,13 +903,13 @@ export default function ScriptsPage() {
                   <td className="py-1 px-4">
                     <div className="flex gap-1">
                       {canEditScript(script) && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}>
-                          <Edit className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(script)}>
+                          <Edit className="text-black-600" />
                         </Button>
                       )}
                       {canDeleteScript(script) && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(script.id)}>
-                          <Trash2 className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(script.id)}>
+                          <Trash2 className="text-red-600" />
                         </Button>
                       )}
                     </div>
