@@ -42,6 +42,8 @@ async def get_permissions_list():
         "groups": PERMISSION_GROUPS
     }
 
+
+
 # Project Execution with Real-time Updates (SSE)
 @api_router.get("/projects/{project_id}/execute")
 async def execute_project(project_id: str, token: Optional[str] = None, skip_audit_log: bool = False):
