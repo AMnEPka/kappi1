@@ -246,7 +246,7 @@ export default function RolesPage() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Управление ролями</h2>
-          <p className="text-gray-600 mt-1">Создание ролей и управление разрешениями</p>
+          <p className="text-gray-600 mt-1">Создание ролей и управление правами доступа</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -259,7 +259,7 @@ export default function RolesPage() {
             <DialogHeader>
               <DialogTitle>{editingRole ? 'Редактировать роль' : 'Новая роль'}</DialogTitle>
               <DialogDescription>
-                {editingRole ? 'Обновите информацию о роли и её разрешениях' : 'Создайте новую роль с набором разрешений'}
+                {editingRole ? 'Обновите информацию о роли и её правах доступа' : 'Создайте новую роль с набором прав доступа'}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -286,8 +286,8 @@ export default function RolesPage() {
               </div>
 
               <div className="space-y-4">
-                <Label className="text-base font-semibold">Разрешения</Label>
-                <p className="text-sm text-gray-500">Выберите разрешения для этой роли</p>
+                <Label className="text-base font-semibold">Права</Label>
+                <p className="text-sm text-gray-500">Выберите права доступа для этой роли</p>
                 
                 {Object.entries(PERMISSION_GROUPS).map(([groupName, groupPermissions]) => {
                   const allSelected = groupPermissions.every(p => formData.permissions.includes(p));
@@ -375,7 +375,7 @@ export default function RolesPage() {
                         <CardTitle className="flex items-center gap-2">
                           {role.name}
                           <Badge variant="outline" className="ml-2">
-                            {role.permissions?.length || 0} разрешений
+                            Права: {role.permissions?.length || 0}
                           </Badge>
                         </CardTitle>
                         {role.description && (
@@ -421,7 +421,7 @@ export default function RolesPage() {
                 {role.permissions && role.permissions.length > 0 && (
                   <CardContent>
                     <div className="space-y-3">
-                      <p className="text-sm font-medium text-gray-700">Разрешения:</p>
+                      <p className="text-sm font-medium text-gray-700">Права доступа:</p>
                       <div className="flex flex-wrap gap-2">
                         {role.permissions.map((permission) => (
                           <Badge key={permission} variant="secondary" className="text-xs">
