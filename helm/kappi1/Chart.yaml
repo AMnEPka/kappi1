@@ -1,0 +1,15 @@
+apiVersion: v2
+name: kappi1
+description: A Helm chart for Kappi1 application - SSH Script Runner with FastAPI backend, React frontend, MongoDB, and Nginx
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - ssh
+  - script-runner
+  - fastapi
+  - react
+  - mongodb
+maintainers:
+  - name: Kappi1 Team
+
