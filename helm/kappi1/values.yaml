@@ -1,0 +1,216 @@
+# Default values for kappi1
+# This is a YAML-formatted file.
+
+# Global settings
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Application name
+nameOverride: ""
+fullnameOverride: ""
+
+# MongoDB Configuration
+mongodb:
+  enabled: true
+  image:
+    repository: mongo
+    tag: "6.0"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 27017
+  
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  environment:
+    MONGO_INITDB_DATABASE: ssh_runner_db
+
+# Backend Configuration
+backend:
+  enabled: true
+  image:
+    repository: kappi1-backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+  
+  replicaCount: 2
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  env:
+    MONGO_URL: "mongodb://mongodb:27017"
+    DB_NAME: "ssh_runner_db"
+    CORS_ORIGINS: "*"
+    PYTHONPATH: "/app"
+    ENCRYPTION_KEY: ""  # Must be set via --set or secrets
+    JWT_SECRET_KEY: ""  # Must be set via --set or secrets
+    SCHEDULER_POLL_SECONDS: "30"
+  
+  # Health check configuration
+  healthCheck:
+    enabled: true
+    path: "/api/hosts"
+    initialDelaySeconds: 40
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  
+  # Logging
+  logging:
+    enabled: true
+    volume:
+      size: 1Gi
+      storageClass: ""
+
+# Frontend Configuration
+frontend:
+  enabled: true
+  image:
+    repository: kappi1-frontend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  
+  replicaCount: 2
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  env:
+    REACT_APP_BACKEND_URL: ""  # Will be set based on ingress/nginx config
+  
+  # Health check configuration
+  healthCheck:
+    enabled: true
+    path: "/"
+    initialDelaySeconds: 5
+    periodSeconds: 30
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Nginx Configuration
+nginx:
+  enabled: true
+  image:
+    repository: nginx
+    tag: "alpine"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: LoadBalancer  # Can be changed to ClusterIP if using Ingress
+    port: 80
+    targetPort: 80
+    annotations: {}
+  
+  replicaCount: 2
+  
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+  
+  # Custom nginx configuration
+  config:
+    enabled: true
+    # If false, will use default nginx config from ConfigMap
+    customConfig: ""  # Path to custom nginx.conf or leave empty for default
+
+# Ingress Configuration (alternative to Nginx service)
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: kappi1.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: kappi1-tls
+    #   hosts:
+    #     - kappi1.example.com
+
+# Secrets (should be created separately or via --set)
+secrets:
+  encryptionKey: ""  # Set via --set backend.env.ENCRYPTION_KEY
+  jwtSecretKey: ""   # Set via --set backend.env.JWT_SECRET_KEY
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 2000
+
+# Security Context
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Node Selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
