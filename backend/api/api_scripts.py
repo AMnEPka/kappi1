@@ -7,7 +7,7 @@ from config.config_init import db
 from models.content_models import Script, ScriptCreate, ScriptUpdate
 from models.auth_models import User
 from services.services_auth import get_current_user, has_permission, require_permission
-from utils.db_utils import prepare_for_mongo, parse_from_mongo
+from utils.db_utils import prepare_for_mongo, parse_from_mongo, encode_script_for_storage, decode_script_from_storage
 from utils.audit_utils import log_audit
 
 router = APIRouter()
@@ -24,7 +24,10 @@ async def create_script(system_id: str, script_input: ScriptCreate, current_user
         raise HTTPException(status_code=404, detail="Система не найдена")
     
     script_obj = Script(**script_input.model_dump(), created_by=current_user.id)
-    doc = prepare_for_mongo(script_obj.model_dump())
+    script_dict = script_obj.model_dump()
+    # Encode script content and processor_script to Base64 before storing
+    script_dict = encode_script_for_storage(script_dict)
+    doc = prepare_for_mongo(script_dict)
     
     await db.scripts.insert_one(doc)
     
@@ -70,6 +73,8 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
     enriched_scripts = []
     for script in scripts:
         script_data = parse_from_mongo(script)
+        # Decode script content and processor_script from Base64
+        script_data = decode_script_from_storage(script_data)
         
         # Check if script has system_id (old scripts might not have it)
         if "system_id" not in script_data or not script_data["system_id"]:
@@ -116,7 +121,10 @@ async def get_script(script_id: str, current_user: User = Depends(get_current_us
         if script.get('created_by') != current_user.id:
             raise HTTPException(status_code=403, detail="Нет доступа к скрипту")
     
-    return Script(**parse_from_mongo(script))
+    script_data = parse_from_mongo(script)
+    # Decode script content and processor_script from Base64
+    script_data = decode_script_from_storage(script_data)
+    return Script(**script_data)
 
 
 @router.post("/scripts", response_model=Script)
@@ -139,7 +147,10 @@ async def create_script_alt(script_input: ScriptCreate, current_user: User = Dep
             category_name = category.get('name', '')
     
     script_obj = Script(**script_input.model_dump(), created_by=current_user.id)
-    doc = prepare_for_mongo(script_obj.model_dump())
+    script_dict = script_obj.model_dump()
+    # Encode script content and processor_script to Base64 before storing
+    script_dict = encode_script_for_storage(script_dict)
+    doc = prepare_for_mongo(script_dict)
     
     await db.scripts.insert_one(doc)
 
@@ -176,6 +187,9 @@ async def update_script(script_id: str, script_update: ScriptUpdate, current_use
     if not update_data:
         raise HTTPException(status_code=400, detail="Нет данных для обновления")
     
+    # Encode script content and processor_script to Base64 before storing
+    update_data = encode_script_for_storage(update_data)
+    
     # Get system and category names for logging
     system_name = ""
     category_name = ""
@@ -206,7 +220,10 @@ async def update_script(script_id: str, script_update: ScriptUpdate, current_use
             "category_name": category_name
         }
     )
-    return Script(**parse_from_mongo(updated_script))
+    script_data = parse_from_mongo(updated_script)
+    # Decode script content and processor_script from Base64
+    script_data = decode_script_from_storage(script_data)
+    return Script(**script_data)
 
 
 @router.delete("/scripts/{script_id}")

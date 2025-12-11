@@ -123,6 +123,8 @@ async def get_or_create_script(
         from datetime import datetime, timezone
         
         script_id = str(uuid.uuid4())
+        from utils.db_utils import encode_script_for_storage
+        
         script = {
             "id": script_id,
             "system_id": system_id,
@@ -137,6 +139,8 @@ async def get_or_create_script(
             "created_at": datetime.now(timezone.utc).isoformat(),
             "created_by": created_by
         }
+        # Encode script content to Base64 before storing
+        script = encode_script_for_storage(script)
         await db.scripts.insert_one(script)
         return script_id
     except Exception as e:
