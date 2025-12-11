@@ -59,7 +59,7 @@ export default function LoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Введите логин"
                 disabled={loading}
-                autoComplete="username"
+                allowAutoComplete={true}
               />
             </div>
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
                 disabled={loading}
-                autoComplete="current-password"
+                allowAutoComplete={true}
               />
             </div>
             
