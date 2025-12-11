@@ -1,7 +1,8 @@
 """Database utility functions for MongoDB serialization"""
 
+import base64
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 
 def prepare_for_mongo(data: dict) -> dict:
@@ -50,3 +51,74 @@ def parse_from_mongo(item: dict) -> dict:
             for value in parsed["run_times"]
         ]
     return parsed
+
+
+def encode_script_content(content: Optional[str]) -> Optional[str]:
+    """Encode script content to Base64 for safe storage
+    
+    Args:
+        content: Script content string to encode
+        
+    Returns:
+        Base64 encoded string, or None if input is None
+    """
+    if content is None:
+        return None
+    return base64.b64encode(content.encode('utf-8')).decode('utf-8')
+
+
+def decode_script_content(encoded_content: Optional[str]) -> Optional[str]:
+    """Decode script content from Base64
+    
+    Args:
+        encoded_content: Base64 encoded string to decode
+        
+    Returns:
+        Decoded string, or None if input is None or empty
+        
+    Raises:
+        ValueError: If the content is not valid Base64
+    """
+    if not encoded_content:
+        return None
+    
+    # Try to decode - if it fails, assume it's already decoded (backward compatibility)
+    try:
+        return base64.b64decode(encoded_content.encode('utf-8')).decode('utf-8')
+    except (ValueError, UnicodeDecodeError):
+        # If decoding fails, assume it's already in plain text (for backward compatibility)
+        return encoded_content
+
+
+def encode_script_for_storage(data: dict) -> dict:
+    """Encode script content and processor_script fields for MongoDB storage
+    
+    Args:
+        data: Dictionary containing script data
+        
+    Returns:
+        Dictionary with content and processor_script Base64 encoded
+    """
+    encoded = data.copy()
+    if 'content' in encoded and encoded['content']:
+        encoded['content'] = encode_script_content(encoded['content'])
+    if 'processor_script' in encoded and encoded['processor_script']:
+        encoded['processor_script'] = encode_script_content(encoded['processor_script'])
+    return encoded
+
+
+def decode_script_from_storage(data: dict) -> dict:
+    """Decode script content and processor_script fields from MongoDB
+    
+    Args:
+        data: Dictionary containing script data from MongoDB
+        
+    Returns:
+        Dictionary with content and processor_script decoded from Base64
+    """
+    decoded = data.copy()
+    if 'content' in decoded:
+        decoded['content'] = decode_script_content(decoded.get('content'))
+    if 'processor_script' in decoded:
+        decoded['processor_script'] = decode_script_content(decoded.get('processor_script'))
+    return decoded

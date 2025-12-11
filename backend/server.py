@@ -15,7 +15,7 @@ import tempfile
 from config.config_init import *
 from models.models_init import *
 from services.services_init import *
-from utils.db_utils import prepare_for_mongo, parse_from_mongo
+from utils.db_utils import prepare_for_mongo, parse_from_mongo, decode_script_from_storage
 from utils.audit_utils import log_audit
 from scheduler.scheduler_utils import parse_datetime_param as _parse_datetime_param, calculate_next_run as _calculate_next_run, normalize_run_times as _normalize_run_times, next_daily_occurrence as _next_daily_occurrence
 from scheduler.scheduler_worker import scheduler_worker
@@ -132,7 +132,10 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 
                 # Get scripts
                 scripts_cursor = db.scripts.find({"id": {"$in": task_obj.script_ids}}, {"_id": 0})
-                scripts = [Script(**parse_from_mongo(s)) for s in await scripts_cursor.to_list(1000)]
+                scripts_data = [parse_from_mongo(s) for s in await scripts_cursor.to_list(1000)]
+                # Decode script content and processor_script from Base64
+                scripts_data = [decode_script_from_storage(s) for s in scripts_data]
+                scripts = [Script(**s) for s in scripts_data]
                 
                 if not scripts:
                     yield f"data: {json.dumps({'type': 'error', 'message': 'Скрипты не найдены для задания'})}\n\n"
@@ -546,7 +549,10 @@ async def execute_script(execute_req: ExecuteRequest, current_user: User = Depen
     if not script_doc:
         raise HTTPException(status_code=404, detail="Скрипт не найден")
     
-    script = Script(**parse_from_mongo(script_doc))
+    script_data = parse_from_mongo(script_doc)
+    # Decode script content and processor_script from Base64
+    script_data = decode_script_from_storage(script_data)
+    script = Script(**script_data)
     
     # Get system for this script
     system_doc = await db.systems.find_one({"id": script.system_id}, {"_id": 0})
