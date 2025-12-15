@@ -267,3 +267,6 @@ async def delete_script(script_id: str, current_user: User = Depends(get_current
     )
     
     return {"message": "Скрипт удален"}
+
+
+
