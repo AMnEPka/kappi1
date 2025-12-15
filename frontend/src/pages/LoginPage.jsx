@@ -40,7 +40,7 @@ export default function LoginPage() {
         <CardHeader className="md3-login-header">
           <div className="md3-login-logo">
             <img
-              src="/logo.png" 
+              src="/logo.svg" 
               alt="OSIB Logo"
               className="md3-login-logo-img"
             />
