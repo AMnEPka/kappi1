@@ -7,14 +7,14 @@ import { SelectNative } from "@/components/ui/select-native";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileCode, Plus, Edit, Trash2, HelpCircle, CheckCircle2, XCircle, Loader2, X } from "lucide-react";
+import { FileCode, Plus, Edit, Trash2, HelpCircle, CheckCircle2, XCircle, Loader2, X, MessageSquare, FileText, History, RotateCcw, Calendar, User, Download  } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useDialog } from "@/hooks/useDialog";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { useAuth } from '@/contexts/AuthContext';
-import { History, RotateCcw } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 export default function ScriptsPage() {
   const { canEditScript, canDeleteScript, canCreateScript } = usePermissions();
@@ -142,12 +142,14 @@ export default function ScriptsPage() {
     }
   };
 
-  const fetchProcessorVersions = async (scriptId) => {
+  const fetchProcessorVersions = async (scriptId, keepDialogOpen = false) => {
     try {
       const response = await api.get(`/api/scripts/${scriptId}/processor-versions`);
       setProcessorVersions(response.data.versions || []);
       setCurrentScriptId(scriptId);
-      setIsVersionsDialogOpen(true);
+      if (!keepDialogOpen) {
+        setIsVersionsDialogOpen(true);
+      }
     } catch (error) {
       toast.error("Ошибка загрузки версий");
     }
@@ -169,15 +171,20 @@ export default function ScriptsPage() {
     try {
       await api.post(`/api/scripts/${scriptId}/processor-versions/rollback?version_number=${versionNumber}`);
       toast.success(`Откат к версии ${versionNumber} выполнен`);
-      setIsVersionsDialogOpen(false);
+      
+      // Обновляем список версий (диалог остается открытым)
+      await fetchProcessorVersions(scriptId, true);
+      
       fetchScripts();
       // Обновляем форму, если редактируем этот скрипт
       if (editingScript && editingScript.id === scriptId) {
         const script = await api.get(`/api/scripts/${scriptId}`);
         const scriptData = script.data;
+        const currentVersionComment = scriptData.processor_script_version?.comment || "";
         setFormData(prev => ({
           ...prev,
-          processor_script: scriptData.processor_script || ""
+          processor_script: scriptData.processor_script || "",
+          processor_script_comment: currentVersionComment
         }));
       }
     } catch (error) {
@@ -348,13 +355,15 @@ export default function ScriptsPage() {
       const scriptData = fullScript.data;
       
       setEditingScript(scriptData);
+      // Получаем комментарий текущей версии, если есть
+      const currentVersionComment = scriptData.processor_script_version?.comment || "";
       setFormData({
         system_id: scriptData.system_id,
         name: scriptData.name,
         description: scriptData.description || "",
         content: scriptData.content,
         processor_script: scriptData.processor_script || "",
-        processor_script_comment: "",
+        processor_script_comment: currentVersionComment,
         create_new_version: false,
         has_reference_files: scriptData.has_reference_files || false,
         test_methodology: scriptData.test_methodology || "",
@@ -1149,78 +1158,72 @@ export default function ScriptsPage() {
 
       {/* Processor Versions Dialog */}
       <Dialog open={isVersionsDialogOpen} onOpenChange={setIsVersionsDialogOpen}>
-        <DialogContent modal={false} className="w-[1600px] h-[700px] max-w-[1600px] max-h-[90vh] rounded-lg p-6 overflow-hidden">
-          <div className="flex flex-col h-full w-full">
+        <DialogContent className="w-[1600px] h-[700px] max-w-[1600px] max-h-[90vh] rounded-lg p-6 overflow-hidden">
+          <ScrollArea className="flex flex-col h-full w-full">
           <DialogHeader className="shrink-0 flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="text-2xl">История версий скрипта-обработчика</DialogTitle>
               <DialogDescription>
                 Просмотр и управление версиями скрипта-обработчика
-              </DialogDescription>
+            </DialogDescription>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsVersionsDialogOpen(false)}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsVersionsDialogOpen(false)}
               className="h-8 w-8"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+          >
+            <X className="h-4 w-4" />
+          </Button>
           </DialogHeader>
             
-            <div className="flex-1 overflow-y-auto mt-4 pr-2">
-              {processorVersions.length === 0 ? (
+          <ScrollArea className="flex-1 mt-4 pr-2">
+        {processorVersions.length === 0 ? (
                 <p className="text-slate-500 text-center py-8">Нет сохраненных версий</p>
-              ) : (
+        ) : (
                 <div className="space-y-4 pb-4">
                   {processorVersions.map((version, index) => (
                     <div key={index} className="border rounded-lg p-4 space-y-2">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
                             <span className="font-semibold">Версия {version.version_number}</span>
                             {index === 0 && (
                               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Текущая</span>
-                            )}
-                          </div>
-                          <p className="text-sm text-slate-600 mt-1">
-                            {version.comment || "Без комментария"}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-1">
-                            Создано: {new Date(version.created_at).toLocaleString('ru-RU')}
-                            {version.created_by && ` • Пользователь: ${version.created_by}`}
-                          </p>
-                        </div>
-                        {isAdmin && index !== 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRollback(currentScriptId, version.version_number)}
-                          >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Откатить
-                          </Button>
                         )}
                       </div>
+                          <p className="text-sm text-slate-600 mt-1">
+                            {version.comment || "Без комментария"}
+                        </p>
+                           <p className="text-xs text-slate-400 mt-1">
+                             Создано: {new Date(version.created_at).toLocaleString('ru-RU')}
+                             {version.created_by_username && ` • Пользователь: ${version.created_by_username}`}
+                           </p>
+                    </div>
+                        {isAdmin && index !== 0 && (
+                      <Button
+                            variant="outline"
+                        size="sm"
+                            onClick={() => handleRollback(currentScriptId, version.version_number)}
+                      >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                        Откатить
+                      </Button>
+                    )}
+                  </div>
                       <div className="mt-2">
                         <Label className="text-xs text-slate-500">Содержимое:</Label>
                         <pre className="mt-1 p-2 bg-slate-50 rounded text-xs font-mono overflow-x-auto max-h-40 overflow-y-auto">
                           {version.content || "(пусто)"}
-                        </pre>
-                      </div>
+                  </pre>
+                </div>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-            
-            <div className="shrink-0 pt-4 border-t flex justify-end">
-              <Button onClick={() => setIsVersionsDialogOpen(false)}>
-                Закрыть
-              </Button>
-            </div>
           </div>
-        </DialogContent>
+        )}
+      </ScrollArea>
+    </ScrollArea>
+  </DialogContent>
       </Dialog>
 
       {/* Confirmation Dialog */}
