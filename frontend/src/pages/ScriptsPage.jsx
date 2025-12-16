@@ -15,6 +15,7 @@ import { useDialog } from "@/hooks/useDialog";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { CodeEditor } from "@/components/ui/code-editor"
 
 export default function ScriptsPage() {
   const { canEditScript, canDeleteScript, canCreateScript } = usePermissions();
@@ -788,12 +789,12 @@ export default function ScriptsPage() {
                         )}
                       </div>
                     </div>
+                    {/* <CodeEditor */}
                     <Textarea
                       value={formData.processor_script}
                       onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
                       placeholder={getPlaceholder()}
                       rows={15}
-                      className="font-mono text-sm"
                     />
                     <div className="mt-2">
                       <Label className="text-sm">
