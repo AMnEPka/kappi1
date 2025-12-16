@@ -113,6 +113,17 @@ class CheckGroupUpdate(BaseModel):
     name: Optional[str] = None
 
 
+class ProcessorScriptVersion(BaseModel):
+    """Модель версии скрипта-обработчика"""
+    model_config = ConfigDict(extra="ignore")
+    
+    content: str  # Содержимое скрипта
+    version_number: int  # Номер версии
+    comment: Optional[str] = None  # Комментарий к версии
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
+
+
 class Script(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -121,7 +132,10 @@ class Script(BaseModel):
     name: str
     description: Optional[str] = None
     content: str  # Команда (короткая, 1-2 строки)
-    processor_script: Optional[str] = None  # Скрипт-обработчик результатов
+    processor_script: Optional[str] = None  # Скрипт-обработчик результатов (для обратной совместимости)
+    # Версионирование processor_script
+    processor_script_version: Optional[ProcessorScriptVersion] = None  # Текущая версия
+    processor_script_versions: List[ProcessorScriptVersion] = Field(default_factory=list)  # История версий
     has_reference_files: bool = False  # Есть ли эталонные файлы
     test_methodology: Optional[str] = None  # Описание методики испытания
     success_criteria: Optional[str] = None  # Критерий успешного прохождения испытания
@@ -137,6 +151,7 @@ class ScriptCreate(BaseModel):
     description: Optional[str] = None
     content: str
     processor_script: Optional[str] = None
+    processor_script_comment: Optional[str] = None  # Комментарий к первой версии
     has_reference_files: bool = False
     test_methodology: Optional[str] = None
     success_criteria: Optional[str] = None
@@ -149,7 +164,9 @@ class ScriptUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
-    processor_script: Optional[str] = None
+    processor_script: Optional[str] = None  # Для обратной совместимости
+    processor_script_comment: Optional[str] = None  # Комментарий к новой версии
+    create_new_version: Optional[bool] = False  # Создать новую версию или обновить текущую
     has_reference_files: Optional[bool] = None
     test_methodology: Optional[str] = None
     success_criteria: Optional[str] = None

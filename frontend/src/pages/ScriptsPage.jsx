@@ -13,10 +13,13 @@ import { api } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useDialog } from "@/hooks/useDialog";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+import { useAuth } from '@/contexts/AuthContext';
+import { History, RotateCcw } from "lucide-react";
 
 export default function ScriptsPage() {
   const { canEditScript, canDeleteScript, canCreateScript } = usePermissions();
   const { dialogState, setDialogState, showConfirm } = useDialog();
+  const { isAdmin } = useAuth();
   const [scripts, setScripts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [systems, setSystems] = useState([]);
@@ -32,6 +35,8 @@ export default function ScriptsPage() {
     description: "",
     content: "",
     processor_script: "",
+    processor_script_comment: "",
+    create_new_version: false,
     has_reference_files: false,
     test_methodology: "",
     success_criteria: "",
@@ -43,6 +48,9 @@ export default function ScriptsPage() {
   const [editingGroup, setEditingGroup] = useState(null);
   const [groupFormData, setGroupFormData] = useState({ name: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [processorVersions, setProcessorVersions] = useState([]);
+  const [isVersionsDialogOpen, setIsVersionsDialogOpen] = useState(false);
+  const [currentScriptId, setCurrentScriptId] = useState(null);
 
   useEffect(() => {
     fetchCategories();
@@ -108,11 +116,19 @@ export default function ScriptsPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const submitData = { ...formData };
+      
+      // При создании новой проверки не отправляем поля версий
+      if (!editingScript) {
+        delete submitData.processor_script_comment;
+        delete submitData.create_new_version;
+      }
+      
       if (editingScript) {
-        await api.put(`/api/scripts/${editingScript.id}`, formData);
+        await api.put(`/api/scripts/${editingScript.id}`, submitData);
         toast.success("Проверка обновлена");
       } else {
-        await api.post(`/api/scripts`, formData);
+        await api.post(`/api/scripts`, submitData);
         toast.success("Проверка создана");
       }
       setIsDialogOpen(false);
@@ -120,6 +136,49 @@ export default function ScriptsPage() {
       fetchScripts();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Ошибка сохранения проверки");
+    }
+  };
+
+  const fetchProcessorVersions = async (scriptId) => {
+    try {
+      const response = await api.get(`/api/scripts/${scriptId}/processor-versions`);
+      setProcessorVersions(response.data.versions || []);
+      setCurrentScriptId(scriptId);
+      setIsVersionsDialogOpen(true);
+    } catch (error) {
+      toast.error("Ошибка загрузки версий");
+    }
+  };
+
+  const handleRollback = async (scriptId, versionNumber) => {
+    const confirmed = await showConfirm(
+      "Откат версии",
+      `Вы уверены, что хотите откатить скрипт-обработчик к версии ${versionNumber}?`,
+      {
+        variant: "default",
+        confirmText: "Откатить",
+        cancelText: "Отмена"
+      }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.post(`/api/scripts/${scriptId}/processor-versions/rollback?version_number=${versionNumber}`);
+      toast.success(`Откат к версии ${versionNumber} выполнен`);
+      setIsVersionsDialogOpen(false);
+      fetchScripts();
+      // Обновляем форму, если редактируем этот скрипт
+      if (editingScript && editingScript.id === scriptId) {
+        const script = await api.get(`/api/scripts/${scriptId}`);
+        const scriptData = script.data;
+        setFormData(prev => ({
+          ...prev,
+          processor_script: scriptData.processor_script || ""
+        }));
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Ошибка отката версии");
     }
   };
 
@@ -152,6 +211,8 @@ export default function ScriptsPage() {
       description: "",
       content: "",
       processor_script: "",
+      processor_script_comment: "",
+      create_new_version: false,
       has_reference_files: false,
       test_methodology: "",
       success_criteria: "",
@@ -249,33 +310,44 @@ export default function ScriptsPage() {
   };
 
   const openEditDialog = async (script) => {
-    setEditingScript(script);
-    setFormData({
-      system_id: script.system_id,
-      name: script.name,
-      description: script.description || "",
-      content: script.content,
-      processor_script: script.processor_script || "",
-      has_reference_files: script.has_reference_files || false,
-      test_methodology: script.test_methodology || "",
-      success_criteria: script.success_criteria || "",
-      order: script.order || 0,
-      group_ids: script.group_ids || []
-    });
-    
-    // Load category and systems for editing
+    // Загружаем полные данные скрипта для получения актуальной версии processor_script
     try {
-      const systemRes = await api.get(`/api/systems/${script.system_id}`);
-      const system = systemRes.data;
-      setFormCategoryId(system.category_id);
+      const fullScript = await api.get(`/api/scripts/${script.id}`);
+      const scriptData = fullScript.data;
       
-      const systemsRes = await api.get(`/api/systems?category_id=${system.category_id}`);
-      setFormSystems(systemsRes.data);
+      setEditingScript(scriptData);
+      setFormData({
+        system_id: scriptData.system_id,
+        name: scriptData.name,
+        description: scriptData.description || "",
+        content: scriptData.content,
+        processor_script: scriptData.processor_script || "",
+        processor_script_comment: "",
+        create_new_version: false,
+        has_reference_files: scriptData.has_reference_files || false,
+        test_methodology: scriptData.test_methodology || "",
+        success_criteria: scriptData.success_criteria || "",
+        order: scriptData.order || 0,
+        group_ids: scriptData.group_ids || []
+      });
+      
+      // Load category and systems for editing
+      try {
+        const systemRes = await api.get(`/api/systems/${scriptData.system_id}`);
+        const system = systemRes.data;
+        setFormCategoryId(system.category_id);
+        
+        const systemsRes = await api.get(`/api/systems?category_id=${system.category_id}`);
+        setFormSystems(systemsRes.data);
+      } catch (error) {
+        console.error("Error loading system info:", error);
+      }
+      
+      setIsDialogOpen(true);
     } catch (error) {
-      console.error("Error loading system info:", error);
+      console.error("Error loading script:", error);
+      toast.error("Ошибка загрузки проверки");
     }
-    
-    setIsDialogOpen(true);
   };
 
   const handleCategoryChangeInForm = async (categoryId) => {
@@ -614,33 +686,70 @@ export default function ScriptsPage() {
                 {/* Правый столбец */}
                 <div className="space-y-4">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <Label>Скрипт-обработчик</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-4 w-4 rounded-full"
-                            >
-                              <HelpCircle className="h-3 w-3 text-gray-500" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            {getTooltipContent()}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Label>Скрипт-обработчик</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-4 w-4 rounded-full"
+                              >
+                                <HelpCircle className="h-3 w-3 text-gray-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              {getTooltipContent()}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      {editingScript && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchProcessorVersions(editingScript.id)}
+                        >
+                          <History className="h-4 w-4 mr-1" />
+                          Версии
+                        </Button>
+                      )}
                     </div>
                     <Textarea
                       value={formData.processor_script}
                       onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
                       placeholder={getPlaceholder()}
-                      rows={10}
+                      rows={15}
                       className="font-mono text-sm"
                     />
+                    <div className="mt-2">
+                      <Label className="text-sm">
+                        Комментарий к версии (опционально)
+                        {editingScript ? " - опишите изменения в этой версии" : " - опишите первую версию скрипта"}
+                      </Label>
+                      <Input
+                        value={formData.processor_script_comment}
+                        onChange={(e) => setFormData({...formData, processor_script_comment: e.target.value})}
+                        placeholder={editingScript ? "Опишите изменения в этой версии" : "Опишите первую версию скрипта"}
+                        className="mt-1"
+                      />
+                    </div>
+                    {editingScript && isAdmin && (
+                      <div className="flex items-center space-x-2 mt-2">
+                        <Checkbox
+                          id="create_new_version"
+                          checked={formData.create_new_version}
+                          onCheckedChange={(checked) => setFormData({...formData, create_new_version: checked})}
+                        />
+                        <Label htmlFor="create_new_version" className="cursor-pointer text-sm">
+                          Создать новую версию (текущая версия будет сохранена в истории)
+                        </Label>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -922,6 +1031,61 @@ export default function ScriptsPage() {
       </div>
         )}
       </div>
+
+      {/* Processor Versions Dialog */}
+      <Dialog open={isVersionsDialogOpen} onOpenChange={setIsVersionsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>История версий скрипта-обработчика</DialogTitle>
+            <DialogDescription>
+              Просмотр и управление версиями скрипта-обработчика
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {processorVersions.length === 0 ? (
+              <p className="text-slate-500 text-center py-8">Нет сохраненных версий</p>
+            ) : (
+              processorVersions.map((version, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">Версия {version.version_number}</span>
+                        {index === 0 && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Текущая</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {version.comment || "Без комментария"}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Создано: {new Date(version.created_at).toLocaleString('ru-RU')}
+                        {version.created_by && ` • Пользователь: ${version.created_by}`}
+                      </p>
+                    </div>
+                    {isAdmin && index !== 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRollback(currentScriptId, version.version_number)}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Откатить
+                      </Button>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    <Label className="text-xs text-slate-500">Содержимое:</Label>
+                    <pre className="mt-1 p-2 bg-slate-50 rounded text-xs font-mono overflow-x-auto max-h-40 overflow-y-auto">
+                      {version.content || "(пусто)"}
+                    </pre>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation Dialog */}
       <ConfirmationDialog

@@ -102,8 +102,30 @@ def encode_script_for_storage(data: dict) -> dict:
     encoded = data.copy()
     if 'content' in encoded and encoded['content']:
         encoded['content'] = encode_script_content(encoded['content'])
+    
+    # Обработка processor_script (для обратной совместимости)
     if 'processor_script' in encoded and encoded['processor_script']:
         encoded['processor_script'] = encode_script_content(encoded['processor_script'])
+    
+    # Обработка версий processor_script
+    if 'processor_script_version' in encoded and encoded['processor_script_version']:
+        version = encoded['processor_script_version']
+        if isinstance(version, dict) and 'content' in version:
+            version = version.copy()
+            version['content'] = encode_script_content(version.get('content'))
+            encoded['processor_script_version'] = version
+    
+    if 'processor_script_versions' in encoded and encoded['processor_script_versions']:
+        versions = []
+        for version in encoded['processor_script_versions']:
+            if isinstance(version, dict) and 'content' in version:
+                version_copy = version.copy()
+                version_copy['content'] = encode_script_content(version_copy.get('content'))
+                versions.append(version_copy)
+            else:
+                versions.append(version)
+        encoded['processor_script_versions'] = versions
+    
     return encoded
 
 
@@ -115,10 +137,121 @@ def decode_script_from_storage(data: dict) -> dict:
         
     Returns:
         Dictionary with content and processor_script decoded from Base64
+        Также обеспечивает обратную совместимость: если есть processor_script_version,
+        то processor_script берется из него
     """
     decoded = data.copy()
     if 'content' in decoded:
         decoded['content'] = decode_script_content(decoded.get('content'))
+    
+    # Обработка версий processor_script
+    if 'processor_script_version' in decoded and decoded['processor_script_version']:
+        version = decoded['processor_script_version']
+        if isinstance(version, dict) and 'content' in version:
+            version = version.copy()
+            version['content'] = decode_script_content(version.get('content'))
+            decoded['processor_script_version'] = version
+            # Для обратной совместимости: устанавливаем processor_script из текущей версии
+            if 'processor_script' not in decoded or not decoded.get('processor_script'):
+                decoded['processor_script'] = version.get('content')
+    
+    if 'processor_script_versions' in decoded and decoded['processor_script_versions']:
+        versions = []
+        for version in decoded['processor_script_versions']:
+            if isinstance(version, dict) and 'content' in version:
+                version_copy = version.copy()
+                version_copy['content'] = decode_script_content(version_copy.get('content'))
+                versions.append(version_copy)
+            else:
+                versions.append(version)
+        decoded['processor_script_versions'] = versions
+    
+    # Обработка processor_script для обратной совместимости (старые скрипты без версий)
     if 'processor_script' in decoded:
         decoded['processor_script'] = decode_script_content(decoded.get('processor_script'))
+    
     return decoded
+
+
+def prepare_processor_script_version_update(
+    script_data: dict,
+    new_content: Optional[str],
+    comment: Optional[str],
+    create_new_version: bool,
+    user_id: str
+) -> dict:
+    """Подготовка обновления версии processor_script
+    
+    Args:
+        script_data: Текущие данные скрипта из БД
+        new_content: Новое содержимое скрипта (если None, версия не меняется)
+        comment: Комментарий к новой версии
+        create_new_version: Создать новую версию или обновить текущую
+        user_id: ID пользователя, создающего версию
+        
+    Returns:
+        Словарь с обновленными данными для сохранения в БД
+    """
+    from datetime import datetime, timezone
+    
+    # Если нового содержимого нет, ничего не меняем
+    if new_content is None:
+        return {}
+    
+    # Декодируем текущие данные для работы
+    decoded_data = decode_script_from_storage(script_data.copy())
+    
+    current_version = decoded_data.get('processor_script_version')
+    versions_history = decoded_data.get('processor_script_versions', [])
+    
+    # Если нет текущей версии, создаем первую
+    if not current_version:
+        new_version = {
+            'content': new_content,
+            'version_number': 1,
+            'comment': comment or 'Первая версия',
+            'created_at': datetime.now(timezone.utc),
+            'created_by': user_id
+        }
+        return {
+            'processor_script_version': new_version,
+            'processor_script_versions': []
+        }
+    
+    # Проверяем, изменилось ли содержимое
+    current_content = current_version.get('content', '')
+    if current_content == new_content:
+        # Содержимое не изменилось, не создаем новую версию
+        return {}
+    
+    # Если нужно создать новую версию
+    if create_new_version:
+        # Сохраняем текущую версию в историю
+        new_history = [current_version.copy()] + versions_history
+        
+        # Создаем новую версию
+        new_version_number = current_version.get('version_number', 0) + 1
+        new_version = {
+            'content': new_content,
+            'version_number': new_version_number,
+            'comment': comment or f'Версия {new_version_number}',
+            'created_at': datetime.now(timezone.utc),
+            'created_by': user_id
+        }
+        
+        return {
+            'processor_script_version': new_version,
+            'processor_script_versions': new_history
+        }
+    else:
+        # Обновляем текущую версию без создания новой
+        updated_version = current_version.copy()
+        updated_version['content'] = new_content
+        if comment:
+            updated_version['comment'] = comment
+        updated_version['created_at'] = datetime.now(timezone.utc)
+        updated_version['created_by'] = user_id
+        
+        return {
+            'processor_script_version': updated_version
+        }
