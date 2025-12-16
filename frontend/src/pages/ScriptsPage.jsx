@@ -7,7 +7,7 @@ import { SelectNative } from "@/components/ui/select-native";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileCode, Plus, Edit, Trash2, HelpCircle, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { FileCode, Plus, Edit, Trash2, HelpCircle, CheckCircle2, XCircle, Loader2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -784,7 +784,7 @@ export default function ScriptsPage() {
                         Комментарий к версии (опционально)
                         {editingScript ? " - опишите изменения в этой версии" : " - опишите первую версию скрипта"}
                       </Label>
-                      <Input
+                      <Textarea
                         value={formData.processor_script_comment}
                         onChange={(e) => setFormData({...formData, processor_script_comment: e.target.value})}
                         placeholder={editingScript ? "Опишите изменения в этой версии" : "Опишите первую версию скрипта"}
@@ -1149,55 +1149,76 @@ export default function ScriptsPage() {
 
       {/* Processor Versions Dialog */}
       <Dialog open={isVersionsDialogOpen} onOpenChange={setIsVersionsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>История версий скрипта-обработчика</DialogTitle>
-            <DialogDescription>
-              Просмотр и управление версиями скрипта-обработчика
-            </DialogDescription>
+        <DialogContent modal={false} className="w-[1600px] h-[700px] max-w-[1600px] max-h-[90vh] rounded-lg p-6 overflow-hidden">
+          <div className="flex flex-col h-full w-full">
+          <DialogHeader className="shrink-0 flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-2xl">История версий скрипта-обработчика</DialogTitle>
+              <DialogDescription>
+                Просмотр и управление версиями скрипта-обработчика
+              </DialogDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsVersionsDialogOpen(false)}
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogHeader>
-          <div className="space-y-4">
-            {processorVersions.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">Нет сохраненных версий</p>
-            ) : (
-              processorVersions.map((version, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">Версия {version.version_number}</span>
-                        {index === 0 && (
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Текущая</span>
+            
+            <div className="flex-1 overflow-y-auto mt-4 pr-2">
+              {processorVersions.length === 0 ? (
+                <p className="text-slate-500 text-center py-8">Нет сохраненных версий</p>
+              ) : (
+                <div className="space-y-4 pb-4">
+                  {processorVersions.map((version, index) => (
+                    <div key={index} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">Версия {version.version_number}</span>
+                            {index === 0 && (
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Текущая</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-600 mt-1">
+                            {version.comment || "Без комментария"}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-1">
+                            Создано: {new Date(version.created_at).toLocaleString('ru-RU')}
+                            {version.created_by && ` • Пользователь: ${version.created_by}`}
+                          </p>
+                        </div>
+                        {isAdmin && index !== 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRollback(currentScriptId, version.version_number)}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Откатить
+                          </Button>
                         )}
                       </div>
-                      <p className="text-sm text-slate-600 mt-1">
-                        {version.comment || "Без комментария"}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Создано: {new Date(version.created_at).toLocaleString('ru-RU')}
-                        {version.created_by && ` • Пользователь: ${version.created_by}`}
-                      </p>
+                      <div className="mt-2">
+                        <Label className="text-xs text-slate-500">Содержимое:</Label>
+                        <pre className="mt-1 p-2 bg-slate-50 rounded text-xs font-mono overflow-x-auto max-h-40 overflow-y-auto">
+                          {version.content || "(пусто)"}
+                        </pre>
+                      </div>
                     </div>
-                    {isAdmin && index !== 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRollback(currentScriptId, version.version_number)}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Откатить
-                      </Button>
-                    )}
-                  </div>
-                  <div className="mt-2">
-                    <Label className="text-xs text-slate-500">Содержимое:</Label>
-                    <pre className="mt-1 p-2 bg-slate-50 rounded text-xs font-mono overflow-x-auto max-h-40 overflow-y-auto">
-                      {version.content || "(пусто)"}
-                    </pre>
-                  </div>
+                  ))}
                 </div>
-              ))
-            )}
+              )}
+            </div>
+            
+            <div className="shrink-0 pt-4 border-t flex justify-end">
+              <Button onClick={() => setIsVersionsDialogOpen(false)}>
+                Закрыть
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
