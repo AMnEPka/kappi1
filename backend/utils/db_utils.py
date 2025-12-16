@@ -229,8 +229,17 @@ def prepare_processor_script_version_update(
         # Сохраняем текущую версию в историю
         new_history = [current_version.copy()] + versions_history
         
-        # Создаем новую версию
-        new_version_number = current_version.get('version_number', 0) + 1
+        # Находим максимальный номер версии из всех версий (текущей + истории)
+        all_version_numbers = []
+        if current_version:
+            all_version_numbers.append(current_version.get('version_number', 0))
+        for hist_version in versions_history:
+            all_version_numbers.append(hist_version.get('version_number', 0))
+        
+        # Создаем новую версию с номером = максимальный + 1
+        max_version_number = max(all_version_numbers) if all_version_numbers else 0
+        new_version_number = max_version_number + 1
+        
         new_version = {
             'content': new_content,
             'version_number': new_version_number,

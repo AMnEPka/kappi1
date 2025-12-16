@@ -41,7 +41,7 @@ async def login(login_data: LoginRequest, request: Request):
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверные имя пользоавтеля или пароль"
+            detail="Неверные имя пользователя или пароль"
         )
     
     user = User(**user_doc)
@@ -60,7 +60,7 @@ async def login(login_data: LoginRequest, request: Request):
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверные имя пользоавтеля или пароль"
+            detail="Неверные имя пользователя или пароль"
         )
     
     if not user.is_active:
