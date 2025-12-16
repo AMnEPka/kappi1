@@ -7,7 +7,7 @@ import { SelectNative } from "@/components/ui/select-native";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileCode, Plus, Edit, Trash2, HelpCircle } from "lucide-react";
+import { FileCode, Plus, Edit, Trash2, HelpCircle, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -51,6 +51,9 @@ export default function ScriptsPage() {
   const [processorVersions, setProcessorVersions] = useState([]);
   const [isVersionsDialogOpen, setIsVersionsDialogOpen] = useState(false);
   const [currentScriptId, setCurrentScriptId] = useState(null);
+  const [isSyntaxCheckDialogOpen, setIsSyntaxCheckDialogOpen] = useState(false);
+  const [syntaxCheckResult, setSyntaxCheckResult] = useState(null);
+  const [isCheckingSyntax, setIsCheckingSyntax] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -179,6 +182,35 @@ export default function ScriptsPage() {
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || "Ошибка отката версии");
+    }
+  };
+
+  const handleSyntaxCheck = async () => {
+    const scriptContent = formData.processor_script;
+    
+    if (!scriptContent || !scriptContent.trim()) {
+      toast.warning("Скрипт-обработчик пуст. Нечего проверять.");
+      return;
+    }
+
+    setIsCheckingSyntax(true);
+    try {
+      const response = await api.post('/api/scripts/validate-syntax', scriptContent, {
+        headers: {
+          'Content-Type': 'text/plain'
+        }
+      });
+      
+      setSyntaxCheckResult(response.data);
+      setIsSyntaxCheckDialogOpen(true);
+    } catch (error) {
+      setSyntaxCheckResult({
+        valid: false,
+        error: error.response?.data?.detail || error.response?.data?.error || "Ошибка при проверке синтаксиса"
+      });
+      setIsSyntaxCheckDialogOpen(true);
+    } finally {
+      setIsCheckingSyntax(false);
     }
   };
 
@@ -707,17 +739,38 @@ export default function ScriptsPage() {
                           </Tooltip>
                         </TooltipProvider>
                       </div>
-                      {editingScript && (
+                      <div className="flex items-center gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => fetchProcessorVersions(editingScript.id)}
+                          onClick={handleSyntaxCheck}
+                          disabled={isCheckingSyntax || !formData.processor_script?.trim()}
                         >
-                          <History className="h-4 w-4 mr-1" />
-                          Версии
+                          {isCheckingSyntax ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Проверка...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Проверить синтаксис
+                            </>
+                          )}
                         </Button>
-                      )}
+                        {editingScript && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchProcessorVersions(editingScript.id)}
+                          >
+                            <History className="h-4 w-4 mr-1" />
+                            Версии
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <Textarea
                       value={formData.processor_script}
@@ -1031,6 +1084,68 @@ export default function ScriptsPage() {
       </div>
         )}
       </div>
+
+      {/* Syntax Check Result Dialog */}
+      <Dialog open={isSyntaxCheckDialogOpen} onOpenChange={setIsSyntaxCheckDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {syntaxCheckResult?.valid ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  Проверка синтаксиса пройдена
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  Обнаружены ошибки синтаксиса
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {syntaxCheckResult?.valid 
+                ? "Скрипт-обработчик синтаксически корректен"
+                : "В скрипте-обработчике обнаружены синтаксические ошибки"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {syntaxCheckResult?.valid ? (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-green-800 font-medium">
+                  {syntaxCheckResult.message || "Синтаксис скрипта корректен"}
+                </p>
+                <p className="text-sm text-green-600 mt-2">
+                  Вы можете сохранить скрипт. Обратите внимание, что проверка не гарантирует корректность логики скрипта или доступность используемых команд.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-800 font-medium mb-2">Ошибка синтаксиса:</p>
+                  <pre className="text-sm text-red-700 font-mono bg-red-100 p-3 rounded overflow-x-auto whitespace-pre-wrap">
+                    {syntaxCheckResult?.error || "Неизвестная ошибка"}
+                  </pre>
+                </div>
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-yellow-800 text-sm">
+                    <strong>Внимание:</strong> Скрипт содержит синтаксические ошибки. 
+                    Вы можете сохранить его, но при выполнении могут возникнуть проблемы. 
+                    Рекомендуется исправить ошибки перед сохранением.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsSyntaxCheckDialogOpen(false)}
+            >
+              Закрыть
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Processor Versions Dialog */}
       <Dialog open={isVersionsDialogOpen} onOpenChange={setIsVersionsDialogOpen}>
