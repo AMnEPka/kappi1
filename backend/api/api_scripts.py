@@ -1,6 +1,6 @@
 """Scripts API endpoints"""
 
-from fastapi import APIRouter, HTTPException, Depends, Query  # pyright: ignore[reportMissingImports]
+from fastapi import APIRouter, HTTPException, Depends, Query, Request  # pyright: ignore[reportMissingImports]
 from typing import Optional
 
 from config.config_init import db
@@ -435,6 +435,75 @@ async def rollback_processor_script_version(
     )
     
     return {"message": f"Откат к версии {version_number} выполнен"}
+
+
+@router.post("/scripts/validate-syntax")
+async def validate_bash_syntax(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """Validate bash syntax of a processor script"""
+    import subprocess
+    import tempfile
+    import os
+    
+    # Получаем содержимое скрипта из body запроса
+    script_content = await request.body()
+    script_content = script_content.decode('utf-8')
+    
+    if not script_content or not script_content.strip():
+        return {
+            "valid": False,
+            "error": "Скрипт пуст"
+        }
+    
+    # Создаем временный файл для проверки
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
+        f.write(script_content)
+        temp_file = f.name
+    
+    try:
+        # Запускаем bash -n для проверки синтаксиса
+        result = subprocess.run(
+            ['bash', '-n', temp_file],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode == 0:
+            return {
+                "valid": True,
+                "message": "Синтаксис скрипта корректен"
+            }
+        else:
+            # Извлекаем сообщение об ошибке
+            error_output = result.stderr.strip() or result.stdout.strip()
+            return {
+                "valid": False,
+                "error": error_output or "Обнаружены синтаксические ошибки"
+            }
+    except subprocess.TimeoutExpired:
+        return {
+            "valid": False,
+            "error": "Превышено время ожидания проверки синтаксиса"
+        }
+    except FileNotFoundError:
+        return {
+            "valid": False,
+            "error": "Bash не найден в системе. Проверка синтаксиса недоступна."
+        }
+    except Exception as e:
+        return {
+            "valid": False,
+            "error": f"Ошибка при проверке синтаксиса: {str(e)}"
+        }
+    finally:
+        # Удаляем временный файл
+        try:
+            os.unlink(temp_file)
+        except:
+            pass
 
 
 
