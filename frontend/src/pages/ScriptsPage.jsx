@@ -16,6 +16,7 @@ import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { CodeEditor } from "@/components/ui/code-editor"
+import { AdvancedCodeEditor } from "@/components/ui/advanced-code-editor"
 
 export default function ScriptsPage() {
   const { canEditScript, canDeleteScript, canCreateScript } = usePermissions();
@@ -789,12 +790,14 @@ export default function ScriptsPage() {
                         )}
                       </div>
                     </div>
-                    {/* <CodeEditor */}
-                    <Textarea
+                    <AdvancedCodeEditor
                       value={formData.processor_script}
                       onChange={(e) => setFormData({...formData, processor_script: e.target.value})}
                       placeholder={getPlaceholder()}
-                      rows={15}
+                      title="Скрипт-обработчик (Bash)"
+                      minHeight={300}
+                      maxHeight={450}
+                      tabSize={2}
                     />
                     <div className="mt-2">
                       <Label className="text-sm">
