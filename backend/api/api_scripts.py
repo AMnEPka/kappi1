@@ -346,15 +346,44 @@ async def get_processor_script_versions(script_id: str, current_user: User = Dep
     script_data = decode_script_from_storage(script_data)
     
     versions = []
-    # Добавляем текущую версию
-    if script_data.get('processor_script_version'):
-        versions.append(script_data['processor_script_version'])
-    # Добавляем историю версий
-    if script_data.get('processor_script_versions'):
-        versions.extend(script_data['processor_script_versions'])
+    current_version = script_data.get('processor_script_version')
+    history_versions = script_data.get('processor_script_versions', [])
     
-    # Сортируем по номеру версии (от новых к старым)
-    versions.sort(key=lambda v: v.get('version_number', 0), reverse=True)
+    # Добавляем текущую версию с пометкой, что это текущая
+    if current_version:
+        current_version_copy = current_version.copy()
+        current_version_copy['is_current'] = True
+        versions.append(current_version_copy)
+    
+    # Добавляем историю версий
+    for version in history_versions:
+        version_copy = version.copy()
+        version_copy['is_current'] = False
+        versions.append(version_copy)
+    
+    # Сортируем: сначала текущая версия (если есть), затем по номеру версии (от новых к старым)
+    versions.sort(key=lambda v: (not v.get('is_current', False), -v.get('version_number', 0)))
+    
+    # Обогащаем версии информацией о пользователях
+    user_ids = set()
+    for version in versions:
+        if version.get('created_by'):
+            user_ids.add(version['created_by'])
+    
+    # Получаем информацию о пользователях
+    users_map = {}
+    if user_ids:
+        users = await db.users.find({"id": {"$in": list(user_ids)}}, {"_id": 0, "id": 1, "username": 1}).to_list(1000)
+        for user in users:
+            users_map[user.get('id')] = user.get('username', 'Неизвестный')
+    
+    # Добавляем username к версиям
+    for version in versions:
+        created_by_id = version.get('created_by')
+        if created_by_id and created_by_id in users_map:
+            version['created_by_username'] = users_map[created_by_id]
+        else:
+            version['created_by_username'] = None
     
     return {"versions": versions}
 
@@ -408,7 +437,8 @@ async def rollback_processor_script_version(
     new_current_version = target_version.copy()
     new_current_version['created_at'] = datetime.now(timezone.utc)
     new_current_version['created_by'] = current_user.id
-    new_current_version['comment'] = f"Откат к версии {version_number}" + (f": {target_version.get('comment', '')}" if target_version.get('comment') else "")
+    # Сохраняем оригинальный комментарий без изменений
+    # Комментарий остается таким, каким его создал пользователь
     
     # Подготавливаем для сохранения
     update_data = {
