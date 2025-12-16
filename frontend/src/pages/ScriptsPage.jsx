@@ -7,7 +7,7 @@ import { SelectNative } from "@/components/ui/select-native";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileCode, Plus, Edit, Trash2, HelpCircle, CheckCircle2, XCircle, Loader2, X, MessageSquare, FileText, History, RotateCcw, Calendar, User, Download  } from "lucide-react";
+import { FileCode, Plus, Edit, Trash2, HelpCircle, CheckCircle2, XCircle, Loader2, X, MessageSquare, FileText, History, RotateCcw, Calendar, User, Download, Hash  } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -125,6 +125,11 @@ export default function ScriptsPage() {
       if (!editingScript) {
         delete submitData.processor_script_comment;
         delete submitData.create_new_version;
+      } else {
+        // При обновлении: если пользователь не админ, по умолчанию создаем новую версию
+        if (!isAdmin && submitData.processor_script !== undefined) {
+          submitData.create_new_version = true;
+        }
       }
       
       if (editingScript) {
@@ -357,6 +362,8 @@ export default function ScriptsPage() {
       setEditingScript(scriptData);
       // Получаем комментарий текущей версии, если есть
       const currentVersionComment = scriptData.processor_script_version?.comment || "";
+      // Для не-админов по умолчанию создаем новую версию
+      const defaultCreateNewVersion = !isAdmin;
       setFormData({
         system_id: scriptData.system_id,
         name: scriptData.name,
@@ -364,7 +371,7 @@ export default function ScriptsPage() {
         content: scriptData.content,
         processor_script: scriptData.processor_script || "",
         processor_script_comment: currentVersionComment,
-        create_new_version: false,
+        create_new_version: defaultCreateNewVersion,
         has_reference_files: scriptData.has_reference_files || false,
         test_methodology: scriptData.test_methodology || "",
         success_criteria: scriptData.success_criteria || "",
@@ -1159,7 +1166,6 @@ export default function ScriptsPage() {
       {/* Processor Versions Dialog */}
       <Dialog open={isVersionsDialogOpen} onOpenChange={setIsVersionsDialogOpen}>
         <DialogContent className="w-[1600px] h-[700px] max-w-[1600px] max-h-[90vh] rounded-lg p-6 overflow-hidden">
-          <ScrollArea className="flex flex-col h-full w-full">
           <DialogHeader className="shrink-0 flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="text-2xl">История версий скрипта-обработчика</DialogTitle>
@@ -1167,60 +1173,176 @@ export default function ScriptsPage() {
                 Просмотр и управление версиями скрипта-обработчика
             </DialogDescription>
             </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsVersionsDialogOpen(false)}
-              className="h-8 w-8"
-          >
-            <X className="h-4 w-4" />
-          </Button>
           </DialogHeader>
+          <ScrollArea className="flex flex-col h-full w-full">
+
             
           <ScrollArea className="flex-1 mt-4 pr-2">
-        {processorVersions.length === 0 ? (
-                <p className="text-slate-500 text-center py-8">Нет сохраненных версий</p>
-        ) : (
-                <div className="space-y-4 pb-4">
-                  {processorVersions.map((version, index) => (
-                    <div key={index} className="border rounded-lg p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                            <span className="font-semibold">Версия {version.version_number}</span>
-                            {index === 0 && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Текущая</span>
-                        )}
-                      </div>
-                          <p className="text-sm text-slate-600 mt-1">
-                            {version.comment || "Без комментария"}
-                        </p>
-                           <p className="text-xs text-slate-400 mt-1">
-                             Создано: {new Date(version.created_at).toLocaleString('ru-RU')}
-                             {version.created_by_username && ` • Пользователь: ${version.created_by_username}`}
-                           </p>
-                    </div>
-                        {isAdmin && index !== 0 && (
-                      <Button
-                            variant="outline"
-                        size="sm"
-                            onClick={() => handleRollback(currentScriptId, version.version_number)}
-                      >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                        Откатить
-                      </Button>
-                    )}
-                  </div>
-                      <div className="mt-2">
-                        <Label className="text-xs text-slate-500">Содержимое:</Label>
-                        <pre className="mt-1 p-2 bg-slate-50 rounded text-xs font-mono overflow-x-auto max-h-40 overflow-y-auto">
-                          {version.content || "(пусто)"}
-                  </pre>
+          {processorVersions.length === 0 ? 
+		  (
+            <div className="h-full flex flex-col items-center justify-center text-center py-16">
+              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                <FileText className="h-8 w-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-700 mb-2">Нет сохраненных версий</h3>
+              <p className="text-slate-500 max-w-md">
+                Здесь будут отображаться все версии скрипта-обработчика после их сохранения
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5 pr-3">
+              {processorVersions.map((version, index) => (
+                <div 
+                  key={index} 
+                  className={`
+                    border rounded-xl p-5 transition-all duration-200 
+                    hover:shadow-md hover:border-slate-300
+                    ${index === 0 
+                      ? 'border-green-200 bg-gradient-to-r from-green-50/30 to-white' 
+                      : 'border-slate-200 bg-white'
+                    }
+                  `}
+                >
+{/* Карточка версии */}
+<div key={index} className="border rounded-xl p-5 transition-all duration-200 hover:shadow-md hover:border-slate-300 bg-white">
+  
+  {/* ВЕРХНИЙ РЯД */}
+  <div className="flex items-center justify-between mb-4">
+    {/* ЛЕВАЯ ЧАСТЬ: версия + бейдж */}
+    <div className="flex items-center gap-3">
+      {/* Иконка версии */}
+      <div className={`
+        flex items-center justify-center h-10 w-10 rounded-lg
+        shadow-sm
+        ${index === 0 
+          ? 'bg-green-100 text-green-700 border border-green-200' 
+          : 'bg-slate-100 text-slate-700 border border-slate-200'
+        }
+      `}>
+        <span className="font-bold text-base">v{version.version_number}</span>
+      </div>
+      
+      {/* Бейдж "Текущая версия" */}
+      {index === 0 && (
+        <span className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full font-medium">
+          Текущая версия
+        </span>
+      )}
+    </div>
+    
+    {/* ПРАВАЯ ЧАСТЬ: кнопка, автор, дата, SHA-1 (справа налево) */}
+    <div className="flex items-center gap-2 h-8">
+      {/* SHA-1 сумма */}
+      {version.content && version.sha1_hash && (
+        <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200" 
+             title={`SHA-1: ${version.sha1_hash}`}>
+          <Hash className="h-4 w-4 text-slate-500" />
+          <span className="text-xs font-mono text-slate-700">
+            {version.sha1_hash}
+          </span>
+        </div>
+      )}
+      
+  {/* Автор */}
+  {version.created_by_username && (
+    <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200 h-full">
+      <User className="h-3.5 w-3.5 text-blue-500" />
+      <span className="text-xs font-medium text-blue-700">
+        {version.created_by_username}
+      </span>
+    </div>
+  )}
+  
+    {/* Дата и время */}
+    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200 h-full">
+      <Calendar className="h-3.5 w-3.5 text-slate-500" />
+      <div className="text-xs text-slate-700 whitespace-nowrap">
+        {new Date(version.created_at).toLocaleDateString('ru-RU', {
+          day: 'numeric',
+          month: 'numeric',
+          year: 'numeric'
+        })}
+        {' '}
+        {new Date(version.created_at).toLocaleTimeString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })}
+      </div>
+    </div>
+
+    {isAdmin && index !== 0 && (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleRollback(currentScriptId, version.version_number)}
+        className="gap-2 border-slate-300 hover:bg-slate-50 hover:border-slate-400 h-full"
+      >
+        <RotateCcw className="h-3.5 w-3.5" />
+        <span className="text-xs">Откатить</span>
+      </Button>
+    )}
+  </div>
+  </div>
+  
+{/* Заголовок комментария */}
+<div className="mb-1">
+  <div className="flex items-center gap-2">
+    <Label className="text-xs font-medium text-slate-700">
+      Комментарий:
+    </Label>
+
+  </div>
+</div>
+
+{/* Текст комментария */}
+<div className="mb-3">
+  <div className="
+    p-2 bg-slate-50 rounded 
+    border border-slate-200
+    text-xs
+    min-h-[32px]
+  ">
+    {version.comment ? (
+      <p className="text-slate-700 whitespace-pre-wrap leading-snug">
+        {version.comment}
+      </p>
+    ) : (
+      <div className="flex items-center justify-center h-[32px]">
+        <span className="text-slate-400 italic text-xs">—</span>
+      </div>
+    )}
+  </div>
+</div>
+
+{/* Содержимое скрипта */}
+<div>
+  <div className="flex items-center justify-between mb-1">
+    <div className="flex items-center gap-2">
+      <Label className="text-xs font-medium text-slate-700">
+        Скрипт:
+      </Label>
+      <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+        {version.content?.length || 0} симв.
+      </span>
+    </div>
+  </div>
+  <pre className="
+    p-2 bg-slate-50 rounded 
+    text-xs font-mono overflow-x-auto 
+    max-h-40 overflow-y-auto
+    border border-slate-200
+    min-h-[32px]
+  ">
+    {version.content || (
+      <span className="text-slate-400 italic">—</span>
+    )}
+  </pre>
+</div>
+</div>
                 </div>
-                    </div>
-                  ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
       </ScrollArea>
     </ScrollArea>
   </DialogContent>
