@@ -204,13 +204,14 @@
      Line Numbers
      ============================================ */
   .ace-line-numbers {
-    flex-shrink: 0;
     padding: 10px 0;
     background: var(--ace-bg-line-numbers);
     border-right: 1px solid var(--ace-border);
     overflow: hidden;
     user-select: none;
     text-align: right;
+    width: 28px !important;
+    min-width: 23px; /* Гарантирует минимальную ширину */
   }
   
   .ace-line-number {
@@ -437,8 +438,8 @@
     
     .ace-line-number {
       font-size: 12px;
-      padding-right: 8px;
-      padding-left: 6px;
+      padding-right: 1px;
+      padding-left: 1px;
     }
     
     .ace-scrollbar-vertical,
