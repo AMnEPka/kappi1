@@ -128,9 +128,19 @@ export default function ScriptsPage() {
         delete submitData.processor_script_comment;
         delete submitData.create_new_version;
       } else {
-        // При обновлении: если пользователь не админ, по умолчанию создаем новую версию
-        if (!isAdmin && submitData.processor_script !== undefined) {
-          submitData.create_new_version = true;
+        // При обновлении: если пользователь не админ и processor_script изменился, создаем новую версию
+        if (!isAdmin) {
+          const originalProcessorScript = editingScript.processor_script || "";
+          const currentProcessorScript = submitData.processor_script || "";
+          // Создаем новую версию только если содержимое действительно изменилось
+          if (originalProcessorScript !== currentProcessorScript) {
+            submitData.create_new_version = true;
+          } else {
+            // Если не изменилось, не отправляем processor_script и связанные поля
+            delete submitData.processor_script;
+            delete submitData.processor_script_comment;
+            delete submitData.create_new_version;
+          }
         }
       }
       
