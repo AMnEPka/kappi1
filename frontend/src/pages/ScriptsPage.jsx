@@ -551,7 +551,7 @@ export default function ScriptsPage() {
                 <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} data-testid="add-script-btn">
                   <Plus className="mr-2 h-4 w-4" /> Добавить проверку
                 </Button>
-              )}            
+              )}         
             </DialogTrigger>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" modal={false}>
             <DialogHeader>
@@ -620,70 +620,70 @@ export default function ScriptsPage() {
                   </div>
 
                   <div>
-  <Label>Добавить проверку в группы</Label>
-  <div className="space-y-2">
-    {checkGroups.length === 0 ? (
-      <p className="text-sm text-slate-400">Нет групп. Создайте группы через кнопку "Группы проверок"</p>
-    ) : (
-      <>
-        <select
-          className="w-full border rounded-md p-2 text-sm"
-          onChange={(e) => {
-            const groupId = e.target.value;
-            if (groupId && !formData.group_ids?.includes(groupId)) {
-              setFormData({
-                ...formData,
-                group_ids: [...(formData.group_ids || []), groupId]
-              });
-            }
-            e.target.value = ""; // Сбрасываем выбор
-          }}
-        >
-          <option value="">Выберите группу...</option>
-          {checkGroups
-            .filter(group => !formData.group_ids?.includes(group.id))
-            .map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))
-          }
-        </select>
-        
-        {/* Выбранные группы в виде тегов */}
-        <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md">
-          {formData.group_ids?.length > 0 ? (
-            formData.group_ids.map(groupId => {
-              const group = checkGroups.find(g => g.id === groupId);
-              return group ? (
-                <div 
-                  key={group.id} 
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                >
-                  {group.name}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        group_ids: formData.group_ids.filter(id => id !== group.id)
-                      });
-                    }}
-                    className="ml-1 text-blue-600 hover:text-blue-800"
-                  >
-                    ×
-                  </button>
-                </div>
-              ) : null;
-            })
-          ) : (
-            <span className="text-slate-400 text-sm">Группы не выбраны</span>
-          )}
-        </div>
-      </>
-    )}
-  </div>
-</div>
+                    <Label>Добавить проверку в группы</Label>
+                    <div className="space-y-2">
+                      {checkGroups.length === 0 ? (
+                        <p className="text-sm text-slate-400">Нет групп. Создайте группы через кнопку "Группы проверок"</p>
+                      ) : (
+                        <>
+                          <select
+                            className="w-full border rounded-md p-2 text-sm"
+                            onChange={(e) => {
+                              const groupId = e.target.value;
+                              if (groupId && !formData.group_ids?.includes(groupId)) {
+                                setFormData({
+                                  ...formData,
+                                  group_ids: [...(formData.group_ids || []), groupId]
+                                });
+                              }
+                              e.target.value = ""; // Сбрасываем выбор
+                            }}
+                          >
+                            <option value="">Выберите группу...</option>
+                            {checkGroups
+                              .filter(group => !formData.group_ids?.includes(group.id))
+                              .map((group) => (
+                                <option key={group.id} value={group.id}>
+                                  {group.name}
+                                </option>
+                              ))
+                            }
+                          </select>
+                          
+                          {/* Выбранные группы в виде тегов */}
+                          <div className="flex flex-wrap gap-2 min-h-[40px] p-2 border rounded-md">
+                            {formData.group_ids?.length > 0 ? (
+                              formData.group_ids.map(groupId => {
+                                const group = checkGroups.find(g => g.id === groupId);
+                                return group ? (
+                                  <div 
+                                    key={group.id} 
+                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                  >
+                                    {group.name}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setFormData({
+                                          ...formData,
+                                          group_ids: formData.group_ids.filter(id => id !== group.id)
+                                        });
+                                      }}
+                                      className="ml-1 text-blue-600 hover:text-blue-800"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ) : null;
+                              })
+                            ) : (
+                              <span className="text-slate-400 text-sm">Группы не выбраны</span>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
 
                   <div>
                     <div className="flex items-center gap-2 mb-2">
