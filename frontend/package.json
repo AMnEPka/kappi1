@@ -59,7 +59,9 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "test": "craco test"
+    "test": "craco test",
+    "test:coverage": "craco test --coverage --watchAll=false",
+    "test:ci": "craco test --coverage --watchAll=false --ci"
   },
   "browserslist": {
     "production": [
@@ -77,12 +79,17 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@craco/craco": "^7.1.0",
     "@eslint/js": "9.23.0",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/user-event": "^14.5.1",
     "autoprefixer": "^10.4.20",
     "eslint": "9.23.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.4",
     "globals": "15.15.0",
+    "identity-obj-proxy": "^3.0.0",
+    "msw": "^2.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17"
   },
