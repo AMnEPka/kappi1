@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request  # pyright: ignore[reportMissingImports]
 from typing import Optional
+import hashlib
 
 from config.config_init import db
 from models.content_models import Script, ScriptCreate, ScriptUpdate
@@ -377,13 +378,21 @@ async def get_processor_script_versions(script_id: str, current_user: User = Dep
         for user in users:
             users_map[user.get('id')] = user.get('username', 'Неизвестный')
     
-    # Добавляем username к версиям
+    # Добавляем username и SHA-1 hash к версиям
     for version in versions:
         created_by_id = version.get('created_by')
         if created_by_id and created_by_id in users_map:
             version['created_by_username'] = users_map[created_by_id]
         else:
             version['created_by_username'] = None
+        
+        # Вычисляем SHA-1 hash содержимого версии
+        content = version.get('content', '')
+        if content:
+            sha1_hash = hashlib.sha1(content.encode('utf-8')).hexdigest()
+            version['sha1_hash'] = sha1_hash
+        else:
+            version['sha1_hash'] = None
     
     return {"versions": versions}
 

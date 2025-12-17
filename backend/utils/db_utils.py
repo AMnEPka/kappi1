@@ -10,6 +10,7 @@ def prepare_for_mongo(data: dict) -> dict:
     
     Converts datetime objects to ISO format strings for storage.
     Handles both individual datetime fields and lists of datetimes.
+    Also handles nested datetimes in processor_script_version and processor_script_versions.
     
     Args:
         data: Dictionary containing data to be stored in MongoDB
@@ -26,6 +27,27 @@ def prepare_for_mongo(data: dict) -> dict:
             value.isoformat() if isinstance(value, datetime) else value
             for value in prepared["run_times"]
         ]
+    
+    # Обработка вложенных datetime в processor_script_version
+    if 'processor_script_version' in prepared and isinstance(prepared['processor_script_version'], dict):
+        version = prepared['processor_script_version'].copy()
+        if 'created_at' in version and isinstance(version['created_at'], datetime):
+            version['created_at'] = version['created_at'].isoformat()
+        prepared['processor_script_version'] = version
+    
+    # Обработка вложенных datetime в processor_script_versions (список версий)
+    if 'processor_script_versions' in prepared and isinstance(prepared['processor_script_versions'], list):
+        versions = []
+        for version in prepared['processor_script_versions']:
+            if isinstance(version, dict):
+                version_copy = version.copy()
+                if 'created_at' in version_copy and isinstance(version_copy['created_at'], datetime):
+                    version_copy['created_at'] = version_copy['created_at'].isoformat()
+                versions.append(version_copy)
+            else:
+                versions.append(version)
+        prepared['processor_script_versions'] = versions
+    
     return prepared
 
 
@@ -34,6 +56,7 @@ def parse_from_mongo(item: dict) -> dict:
     
     Converts ISO format strings back to datetime objects.
     Handles both individual datetime fields and lists of datetimes.
+    Also handles nested datetime strings in processor_script_version and processor_script_versions.
     
     Args:
         item: Dictionary retrieved from MongoDB
@@ -50,6 +73,27 @@ def parse_from_mongo(item: dict) -> dict:
             datetime.fromisoformat(value) if isinstance(value, str) else value
             for value in parsed["run_times"]
         ]
+    
+    # Обработка вложенных datetime строк в processor_script_version
+    if 'processor_script_version' in parsed and isinstance(parsed['processor_script_version'], dict):
+        version = parsed['processor_script_version'].copy()
+        if 'created_at' in version and isinstance(version['created_at'], str):
+            version['created_at'] = datetime.fromisoformat(version['created_at'])
+        parsed['processor_script_version'] = version
+    
+    # Обработка вложенных datetime строк в processor_script_versions (список версий)
+    if 'processor_script_versions' in parsed and isinstance(parsed['processor_script_versions'], list):
+        versions = []
+        for version in parsed['processor_script_versions']:
+            if isinstance(version, dict):
+                version_copy = version.copy()
+                if 'created_at' in version_copy and isinstance(version_copy['created_at'], str):
+                    version_copy['created_at'] = datetime.fromisoformat(version_copy['created_at'])
+                versions.append(version_copy)
+            else:
+                versions.append(version)
+        parsed['processor_script_versions'] = versions
+    
     return parsed
 
 
