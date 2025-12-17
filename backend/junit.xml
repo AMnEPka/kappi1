@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="31" skipped="4" tests="91" time="3.668" timestamp="2025-12-17T16:19:25.182402+03:00" hostname="DESKTOP-ULA77EN"><testcase classname="tests.unit.test_audit_utils.TestAuditLogging" name="test_persist_audit_log" time="0.079"><failure message="assert 0 == 1&#10; +  where 0 = len([])">tests\unit\test_audit_utils.py:30: in test_persist_audit_log
+    assert len(logs) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])</failure></testcase><testcase classname="tests.unit.test_audit_utils.TestAuditLogging" name="test_persist_audit_log_creates_id" time="0.005"><failure message="IndexError: list index out of range">tests\unit\test_audit_utils.py:45: in test_persist_audit_log_creates_id
+    assert logs[0]["id"] is not None
+           ^^^^^^^
+E   IndexError: list index out of range</failure></testcase><testcase classname="tests.unit.test_audit_utils.TestAuditLogging" name="test_persist_audit_log_adds_timestamp" time="0.005"><failure message="IndexError: list index out of range">tests\unit\test_audit_utils.py:58: in test_persist_audit_log_adds_timestamp
+    assert "created_at" in logs[0]
+                           ^^^^^^^
+E   IndexError: list index out of range</failure></testcase><testcase classname="tests.unit.test_audit_utils.TestAuditLogging" name="test_log_audit_basic" time="0.009" /><testcase classname="tests.unit.test_audit_utils.TestAuditLogging" name="test_log_audit_with_details" time="0.007" /><testcase classname="tests.unit.test_audit_utils.TestAuditLogging" name="test_log_audit_without_user" time="0.008" /><testcase classname="tests.unit.test_audit_utils.TestAuditLogging" name="test_audit_log_structure" time="0.006"><failure message="IndexError: list index out of range">tests\unit\test_audit_utils.py:110: in test_audit_log_structure
+    log = logs[0]
+          ^^^^^^^
+E   IndexError: list index out of range</failure></testcase><testcase classname="tests.unit.test_auth_service.TestPasswordHashing" name="test_hash_password_creates_hash" time="0.225" /><testcase classname="tests.unit.test_auth_service.TestPasswordHashing" name="test_verify_password_correct" time="0.390" /><testcase classname="tests.unit.test_auth_service.TestPasswordHashing" name="test_verify_password_incorrect" time="0.390" /><testcase classname="tests.unit.test_auth_service.TestPasswordHashing" name="test_hash_password_different_hashes" time="0.782" /><testcase classname="tests.unit.test_auth_service.TestJWTTokens" name="test_create_access_token" time="0.008" /><testcase classname="tests.unit.test_auth_service.TestJWTTokens" name="test_decode_token_valid" time="0.002" /><testcase classname="tests.unit.test_auth_service.TestJWTTokens" name="test_decode_token_invalid" time="0.002" /><testcase classname="tests.unit.test_auth_service.TestJWTTokens" name="test_token_expiration" time="0.001" /><testcase classname="tests.unit.test_auth_service.TestJWTTokens" name="test_token_custom_expiration" time="0.001" /><testcase classname="tests.unit.test_auth_service.TestPasswordEncryption" name="test_encrypt_password" time="0.002" /><testcase classname="tests.unit.test_auth_service.TestPasswordEncryption" name="test_decrypt_password" time="0.001" /><testcase classname="tests.unit.test_auth_service.TestPasswordEncryption" name="test_encrypt_decrypt_roundtrip" time="0.001" /><testcase classname="tests.unit.test_auth_service.TestGetCurrentUserFromToken" name="test_get_current_user_from_token_valid" time="0.006"><failure message="fastapi.exceptions.HTTPException: 401: Ошибка авторизации">services\services_auth.py:37: in get_current_user_from_token
+    return User(**user_doc)
+           ^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-123', 'usern...2addfc2d9503c68b9c347')}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-123', 'usern...2addfc2d9503c68b9c347')}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+
+During handling of the above exception, another exception occurred:
+tests\unit\test_auth_service.py:188: in test_get_current_user_from_token_valid
+    user = await get_current_user_from_token(token)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+services\services_auth.py:41: in get_current_user_from_token
+    raise HTTPException(
+E   fastapi.exceptions.HTTPException: 401: Ошибка авторизации</failure></testcase><testcase classname="tests.unit.test_auth_service.TestGetCurrentUserFromToken" name="test_get_current_user_from_token_invalid_token" time="0.004" /><testcase classname="tests.unit.test_auth_service.TestGetCurrentUserFromToken" name="test_get_current_user_from_token_user_not_found" time="0.006" /><testcase classname="tests.unit.test_auth_service.TestUserPermissions" name="test_get_user_permissions_admin" time="0.006"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:225: in test_get_user_permissions_admin
+    admin_user = User(
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestUserPermissions" name="test_get_user_permissions_regular_user" time="0.007"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:250: in test_get_user_permissions_regular_user
+    user = User(
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestUserPermissions" name="test_get_user_permissions_no_roles" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:279: in test_get_user_permissions_no_roles
+    user = User(
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestUserPermissions" name="test_has_permission_true" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:294: in test_has_permission_true
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestUserPermissions" name="test_has_permission_false" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:307: in test_has_permission_false
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestUserPermissions" name="test_require_permission_success" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:317: in test_require_permission_success
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestUserPermissions" name="test_require_permission_failure" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:330: in test_require_permission_failure
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestProjectAccess" name="test_can_access_project_admin" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:346: in test_can_access_project_admin
+    admin_user = User(id="admin-1", username="admin", is_admin=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestProjectAccess" name="test_can_access_project_creator" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:356: in test_can_access_project_creator
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestProjectAccess" name="test_can_access_project_shared" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:371: in test_can_access_project_shared
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_auth_service.TestProjectAccess" name="test_can_access_project_denied" time="0.006"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_auth_service.py:386: in test_can_access_project_denied
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_db_utils.TestDateTimeHandling" name="test_prepare_for_mongo_datetime" time="0.002" /><testcase classname="tests.unit.test_db_utils.TestDateTimeHandling" name="test_parse_from_mongo_datetime" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestDateTimeHandling" name="test_prepare_for_mongo_multiple_datetime_fields" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestDateTimeHandling" name="test_prepare_for_mongo_run_times_list" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestDateTimeHandling" name="test_parse_from_mongo_run_times_list" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestBase64Encoding" name="test_encode_script_content" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestBase64Encoding" name="test_decode_script_content" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestBase64Encoding" name="test_encode_decode_roundtrip" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestBase64Encoding" name="test_encode_script_content_none" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestBase64Encoding" name="test_decode_script_content_none" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestBase64Encoding" name="test_decode_script_content_empty" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestBase64Encoding" name="test_decode_script_content_backward_compatibility" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestScriptStorageEncoding" name="test_encode_script_for_storage" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestScriptStorageEncoding" name="test_decode_script_from_storage" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestProcessorScriptVersioning" name="test_prepare_first_version" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestProcessorScriptVersioning" name="test_prepare_new_version" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestProcessorScriptVersioning" name="test_prepare_version_no_change" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestProcessorScriptVersioning" name="test_prepare_version_none_content" time="0.001" /><testcase classname="tests.unit.test_db_utils.TestProcessorScriptVersioning" name="test_prepare_version_update_current" time="0.001" /><testcase classname="tests.unit.test_example" name="test_example_unit_test" time="0.001" /><testcase classname="tests.unit.test_example" name="test_user_builder" time="0.001" /><testcase classname="tests.unit.test_example" name="test_host_builder" time="0.001" /><testcase classname="tests.unit.test_example" name="test_mock_db_fixture" time="0.005" /><testcase classname="tests.unit.test_rbac_service.TestRBACPermissions" name="test_admin_has_all_permissions" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:25: in test_admin_has_all_permissions
+    admin_user = User(id="admin-1", username="admin", is_admin=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestRBACPermissions" name="test_user_with_multiple_roles" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:49: in test_user_with_multiple_roles
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestRBACPermissions" name="test_user_with_no_roles" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:78: in test_user_with_no_roles
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestRBACPermissions" name="test_has_permission_with_multiple_required" time="0.004"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:88: in test_has_permission_with_multiple_required
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestRequirePermission" name="test_require_permission_single_success" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:105: in test_require_permission_single_success
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestRequirePermission" name="test_require_permission_multiple_or_success" time="0.004"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:118: in test_require_permission_multiple_or_success
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestRequirePermission" name="test_require_permission_failure" time="0.004"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:131: in test_require_permission_failure
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestRequirePermission" name="test_require_permission_admin_bypass" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:145: in test_require_permission_admin_bypass
+    admin_user = User(id="admin-1", username="admin", is_admin=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestProjectAccessControl" name="test_admin_access_all_projects" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:164: in test_admin_access_all_projects
+    admin_user = User(id="admin-1", username="admin", is_admin=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'admin-1', 'userna...dmin', 'is_admin': True}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestProjectAccessControl" name="test_creator_access_own_project" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:174: in test_creator_access_own_project
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestProjectAccessControl" name="test_creator_cannot_access_other_project" time="0.004"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:190: in test_creator_cannot_access_other_project
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestProjectAccessControl" name="test_shared_access" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:206: in test_shared_access
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_rbac_service.TestProjectAccessControl" name="test_no_access_to_nonexistent_project" time="0.005"><failure message="pydantic_core._pydantic_core.ValidationError: 2 validation errors for User&#10;full_name&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing&#10;password_hash&#10;  Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]&#10;    For further information visit https://errors.pydantic.dev/2.12/v/missing">tests\unit\test_rbac_service.py:222: in test_no_access_to_nonexistent_project
+    user = User(id="user-1", username="testuser", is_admin=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   pydantic_core._pydantic_core.ValidationError: 2 validation errors for User
+E   full_name
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+E   password_hash
+E     Field required [type=missing, input_value={'id': 'user-1', 'usernam...ser', 'is_admin': False}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing</failure></testcase><testcase classname="tests.unit.test_validators.TestEmailValidation" name="test_valid_email_in_user_create" time="0.001" /><testcase classname="tests.unit.test_validators.TestEmailValidation" name="test_username_required" time="0.001" /><testcase classname="tests.unit.test_validators.TestEmailValidation" name="test_password_required" time="0.001" /><testcase classname="tests.unit.test_validators.TestHostnameValidation" name="test_valid_ipv4_hostname" time="0.001"><skipped type="pytest.skip" message="Model doesn't validate empty hostname - need to fix content_models.py">C:\Users\user\kapibara\kappi1\backend\tests\unit\test_validators.py:48: Model doesn't validate empty hostname - need to fix content_models.py</skipped></testcase><testcase classname="tests.unit.test_validators.TestHostnameValidation" name="test_valid_fqdn_hostname" time="0.001" /><testcase classname="tests.unit.test_validators.TestHostnameValidation" name="test_hostname_required" time="0.001" /><testcase classname="tests.unit.test_validators.TestHostnameValidation" name="test_hostname_empty_string" time="0.001"><failure message="Failed: Expected ValidationError for empty hostname">tests\unit\test_validators.py:104: in test_hostname_empty_string
+    pytest.fail("Expected ValidationError for empty hostname")
+E   Failed: Expected ValidationError for empty hostname</failure></testcase><testcase classname="tests.unit.test_validators.TestPortValidation" name="test_valid_ssh_port" time="0.000"><skipped type="pytest.skip" message="Model doesn't validate port range - need to fix content_models.py">C:\Users\user\kapibara\kappi1\backend\tests\unit\test_validators.py:114: Model doesn't validate port range - need to fix content_models.py</skipped></testcase><testcase classname="tests.unit.test_validators.TestPortValidation" name="test_valid_winrm_port" time="0.001" /><testcase classname="tests.unit.test_validators.TestPortValidation" name="test_valid_custom_port" time="0.001" /><testcase classname="tests.unit.test_validators.TestPortValidation" name="test_port_default_value" time="0.001" /><testcase classname="tests.unit.test_validators.TestPortValidation" name="test_port_minimum_value" time="0.001"><failure message="Failed: Expected ValidationError for port 0">tests\unit\test_validators.py:183: in test_port_minimum_value
+    pytest.fail("Expected ValidationError for port 0")
+E   Failed: Expected ValidationError for port 0</failure></testcase><testcase classname="tests.unit.test_validators.TestPortValidation" name="test_port_maximum_value" time="0.001"><skipped type="pytest.skip" message="Model doesn't validate port range - need to fix content_models.py">C:\Users\user\kapibara\kappi1\backend\tests\unit\test_validators.py:188: Model doesn't validate port range - need to fix content_models.py</skipped></testcase><testcase classname="tests.unit.test_validators.TestPortValidation" name="test_port_negative_value" time="0.000"><skipped type="pytest.skip" message="Model doesn't validate port range - need to fix content_models.py">C:\Users\user\kapibara\kappi1\backend\tests\unit\test_validators.py:206: Model doesn't validate port range - need to fix content_models.py</skipped></testcase><testcase classname="tests.unit.test_validators.TestConnectionTypeValidation" name="test_valid_ssh_connection" time="0.001" /><testcase classname="tests.unit.test_validators.TestConnectionTypeValidation" name="test_valid_winrm_connection" time="0.001" /><testcase classname="tests.unit.test_validators.TestConnectionTypeValidation" name="test_connection_type_default" time="0.001" /><testcase classname="tests.unit.test_validators.TestAuthTypeValidation" name="test_password_auth_type" time="0.001" /><testcase classname="tests.unit.test_validators.TestAuthTypeValidation" name="test_key_auth_type" time="0.001" /><testcase classname="tests.unit.test_validators.TestLoginRequestValidation" name="test_valid_login_request" time="0.001" /><testcase classname="tests.unit.test_validators.TestLoginRequestValidation" name="test_login_username_required" time="0.001" /><testcase classname="tests.unit.test_validators.TestLoginRequestValidation" name="test_login_password_required" time="0.001" /></testsuite></testsuites>

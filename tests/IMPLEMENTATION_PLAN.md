@@ -88,13 +88,13 @@ frontend/
 #### 1.2 Unit Tests для критичных сервисов
 
 **Приоритет 1 (Критично):**
-- [ ] `test_auth_service.py` - JWT, login, password hashing (15+ тестов)
-- [ ] `test_rbac_service.py` - Permissions, roles (12+ тестов)
-- [ ] `test_validators.py` - Email, hostname, port validation (10+ тестов)
+- [x] `test_auth_service.py` - JWT, login, password hashing (**30 тестов** ✅)
+- [x] `test_rbac_service.py` - Permissions, roles (**15 тестов** ✅)
+- [x] `test_validators.py` - Email, hostname, port validation (**30 тестов** ✅)
 
 **Приоритет 2 (Высокий):**
-- [ ] `test_db_utils.py` - Base64 encoding/decoding, datetime handling (8+ тестов)
-- [ ] `test_audit_utils.py` - Audit logging (5+ тестов)
+- [x] `test_db_utils.py` - Base64 encoding/decoding, datetime handling (**20 тестов** ✅)
+- [x] `test_audit_utils.py` - Audit logging (**8 тестов** ✅)
 
 **Целевое покрытие:** 30-40% backend кода
 
