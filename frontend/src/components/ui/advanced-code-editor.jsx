@@ -461,10 +461,6 @@ export const AdvancedCodeEditor = forwardRef(({
       {showHeader && (
         <div className="ace-header">
           <div className="ace-header-left">
-            <Code2 className="ace-header-icon" />
-            <span className="ace-header-title">{title}</span>
-          </div>
-          <div className="ace-header-right">
             <button
               type="button"
               className="ace-header-btn"
@@ -473,19 +469,6 @@ export const AdvancedCodeEditor = forwardRef(({
             >
               {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
-            {isFullscreen && (
-              <button
-                type="button"
-                className="ace-header-btn ace-header-btn-close"
-                onClick={() => {
-                  setIsFullscreen(false);
-                  onFullscreenExit?.();
-                }}
-                title="Закрыть (Esc)"
-              >
-                <X size={16} />
-              </button>
-            )}
           </div>
         </div>
       )}
