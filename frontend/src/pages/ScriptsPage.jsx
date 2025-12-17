@@ -1188,9 +1188,6 @@ export default function ScriptsPage() {
             </DialogDescription>
             </div>
           </DialogHeader>
-          <ScrollArea className="flex flex-col h-full w-full">
-
-            
           <ScrollArea className="flex-1 mt-4 pr-2">
           {processorVersions.length === 0 ? 
 		  (
@@ -1357,9 +1354,8 @@ export default function ScriptsPage() {
               ))}
             </div>
           )}
-      </ScrollArea>
-    </ScrollArea>
-  </DialogContent>
+          </ScrollArea>
+        </DialogContent>
       </Dialog>
 
       {/* Confirmation Dialog */}
