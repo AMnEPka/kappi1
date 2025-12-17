@@ -1,0 +1,490 @@
+/* Advanced Code Editor Styles */
+/* IDE-like code editor with custom scrollbars, line numbers, and fullscreen support */
+
+/* ============================================
+   CSS Variables - Light Theme (Default)
+   ============================================ */
+   .ace-container {
+    --ace-bg: #ffffff;
+    --ace-bg-header: #f8f9fa;
+    --ace-bg-line-numbers: #f1f3f4;
+    --ace-bg-editor: #fafafa;
+    --ace-border: #e0e0e0;
+    --ace-border-focus: #4285f4;
+    --ace-text: #1a1a1a;
+    --ace-text-muted: #5f6368;
+    --ace-text-line-number: #80868b;
+    --ace-scrollbar-track: #f1f3f4;
+    --ace-scrollbar-thumb: #bdc1c6;
+    --ace-scrollbar-thumb-hover: #9aa0a6;
+    --ace-scrollbar-thumb-active: #5f6368;
+    --ace-placeholder: #9aa0a6;
+    
+    /* Syntax highlighting - Light theme */
+    --ace-syntax-comment: #5f6368;
+    --ace-syntax-string: #0d652d;
+    --ace-syntax-variable: #1967d2;
+    --ace-syntax-keyword: #9334e6;
+    --ace-syntax-operator: #d93025;
+    --ace-syntax-number: #0d904f;
+  }
+  
+  /* Dark theme */
+  [data-theme="dark"] .ace-container,
+  .ace-container.ace-dark {
+    --ace-bg: #1e1e1e;
+    --ace-bg-header: #252526;
+    --ace-bg-line-numbers: #1e1e1e;
+    --ace-bg-editor: #1e1e1e;
+    --ace-border: #3c3c3c;
+    --ace-border-focus: #007acc;
+    --ace-text: #d4d4d4;
+    --ace-text-muted: #858585;
+    --ace-text-line-number: #858585;
+    --ace-scrollbar-track: #1e1e1e;
+    --ace-scrollbar-thumb: #424242;
+    --ace-scrollbar-thumb-hover: #4f4f4f;
+    --ace-scrollbar-thumb-active: #5a5a5a;
+    --ace-placeholder: #6b6b6b;
+    
+    /* Syntax highlighting - Dark theme */
+    --ace-syntax-comment: #6a9955;
+    --ace-syntax-string: #ce9178;
+    --ace-syntax-variable: #9cdcfe;
+    --ace-syntax-keyword: #c586c0;
+    --ace-syntax-operator: #d4d4d4;
+    --ace-syntax-number: #b5cea8;
+  }
+  
+  /* ============================================
+     Container
+     ============================================ */
+  .ace-container {
+    display: flex;
+    flex-direction: column;
+    background: var(--ace-bg);
+    border: 1px solid var(--ace-border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: 'Roboto Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .ace-container:hover {
+    border-color: var(--ace-border);
+  }
+  
+  .ace-container.ace-focused {
+    border-color: var(--ace-border-focus);
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
+  }
+  
+  /* ============================================
+     Fullscreen Mode
+     ============================================ */
+  .ace-container.ace-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    max-height: none !important;
+    min-height: 100vh !important;
+    z-index: 9999;
+    border-radius: 0;
+    border: none;
+  }
+  
+  .ace-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9998;
+    backdrop-filter: blur(2px);
+  }
+  
+  /* ============================================
+     Header
+     ============================================ */
+  .ace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--ace-bg-header);
+    border-bottom: 1px solid var(--ace-border);
+    flex-shrink: 0;
+    height: 44px;
+    z-index: 10;
+    user-select: none;
+  }
+  
+  .ace-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .ace-header-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--ace-text-muted);
+  }
+  
+  .ace-header-title {
+    font-family: 'Roboto', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ace-text-muted);
+    letter-spacing: 0.01em;
+  }
+  
+  .ace-header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .ace-header-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--ace-text-muted);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  
+  .ace-header-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--ace-text);
+  }
+  
+  .ace-header-btn:active {
+    background: rgba(0, 0, 0, 0.12);
+  }
+  
+  .ace-header-btn-close:hover {
+    background: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
+  }
+  
+  [data-theme="dark"] .ace-header-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  [data-theme="dark"] .ace-header-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  
+  /* ============================================
+     Editor Wrapper
+     ============================================ */
+  .ace-editor-wrapper {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* ============================================
+     Line Numbers
+     ============================================ */
+  .ace-line-numbers {
+    padding: 10px 0;
+    background: var(--ace-bg-line-numbers);
+    border-right: 1px solid var(--ace-border);
+    overflow: hidden;
+    user-select: none;
+    text-align: right;
+    width: 28px !important;
+    min-width: 23px; /* Гарантирует минимальную ширину */
+  }
+  
+  .ace-line-number {
+    height: 21px;
+    line-height: 21px;
+    padding-right: 12px;
+    padding-left: 8px;
+    color: var(--ace-text-line-number);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* ============================================
+     Content Wrapper
+     ============================================ */
+  .ace-content-wrapper {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--ace-bg-editor);
+  }
+  
+  /* ============================================
+     Syntax Highlight Layer
+     ============================================ */
+  .ace-highlight-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 15px;
+    bottom: 15px;
+    padding: 10px 12px;
+    overflow: hidden;
+    pointer-events: none;
+    white-space: pre;
+  }
+  
+  .ace-highlight-content {
+    min-width: max-content;
+  }
+  
+  .ace-placeholder {
+    color: var(--ace-placeholder);
+    font-style: italic;
+  }
+  
+  /* Syntax highlighting classes */
+  .ace-comment {
+    color: var(--ace-syntax-comment);
+    font-style: italic;
+  }
+  
+  .ace-string {
+    color: var(--ace-syntax-string);
+  }
+  
+  .ace-variable {
+    color: var(--ace-syntax-variable);
+  }
+  
+  .ace-keyword {
+    color: var(--ace-syntax-keyword);
+    font-weight: 600;
+  }
+  
+  .ace-operator {
+    color: var(--ace-syntax-operator);
+  }
+  
+  .ace-number {
+    color: var(--ace-syntax-number);
+  }
+  
+  /* ============================================
+     Textarea
+     ============================================ */
+  .ace-textarea {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 10px 12px;
+    padding-right: 27px; /* Space for scrollbar */
+    padding-bottom: 27px; /* Space for scrollbar */
+    margin: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--ace-text);
+    font-family: inherit;
+    font-size: inherit;
+    line-height: 21px;
+    resize: none;
+    white-space: pre;
+    overflow: auto;
+    tab-size: 4;
+    -moz-tab-size: 4;
+    
+    /* Hide native scrollbars */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .ace-textarea::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Selection styling */
+  .ace-textarea::selection {
+    background: rgba(66, 133, 244, 0.3);
+  }
+  
+  .ace-textarea::-moz-selection {
+    background: rgba(66, 133, 244, 0.3);
+  }
+  
+  /* ============================================
+     Custom Scrollbars
+     ============================================ */
+  .ace-scrollbar-vertical {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 14px;
+    bottom: 15px;
+    background: var(--ace-scrollbar-track);
+    border-left: 1px solid var(--ace-border);
+    z-index: 5;
+    cursor: pointer;
+  }
+  
+  .ace-scrollbar-horizontal {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 15px;
+    height: 14px;
+    background: var(--ace-scrollbar-track);
+    border-top: 1px solid var(--ace-border);
+    z-index: 5;
+    cursor: pointer;
+  }
+  
+  .ace-scrollbar-thumb {
+    position: absolute;
+    background: var(--ace-scrollbar-thumb);
+    border-radius: 6px;
+    transition: background-color 0.15s ease;
+    cursor: grab;
+  }
+  
+  .ace-scrollbar-thumb:hover {
+    background: var(--ace-scrollbar-thumb-hover);
+  }
+  
+  .ace-scrollbar-thumb:active,
+  .ace-scrollbar-active .ace-scrollbar-thumb {
+    background: var(--ace-scrollbar-thumb-active);
+    cursor: grabbing;
+  }
+  
+  /* Vertical scrollbar thumb positioning */
+  .ace-scrollbar-vertical .ace-scrollbar-thumb {
+    left: 2px;
+    right: 2px;
+    min-height: 30px;
+  }
+  
+  /* Horizontal scrollbar thumb positioning */
+  .ace-scrollbar-horizontal .ace-scrollbar-thumb {
+    top: 2px;
+    bottom: 2px;
+    min-width: 50px;
+  }
+  
+  /* Corner when both scrollbars visible */
+  .ace-scrollbar-corner {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 14px;
+    height: 14px;
+    background: var(--ace-scrollbar-track);
+    border-top: 1px solid var(--ace-border);
+    border-left: 1px solid var(--ace-border);
+    z-index: 6;
+  }
+  
+  /* ============================================
+     Scrollbar animations
+     ============================================ */
+  .ace-scrollbar-vertical,
+  .ace-scrollbar-horizontal {
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+  }
+  
+  .ace-container:hover .ace-scrollbar-vertical,
+  .ace-container:hover .ace-scrollbar-horizontal,
+  .ace-container.ace-focused .ace-scrollbar-vertical,
+  .ace-container.ace-focused .ace-scrollbar-horizontal {
+    opacity: 1;
+  }
+  
+  /* ============================================
+     Responsive adjustments
+     ============================================ */
+  @media (max-width: 768px) {
+    .ace-container {
+      font-size: 13px;
+    }
+    
+    .ace-header {
+      padding: 6px 10px;
+      height: 40px;
+    }
+    
+    .ace-header-title {
+      font-size: 12px;
+    }
+    
+    .ace-line-number {
+      font-size: 12px;
+      padding-right: 1px;
+      padding-left: 1px;
+    }
+    
+    .ace-scrollbar-vertical,
+    .ace-scrollbar-corner {
+      width: 12px;
+    }
+    
+    .ace-scrollbar-horizontal,
+    .ace-scrollbar-corner {
+      height: 12px;
+    }
+  }
+  
+  /* ============================================
+     Accessibility
+     ============================================ */
+  @media (prefers-reduced-motion: reduce) {
+    .ace-container,
+    .ace-header-btn,
+    .ace-scrollbar-thumb,
+    .ace-scrollbar-vertical,
+    .ace-scrollbar-horizontal {
+      transition: none;
+    }
+  }
+  
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .ace-container {
+      --ace-border: #000000;
+      --ace-border-focus: #0066cc;
+    }
+    
+    .ace-container.ace-focused {
+      box-shadow: 0 0 0 2px #0066cc;
+    }
+  }
+  
+  /* Focus visible for keyboard navigation */
+  .ace-textarea:focus-visible {
+    outline: none;
+  }
+  
+  .ace-header-btn:focus-visible {
+    outline: 2px solid var(--ace-border-focus);
+    outline-offset: 2px;
+  }
+  
