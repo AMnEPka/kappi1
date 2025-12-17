@@ -46,7 +46,7 @@ export const MainLayout = ({ children }) => {
           <Link to="/" className="md3-app-bar-brand">
             <div className="md3-app-bar-logo">
               <img 
-                src="/logo.png" 
+                src="/logo.svg" 
                 alt="OSIB" 
                 className="md3-app-bar-logo-img"
               />
