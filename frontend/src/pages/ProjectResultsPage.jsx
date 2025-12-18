@@ -21,6 +21,7 @@ import { ChevronLeft, CheckCircle, XCircle, Eye, Download, BarChart3, X } from "
 import { toast } from "sonner";
 import { api } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
 
 export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [searchParams, setSearchParams] = useSearchParams(); // ← Добавьте этот хук
@@ -55,6 +56,41 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     } else {
       navigate('/');
     }
+  };
+
+  const getErrorInfo = (execution) => {
+    if (!execution || execution.check_status !== 'Ошибка') return null;
+    
+    // First, try to use error_code and error_description from backend
+    if (execution.error_code && execution.error_description) {
+      // Backend already provided error description, but we need to parse it
+      // Format: "Категория: Ошибка - Описание"
+      const parts = execution.error_description.split(': ');
+      if (parts.length >= 2) {
+        const category = parts[0];
+        const rest = parts.slice(1).join(': ');
+        const errorParts = rest.split(' - ');
+        return {
+          category: category,
+          error: errorParts[0] || '',
+          description: errorParts[1] || rest
+        };
+      }
+      // Fallback: use error_description as-is
+      return {
+        category: 'Ошибка',
+        error: execution.error_description,
+        description: execution.error_description
+      };
+    }
+    
+    // Fallback: check output for error code (for backward compatibility)
+    const errorCode = extractErrorCode(execution.output);
+    if (errorCode) {
+      return getErrorDescription(errorCode);
+    }
+    
+    return null;
   };
 
   const getComparisonSessions = () => {
@@ -204,6 +240,16 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   // Get badge by check status with colors
   const getCheckStatusBadge = (execution) => {
     const status = execution.check_status;
+    
+    // If error occurred and we have error info, show it in badge
+    const errorInfo = getErrorInfo(execution);
+    if (errorInfo && status === 'Ошибка') {
+      return (
+        <Badge className="bg-red-500 hover:bg-red-600">
+          {errorInfo.error} ({errorInfo.category})
+        </Badge>
+      );
+    }
     
     // Check explicit statuses first before fallback
     if (status === 'Пройдена') {
@@ -544,42 +590,85 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
 
       {/* Execution Details Dialog */}
       <Dialog open={!!selectedExecution} onOpenChange={() => setSelectedExecution(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {selectedExecution?.script_name}
-            </DialogTitle>
-            <DialogDescription>
-              Выполнено: {formatDate(selectedExecution?.executed_at)}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-bold mb-2">Статус:</h3>
-              {selectedExecution && getCheckStatusBadge(selectedExecution)}
-            </div>
-
-            {selectedExecution?.output && (
-              <div>
-                <h3 className="font-bold mb-2">Вывод:</h3>
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                  {selectedExecution.output}
-                </pre>
-              </div>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {selectedExecution?.script_name}
+          </DialogTitle>
+          <DialogDescription>
+            Выполнено: {formatDate(selectedExecution?.executed_at)}
+            {selectedExecution?.host_id && (
+              <span> • Хост: {getHostName(selectedExecution.host_id)}</span>
             )}
+          </DialogDescription>
+        </DialogHeader>
 
-            {selectedExecution?.error && (
-              <div>
-                <h3 className="font-bold mb-2 text-red-600">Ошибка:</h3>
-                <pre className="bg-red-50 text-red-900 p-4 rounded-lg overflow-x-auto text-sm border border-red-200">
-                  {selectedExecution.error}
-                </pre>
-              </div>
-            )}
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-bold mb-2">Статус:</h3>
+            {selectedExecution && getCheckStatusBadge(selectedExecution)}
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* Блок с информацией об ошибке */}
+          {selectedExecution && getErrorInfo(selectedExecution) && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h3 className="font-bold mb-2 text-red-700">Описание ошибки:</h3>
+              <div className="space-y-2">
+                {selectedExecution.error_code && (
+                  <div>
+                    <span className="font-medium">Код ошибки: </span>
+                    <span className="font-mono bg-red-100 px-2 py-1 rounded">
+                      {selectedExecution.error_code}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span className="font-medium">Категория: </span>
+                  <span>{getErrorInfo(selectedExecution).category}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Ошибка: </span>
+                  <span>{getErrorInfo(selectedExecution).error}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Описание: </span>
+                  <span>{getErrorInfo(selectedExecution).description}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedExecution?.output && (
+            <div>
+              <h3 className="font-bold mb-2">Вывод команды:</h3>
+              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
+                {selectedExecution.output}
+              </pre>
+            </div>
+          )}
+
+          {/* Существующий блок error */}
+          {selectedExecution?.error && (
+            <div>
+              <h3 className="font-bold mb-2 text-red-600">Ошибка выполнения:</h3>
+              <pre className="bg-red-50 text-red-900 p-4 rounded-lg overflow-x-auto text-sm border border-red-200">
+                {selectedExecution.error}
+              </pre>
+            </div>
+          )}
+
+          {/* Блок результата проверки */}
+          {selectedExecution?.check_result && (
+            <div>
+              <h3 className="font-bold mb-2">Результат проверки:</h3>
+              <pre className="bg-blue-50 text-blue-900 p-4 rounded-lg overflow-x-auto text-sm border border-blue-200">
+                {selectedExecution.check_result}
+              </pre>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }

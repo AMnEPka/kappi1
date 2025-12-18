@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
+import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
 
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
@@ -284,12 +285,24 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const getLogMessage = (log) => {
     switch (log.type) {
       case 'status':
-        // Если статус завершен, показываем исходное сообщение
         return log.message;
       case 'info':
         return log.message;
       case 'error':
+        // Попробуем извлечь информацию об ошибке
+        const errorCode = extractErrorCode(log.message);
+        if (errorCode && ERROR_CODES[errorCode]) {
+          const errorInfo = getErrorDescription(errorCode);
+          return `${log.message}\n  → ${errorInfo.category}: ${errorInfo.error} (${errorInfo.description})`;
+        }
         return log.message;
+      case 'task_error':
+        const taskErrorCode = extractErrorCode(log.error);
+        if (taskErrorCode && ERROR_CODES[taskErrorCode]) {
+          const taskErrorInfo = getErrorDescription(taskErrorCode);
+          return `Ошибка на хосте ${log.host_name}: ${log.error}\n  → ${taskErrorInfo.category}: ${taskErrorInfo.error}`;
+        }
+        return `Ошибка на хосте ${log.host_name}: ${log.error}`;      
       case 'task_start':
         return `\nХост ${log.host_name}`;
       case 'check_network':
@@ -302,8 +315,6 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         return `Проверки проведены ${log.completed}/${log.total}`;
       case 'task_complete':
         return 'Проверки завершены';
-      case 'task_error':
-        return `Ошибка на хосте ${log.host_name}: ${log.error}`;
       case 'complete':
         const totalHosts = log.total;
         const successfulHosts = log.successful_hosts || log.completed;
