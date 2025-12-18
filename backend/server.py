@@ -48,6 +48,7 @@ async def get_permissions_list():
 @api_router.get("/projects/{project_id}/execute")
 async def execute_project(project_id: str, token: Optional[str] = None, skip_audit_log: bool = False):
     """Execute project with real-time updates via Server-Sent Events (requires projects_execute permission and access to project)"""
+    from utils.error_codes import get_error_code_for_check_type, get_error_description
     
     # Get current user from token parameter (for SSE which doesn't support headers)
     if not token:
@@ -159,6 +160,10 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 
                 if not network_ok:
                     # Mark all scripts as failed with network error
+                    error_code = get_error_code_for_check_type('network')
+                    error_info = get_error_description(error_code) if error_code else None
+                    error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}" if error_info else None
+                    
                     for script in scripts:
                         execution = Execution(
                             project_id=project_id,
@@ -172,6 +177,8 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                             output="",
                             error=network_msg,
                             check_status="Ошибка",
+                            error_code=error_code,
+                            error_description=error_description,
                             executed_by=user_id
                         )
                         exec_doc = prepare_for_mongo(execution.model_dump())
@@ -193,6 +200,10 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                     
                     if not login_ok:
                         # Mark all scripts as failed with login error
+                        error_code = get_error_code_for_check_type('login')
+                        error_info = get_error_description(error_code) if error_code else None
+                        error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}" if error_info else None
+                        
                         for script in scripts:
                             execution = Execution(
                                 project_id=project_id,
@@ -206,7 +217,9 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                                 output="",
                                 error=login_msg,
                                 check_status="Ошибка",
-                            executed_by=user_id
+                                error_code=error_code,
+                                error_description=error_description,
+                                executed_by=user_id
                             )
                             exec_doc = prepare_for_mongo(execution.model_dump())
                             await db.executions.insert_one(exec_doc)
@@ -229,6 +242,10 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                     
                     if not login_ok:
                         # Mark all scripts as failed with login error
+                        error_code = get_error_code_for_check_type('login')
+                        error_info = get_error_description(error_code) if error_code else None
+                        error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}" if error_info else None
+                        
                         for script in scripts:
                             execution = Execution(
                                 project_id=project_id,
@@ -242,7 +259,9 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                                 output="",
                                 error=login_msg,
                                 check_status="Ошибка",
-                            executed_by=user_id
+                                error_code=error_code,
+                                error_description=error_description,
+                                executed_by=user_id
                             )
                             exec_doc = prepare_for_mongo(execution.model_dump())
                             await db.executions.insert_one(exec_doc)
@@ -260,6 +279,11 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 
                 if not sudo_ok:
                     # Mark all scripts as failed with sudo error
+                    check_type = 'admin' if host.connection_type == 'winrm' else 'sudo'
+                    error_code = get_error_code_for_check_type(check_type)
+                    error_info = get_error_description(error_code) if error_code else None
+                    error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}" if error_info else None
+                    
                     for script in scripts:
                         execution = Execution(
                             project_id=project_id,
@@ -273,6 +297,8 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                             output="",
                             error=sudo_msg,
                             check_status="Ошибка",
+                            error_code=error_code,
+                            error_description=error_description,
                             executed_by=user_id
                         )
                         exec_doc = prepare_for_mongo(execution.model_dump())

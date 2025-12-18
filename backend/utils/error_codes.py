@@ -151,3 +151,22 @@ def extract_error_code_from_output(output: str) -> Optional[int]:
     
     return None
 
+
+def get_error_code_for_check_type(check_type: str) -> Optional[int]:
+    """
+    Get error code for pre-execution check types
+    
+    Args:
+        check_type: Type of check ('network', 'login', 'sudo', 'admin')
+        
+    Returns:
+        Error code if known, None otherwise
+    """
+    error_code_map = {
+        'network': 1001,  # Нет сетевого доступа
+        'login': 1002,    # Неверные учётные данные
+        'sudo': 1003,     # Недостаточно прав (sudo)
+        'admin': 1003,    # Недостаточно прав (admin access on Windows)
+    }
+    return error_code_map.get(check_type.lower())
+

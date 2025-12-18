@@ -155,6 +155,23 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
           
           // Add log entry - but replace previous progress if new progress comes
           setLogs(prev => {
+            // Skip task_error if we already showed check_network/check_login/check_sudo error for this host
+            if (data.type === 'task_error') {
+              // Check if there was a check error for this host recently
+              const hasCheckError = prev.some(log => 
+                log.host_name === data.host_name &&
+                (
+                  (log.type === 'check_network' && !log.success) ||
+                  (log.type === 'check_login' && !log.success) ||
+                  (log.type === 'check_sudo' && !log.success)
+                )
+              );
+              if (hasCheckError) {
+                // Skip this task_error as it's a duplicate of the check error
+                return prev;
+              }
+            }
+            
             if (data.type === 'script_progress') {
               // Replace last progress entry if it exists
               const lastIndex = prev.length - 1;
