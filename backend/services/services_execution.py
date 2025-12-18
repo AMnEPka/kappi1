@@ -12,6 +12,7 @@ import logging
 
 from config.config_init import logger, decrypt_password, db
 from models.models_init import Host, ExecutionResult
+from utils.error_codes import get_error_description, extract_error_code_from_output
 
 
 def _check_network_access(host: Host) -> Tuple[bool, str]:
@@ -296,30 +297,51 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         processor_result = type('obj', (object,), {
             'output': result.stdout,
             'error': result.stderr if result.returncode != 0 else None,
-            'success': result.returncode == 0
+            'success': result.returncode == 0,
+            'returncode': result.returncode
         })()
+        
+        # Extract error code from exit code or output
+        error_code = None
+        error_description = None
+        
+        # First, check if returncode is an error code (>= 1000, as per error codes table)
+        if processor_result.returncode >= 1000:
+            error_code = processor_result.returncode
+            error_info = get_error_description(error_code)
+            error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+        else:
+            # Try to extract from output
+            error_code = extract_error_code_from_output(processor_result.output)
+            if error_code:
+                error_info = get_error_description(error_code)
+                error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
         
         # Parse processor output to determine check result
         output = processor_result.output.strip()
         check_status = None
         
-        # Look for status keywords
-        for line in output.split('\n'):
-            line_stripped = line.strip()
-            line_lower = line_stripped.lower()
-            
-            if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
-                check_status = 'Пройдена'
-                break
-            elif 'не пройдена' in line_lower:
-                check_status = 'Не пройдена'
-                break
-            elif 'оператор' in line_lower:
-                check_status = 'Оператор'
-                break            
-            else:
-                check_status = 'Ошибка'
-                break
+        # If we have an error code, set status to 'Ошибка'
+        if error_code:
+            check_status = 'Ошибка'
+        else:
+            # Look for status keywords
+            for line in output.split('\n'):
+                line_stripped = line.strip()
+                line_lower = line_stripped.lower()
+                
+                if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
+                    check_status = 'Пройдена'
+                    break
+                elif 'не пройдена' in line_lower:
+                    check_status = 'Не пройдена'
+                    break
+                elif 'оператор' in line_lower:
+                    check_status = 'Оператор'
+                    break            
+                else:
+                    check_status = 'Ошибка'
+                    break
 
         
         # Build result message - only command output and final status
@@ -331,7 +353,9 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             success=(check_status == 'Пройдена'),
             output=result_output,
             error=processor_result.error if processor_result.error else None,
-            check_status=check_status
+            check_status=check_status,
+            error_code=error_code,
+            error_description=error_description
         )
         
     except Exception as e:

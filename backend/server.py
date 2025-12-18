@@ -319,6 +319,8 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                             output=result.output,
                             error=result.error,
                             check_status=result.check_status,
+                            error_code=result.error_code,
+                            error_description=result.error_description,
                             executed_by=user_id
                         )
                         
@@ -584,6 +586,8 @@ async def execute_script(execute_req: ExecuteRequest, current_user: User = Depen
             output=result.output,
             error=result.error,
             check_status=result.check_status,
+            error_code=result.error_code,
+            error_description=result.error_description,
             executed_by=current_user.id
         )
         
@@ -728,6 +732,13 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
         }
         result = result_map.get(execution.check_status, execution.check_status or "Не определён")
         
+        # Add error description to comments if error occurred
+        comments = ""
+        if execution.error_code and execution.error_description:
+            comments = f"Код ошибки: {execution.error_code}. {execution.error_description}"
+        elif execution.error:
+            comments = execution.error
+        
         # Level of criticality column - host and username info
         host_info = ""
         if host:
@@ -743,7 +754,7 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
             test_methodology,  # Описание методики
             success_criteria,  # Критерий успешного прохождения
             result,  # Результат
-            "",  # Комментарии (пусто)
+            comments,  # Комментарии (с описанием ошибки, если есть)
             host_info  # Уровень критичности
         ]
         
