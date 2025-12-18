@@ -31,7 +31,9 @@ from config.config_security import ( # pyright: ignore[reportMissingImports]
 
 from config.config_database import (
     client,
-    db
+    db,
+    ensure_indexes,
+    check_db_health
 )
 
 __all__ = [
@@ -58,7 +60,9 @@ __all__ = [
     "encrypt_password",
     "decrypt_password",
 
-    #DB
+    # DB
     "db",
-    "client"
+    "client",
+    "ensure_indexes",
+    "check_db_health"
 ]
