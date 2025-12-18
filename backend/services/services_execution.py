@@ -19,11 +19,11 @@ def _check_network_access(host: Host) -> Tuple[bool, str]:
     """Check if host is reachable"""
     try:
         socket.create_connection((host.hostname, host.port), timeout=5)
-        return True, "Network access OK"
+        return True, "Сетевой доступ получен"
     except socket.timeout:
-        return False, f"Connection timeout to {host.hostname}:{host.port}"
+        return False, "Нет сетевого доступа: Недоступен сервер или порт"
     except socket.error as e:
-        return False, f"Network error: {str(e)}"
+        return False, f"Нет сетевого доступа: {str(e)}"
 
 
 def _check_ssh_login(host: Host) -> Tuple[bool, str]:
@@ -53,7 +53,7 @@ def _check_ssh_login(host: Host) -> Tuple[bool, str]:
         ssh.close()
         return True, "SSH login OK"
     except Exception as e:
-        return False, f"SSH login failed: {str(e)}"
+        return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
 
 
 def _check_ssh_login_and_sudo(host: Host) -> Tuple[bool, str, bool, str]:
@@ -103,9 +103,9 @@ def _check_sudo_access_linux(host: Host) -> Tuple[bool, str]:
         if exit_code == 0:
             return True, "Sudo access OK (no password required)"
         else:
-            return False, "Sudo access requires password"
+            return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
     except Exception as e:
-        return False, f"Sudo check failed: {str(e)}"
+        return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
 
 
 def _check_admin_access(host: Host) -> Tuple[bool, str]:
@@ -120,9 +120,9 @@ def _check_admin_access(host: Host) -> Tuple[bool, str]:
         if r.status_code == 0:
             return True, "Admin access OK"
         else:
-            return False, "Admin access check failed"
+            return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
     except Exception as e:
-        return False, f"Admin access check failed: {str(e)}"
+        return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
 
 
 def _check_winrm_login(host: Host) -> Tuple[bool, str]:
@@ -136,9 +136,9 @@ def _check_winrm_login(host: Host) -> Tuple[bool, str]:
         if r.status_code == 0:
             return True, "WinRM login OK"
         else:
-            return False, "WinRM login failed"
+            return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
     except Exception as e:
-        return False, f"WinRM login failed: {str(e)}"
+        return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
 
 
 def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:

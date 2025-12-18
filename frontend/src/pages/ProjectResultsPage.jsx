@@ -242,14 +242,14 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     const status = execution.check_status;
     
     // If error occurred and we have error info, show it in badge
-    const errorInfo = getErrorInfo(execution);
-    if (errorInfo && status === 'Ошибка') {
-      return (
-        <Badge className="bg-red-500 hover:bg-red-600">
-          {errorInfo.error} ({errorInfo.category})
-        </Badge>
-      );
-    }
+    // const errorInfo = getErrorInfo(execution);
+    // if (errorInfo && status === 'Ошибка') {
+    //   return (
+    //     <Badge className="bg-red-500 hover:bg-red-600">
+    //       {errorInfo.error} ({errorInfo.category})
+    //     </Badge>
+    //   );
+    // }
     
     // Check explicit statuses first before fallback
     if (status === 'Пройдена') {
@@ -258,8 +258,6 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
       return <Badge className="bg-yellow-500 hover:bg-yellow-600">Не пройдена</Badge>;
     } else if (status === 'Оператор') {
       return <Badge className="bg-blue-500 hover:bg-blue-600">Оператор</Badge>;
-    } else if (status === 'Ошибка') {
-      return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
     } else {
       // Fallback for undefined status
       return <Badge className="bg-red-500 hover:bg-red-600">Ошибка</Badge>;
@@ -648,14 +646,14 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
           )}
 
           {/* Существующий блок error */}
-          {selectedExecution?.error && (
+          {/* {selectedExecution?.error && (
             <div>
               <h3 className="font-bold mb-2 text-red-600">Ошибка выполнения:</h3>
               <pre className="bg-red-50 text-red-900 p-4 rounded-lg overflow-x-auto text-sm border border-red-200">
                 {selectedExecution.error}
               </pre>
             </div>
-          )}
+          )} */}
 
           {/* Блок результата проверки */}
           {selectedExecution?.check_result && (
