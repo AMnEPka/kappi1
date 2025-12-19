@@ -96,4 +96,9 @@ async def check_db_health() -> dict:
         await db.command("ping")
         return {"status": "healthy", "message": "MongoDB is responsive"}
     except Exception as e:
-        return {"status": "unhealthy", "message": str(e)}
+        # Log detailed error server-side, but do not expose internal details to clients
+        logger.exception("MongoDB health check failed")
+        return {
+            "status": "unhealthy",
+            "message": "MongoDB is not reachable"
+        }
