@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -13,11 +13,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { api } from '../config/api';
 import { useDialog } from "@/hooks/useDialog";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+import { useApiLoader } from "@/hooks/useApiLoader";
+
+const INITIAL_FORM_DATA = {
+  username: '',
+  full_name: '',
+  password: '',
+  is_admin: false
+};
 
 export default function UsersPage() {
-  const [users, setUsers] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rolesDialogOpen, setRolesDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
@@ -27,45 +32,21 @@ export default function UsersPage() {
   const { hasPermission } = useAuth();
   const { dialogState, setDialogState, showConfirm } = useDialog();
 
-  const [formData, setFormData] = useState({
-    username: '',
-    full_name: '',
-    password: '',
-    is_admin: false
-  });
-
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [newPassword, setNewPassword] = useState('');
 
-  useEffect(() => {
-    if (hasPermission('users_manage')) {
-      fetchUsers();
-      fetchRoles();
-    }
-  }, []);
+  // Оптимизированная загрузка данных с AbortController
+  const canManage = hasPermission('users_manage');
+  const { data, loading, refetch } = useApiLoader([
+    { key: 'users', url: '/api/users', enabled: canManage },
+    { key: 'roles', url: '/api/roles', enabled: canManage }
+  ], [canManage]);
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/api/users`);
-      setUsers(response.data);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      toast.error("Ошибка загрузки пользователей");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const users = data.users || [];
+  const roles = data.roles || [];
 
-  const fetchRoles = async () => {
-    try {
-      const response = await api.get(`/api/roles`);
-      setRoles(response.data);
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-    }
-  };
-
-  const fetchUserRoles = async (userId) => {
+  // Мемоизированные handlers
+  const fetchUserRoles = useCallback(async (userId) => {
     try {
       const response = await api.get(`/api/users/${userId}/roles`);
       return response.data.map(r => r.id);
@@ -73,14 +54,13 @@ export default function UsersPage() {
       console.error('Error fetching user roles:', error);
       return [];
     }
-  };
+  }, []);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
 
     try {
       if (editingUser) {
-        // Update user
         const updateData = {
           full_name: formData.full_name,
           is_admin: formData.is_admin,
@@ -89,21 +69,21 @@ export default function UsersPage() {
         await api.put(`/api/users/${editingUser.id}`, updateData);
         toast.success("Пользователь обновлен");
       } else {
-        // Create user
         await api.post(`/api/users`, formData);
         toast.success("Пользователь создан");
       }
 
       setDialogOpen(false);
-      resetForm();
-      fetchUsers();
+      setEditingUser(null);
+      setFormData(INITIAL_FORM_DATA);
+      refetch();
     } catch (error) {
       console.error('Error saving user:', error);
       toast.error(error.response?.data?.detail || "Ошибка сохранения пользователя");
     }
-  };
+  }, [editingUser, formData, refetch]);
 
-  const handleDelete = async (userId) => {
+  const handleDelete = useCallback(async (userId) => {
     const confirmed = await showConfirm(
       "Удаление пользователя",
       "Вы уверены, что хотите удалить этого пользователя? Его данные будут переназначены на администратора.",
@@ -119,14 +99,14 @@ export default function UsersPage() {
     try {
       await api.delete(`/api/users/${userId}`);
       toast.success("Пользователь удален");
-      fetchUsers();
+      refetch();
     } catch (error) {
       console.error('Error deleting user:', error);
       toast.error(error.response?.data?.detail || "Не удалось удалить пользователя");
     }
-  };
+  }, [showConfirm, refetch]);
 
-  const handleResetPassword = async () => {
+  const handleResetPassword = useCallback(async () => {
     if (!newPassword) {
       toast.error("Введите новый пароль");
       return;
@@ -143,28 +123,28 @@ export default function UsersPage() {
       console.error('Error resetting password:', error);
       toast.error("Не удалось изменить пароль");
     }
-  };
+  }, [newPassword, selectedUserId]);
 
-  const openRolesDialog = async (user) => {
+  const openRolesDialog = useCallback(async (user) => {
     setSelectedUserId(user.id);
     const userRoles = await fetchUserRoles(user.id);
     setSelectedRoles(userRoles);
     setRolesDialogOpen(true);
-  };
+  }, [fetchUserRoles]);
 
-  const handleSaveRoles = async () => {
+  const handleSaveRoles = useCallback(async () => {
     try {
       await api.put(`/api/users/${selectedUserId}/roles`, selectedRoles);
       toast.success("Роли назначены");
       setRolesDialogOpen(false);
-      fetchUsers();
+      refetch();
     } catch (error) {
       console.error('Error saving roles:', error);
       toast.error("Не удалось сохранить роли");
     }
-  };
+  }, [selectedUserId, selectedRoles, refetch]);
 
-  const openEditDialog = (user) => {
+  const openEditDialog = useCallback((user) => {
     setEditingUser(user);
     setFormData({
       username: user.username,
@@ -173,19 +153,121 @@ export default function UsersPage() {
       is_admin: user.is_admin
     });
     setDialogOpen(true);
-  };
+  }, []);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setEditingUser(null);
-    setFormData({
-      username: '',
-      full_name: '',
-      password: '',
-      is_admin: false
-    });
-  };
+    setFormData(INITIAL_FORM_DATA);
+  }, []);
 
-  if (!hasPermission('users_manage')) {
+  const handleRoleToggle = useCallback((roleId, checked) => {
+    if (checked) {
+      setSelectedRoles(prev => [...prev, roleId]);
+    } else {
+      setSelectedRoles(prev => prev.filter(id => id !== roleId));
+    }
+  }, []);
+
+  const handleFormChange = useCallback((field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  // Мемоизированный рендер списка пользователей
+  const userCards = useMemo(() => (
+    users.map((user) => (
+      <Card key={user.id}>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                <User className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  {user.full_name}
+                  {user.is_admin && (
+                    <Badge variant="yellow">
+                      <Shield className="h-3 w-3 mr-1" />
+                      Админ
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>@{user.username}</CardDescription>
+              </div>
+            </div>
+            <TooltipProvider>
+              <div className="flex gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEditDialog(user)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Редактировать пользователя</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openRolesDialog(user)}
+                    >
+                      <Shield className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Настроить роли</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedUserId(user.id);
+                        setPasswordDialogOpen(true);
+                      }}
+                    >
+                      <Key className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Сменить пароль</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(user.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Удалить пользователя</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
+          </div>
+        </CardHeader>
+      </Card>
+    ))
+  ), [users, openEditDialog, openRolesDialog, handleDelete]);
+
+  if (!canManage) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-64">
@@ -223,7 +305,7 @@ export default function UsersPage() {
                 <Input
                   id="username"
                   value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  onChange={(e) => handleFormChange('username', e.target.value)}
                   required
                   disabled={editingUser}
                 />
@@ -233,7 +315,7 @@ export default function UsersPage() {
                 <Input
                   id="full_name"
                   value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  onChange={(e) => handleFormChange('full_name', e.target.value)}
                   required
                 />
               </div>
@@ -244,7 +326,7 @@ export default function UsersPage() {
                     id="password"
                     type="password"
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    onChange={(e) => handleFormChange('password', e.target.value)}
                     required
                   />
                 </div>
@@ -253,7 +335,7 @@ export default function UsersPage() {
                 <Checkbox
                   id="is_admin"
                   checked={formData.is_admin}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_admin: checked })}
+                  onCheckedChange={(checked) => handleFormChange('is_admin', checked)}
                 />
                 <Label htmlFor="is_admin" className="cursor-pointer">
                   Администратор (полный доступ)
@@ -274,101 +356,14 @@ export default function UsersPage() {
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">Загрузка...</div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto mb-2"></div>
+            <span className="text-gray-500">Загрузка...</span>
+          </div>
         </div>
       ) : (
         <div className="grid gap-4">
-          {users.map((user) => (
-            <Card key={user.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
-                      <User className="h-6 w-6 text-yellow-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        {user.full_name}
-                        {user.is_admin && (
-                          <Badge variant="yellow">
-                            <Shield className="h-3 w-3 mr-1" />
-                            Админ
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      <CardDescription>@{user.username}</CardDescription>
-                    </div>
-                  </div>
-                  <TooltipProvider>
-                    <div className="flex gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openEditDialog(user)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Редактировать пользователя</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openRolesDialog(user)}
-                          >
-                            <Shield className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Настроить роли</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedUserId(user.id);
-                              setPasswordDialogOpen(true);
-                            }}
-                          >
-                            <Key className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Сменить пароль</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDelete(user.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Удалить пользователя</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TooltipProvider>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
+          {userCards}
         </div>
       )}
 
@@ -385,13 +380,7 @@ export default function UsersPage() {
                 <Checkbox
                   id={`role-${role.id}`}
                   checked={selectedRoles.includes(role.id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedRoles([...selectedRoles, role.id]);
-                    } else {
-                      setSelectedRoles(selectedRoles.filter(id => id !== role.id));
-                    }
-                  }}
+                  onCheckedChange={(checked) => handleRoleToggle(role.id, checked)}
                 />
                 <div className="flex-1">
                   <Label htmlFor={`role-${role.id}`} className="cursor-pointer font-medium">

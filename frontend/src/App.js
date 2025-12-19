@@ -1,25 +1,36 @@
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from "react-router-dom";
 import { ThemeProvider } from './providers/ThemeProvider';
+import { Suspense, lazy } from 'react';
 
-// Page imports
-import AdminPage from "@/pages/AdminPage";
-import ProjectsPage from "@/pages/ProjectsPage";
-import ProjectWizard from "@/pages/ProjectWizard";
-import ProjectExecutionPage from "@/pages/ProjectExecutionPage";
-import ProjectResultsPage from "@/pages/ProjectResultsPage";
-import LoginPage from "@/pages/LoginPage";
-import UsersPage from "@/pages/UsersPage";
-import RolesPage from "@/pages/RolesPage";
-import LogsPage from "@/pages/LogsPage";
-import SchedulerPage from "@/pages/SchedulerPage";
-import HostsPage from "@/pages/HostsPage";
-import ScriptsPage from "@/pages/ScriptsPage";
-import ExecutePage from "@/pages/ExecutePage";
-import HistoryPage from "@/pages/HistoryPage";
+// Lazy loaded pages
+const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const ProjectsPage = lazy(() => import("@/pages/ProjectsPage"));
+const ProjectWizard = lazy(() => import("@/pages/ProjectWizard"));
+const ProjectExecutionPage = lazy(() => import("@/pages/ProjectExecutionPage"));
+const ProjectResultsPage = lazy(() => import("@/pages/ProjectResultsPage"));
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const UsersPage = lazy(() => import("@/pages/UsersPage"));
+const RolesPage = lazy(() => import("@/pages/RolesPage"));
+const LogsPage = lazy(() => import("@/pages/LogsPage"));
+const SchedulerPage = lazy(() => import("@/pages/SchedulerPage"));
+const HostsPage = lazy(() => import("@/pages/HostsPage"));
+const ScriptsPage = lazy(() => import("@/pages/ScriptsPage"));
+const ExecutePage = lazy(() => import("@/pages/ExecutePage"));
+const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
 
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { MainLayout } from "@/components/layouts/MainLayout";
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+      <p className="text-gray-600">Загрузка...</p>
+    </div>
+  </div>
+);
 
 // Wrapper components for project pages with routing
 const ProjectsPageWrapper = () => {
@@ -77,30 +88,34 @@ function App() {
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Routes>
-                    <Route path="/" element={<ProjectsPageWrapper />} />
-                    <Route path="/hosts" element={<HostsPage />} />
-                    <Route path="/scripts" element={<ScriptsPage />} />
-                    <Route path="/execute" element={<ExecutePage />} />
-                    <Route path="/new" element={<ProjectWizardWrapper />} />
-                    <Route path="/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
-                    <Route path="/:projectId/results" element={<ProjectResultsPageWrapper />} />
-                    <Route path="/history" element={<HistoryPage />} />
-                    <Route path="/scheduler" element={<SchedulerPage />} />
-                    <Route path="/logs" element={<LogsPage />} />
-                    <Route path="/admin" element={<AdminPage />} />
-                    <Route path="/users" element={<UsersPage />} />
-                    <Route path="/roles" element={<RolesPage />} />
-                  </Routes>
-                </MainLayout>
-              </ProtectedRoute>
-            } />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/*" element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        <Route path="/" element={<ProjectsPageWrapper />} />
+                        <Route path="/hosts" element={<HostsPage />} />
+                        <Route path="/scripts" element={<ScriptsPage />} />
+                        <Route path="/execute" element={<ExecutePage />} />
+                        <Route path="/new" element={<ProjectWizardWrapper />} />
+                        <Route path="/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
+                        <Route path="/:projectId/results" element={<ProjectResultsPageWrapper />} />
+                        <Route path="/history" element={<HistoryPage />} />
+                        <Route path="/scheduler" element={<SchedulerPage />} />
+                        <Route path="/logs" element={<LogsPage />} />
+                        <Route path="/admin" element={<AdminPage />} />
+                        <Route path="/users" element={<UsersPage />} />
+                        <Route path="/roles" element={<RolesPage />} />
+                      </Routes>
+                    </Suspense>
+                  </MainLayout>
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

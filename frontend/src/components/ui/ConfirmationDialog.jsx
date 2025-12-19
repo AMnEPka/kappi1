@@ -1,4 +1,5 @@
 // components/ConfirmationDialog.jsx
+import DOMPurify from 'dompurify';
 import {
     Dialog,
     DialogContent,
@@ -20,14 +21,22 @@ import {
     onCancel,
     variant = "default", // "default" | "destructive"
   }) => {
+    // Санитизация HTML для предотвращения XSS
+    const sanitizedDescription = description 
+      ? DOMPurify.sanitize(description, { 
+          ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'br', 'p', 'span'],
+          ALLOWED_ATTR: ['class']
+        })
+      : null;
+
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            {description && (
+            {sanitizedDescription && (
               <DialogDescription 
-              dangerouslySetInnerHTML={{ __html: description }}
+                dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
               />
             )}
           </DialogHeader>
