@@ -33,15 +33,11 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      console.log('🔐 Login started...');
-
       const response = await api.post('/api/auth/login', {
         username,
         password
       });
 
-      console.log('✅ Login successful');
-      
       const { access_token, refresh_token, user: userData } = response.data;
       
       // Store both tokens
@@ -65,7 +61,6 @@ export const AuthProvider = ({ children }) => {
 
   const fetchCurrentUser = async () => {
     try {
-      console.log('🔍 Fetching current user...');
       const response = await api.get('/api/auth/me');
       
       // Set user and permissions
@@ -76,7 +71,6 @@ export const AuthProvider = ({ children }) => {
       }
 
       setPermissions(response.data.permissions || []);
-      console.log('✅ User data loaded');
       
     } catch (error) {
       console.error('❌ Failed to fetch current user:', error);
@@ -92,7 +86,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    console.log('🚪 Logging out...');
     try {
       // Call logout API to invalidate refresh token
       await logoutApi();
@@ -106,7 +99,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logoutAllSessions = async () => {
-    console.log('🚪 Logging out from all sessions...');
     try {
       const response = await api.post('/api/auth/logout-all');
       clearTokens();

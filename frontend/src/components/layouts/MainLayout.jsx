@@ -99,22 +99,6 @@ export const MainLayout = ({ children }) => {
             </Button>
           </Link>
 
-          <Link 
-            to="/hosts" 
-            className="md3-sidebar-item-link"
-            onClick={(e) => e.preventDefault()} // ← блокируем переход
-            style={{ cursor: 'not-allowed' }}
-          >
-            <Button
-              variant={isActive('/hosts') ? "tonal" : "text"}
-              className={`md3-sidebar-button ${isActive('/hosts') ? 'md3-sidebar-button-active' : ''} md3-sidebar-button-inactive`}
-              disabled={true}
-            >
-              <Server className="md3-icon" />
-              {isSidebarExpanded && "Хосты"}
-            </Button>
-          </Link>
-
           <Link to="/scripts" className="md3-sidebar-item-link">
             <Button
               variant={isActive('/scripts') ? "tonal" : "text"}
