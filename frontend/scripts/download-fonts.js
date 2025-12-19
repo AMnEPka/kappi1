@@ -56,8 +56,6 @@ async function downloadFonts() {
       fs.mkdirSync(fontDir, { recursive: true });
     }
   }
-
-  console.log('Downloading fonts...');
   
   for (const [fontFamily, variants] of Object.entries(fonts)) {
     for (const variant of variants) {
@@ -66,25 +64,10 @@ async function downloadFonts() {
       
       const woff2Path = path.join(publicDir, fontFamily, `${variant.name}-${variant.weight === 300 ? 'Light' : variant.weight === 400 ? 'Regular' : variant.weight === 500 ? 'Medium' : 'Bold'}.woff2`);
       const woffPath = path.join(publicDir, fontFamily, `${variant.name}-${variant.weight === 300 ? 'Light' : variant.weight === 400 ? 'Regular' : variant.weight === 500 ? 'Medium' : 'Bold'}.woff`);
-      
-      try {
-        console.log(`Downloading ${variant.name} (weight: ${variant.weight})...`);
-        // Note: This is a simplified version. You may need to adjust URLs based on actual GitHub structure
-        // Alternative: Use npm package @fontsource/roboto and @fontsource/roboto-mono
-        console.log(`  WOFF2: ${woff2Url}`);
-        console.log(`  WOFF: ${woffUrl}`);
-        console.log(`  Please download manually from: https://fonts.google.com/specimen/Roboto`);
-        console.log(`  Or use: npm install @fontsource/roboto @fontsource/roboto-mono`);
-      } catch (error) {
-        console.error(`Error downloading ${variant.name}:`, error.message);
-      }
+
     }
   }
-  
-  console.log('\nFont download script completed.');
-  console.log('For offline use, please either:');
-  console.log('1. Install fonts via npm: npm install @fontsource/roboto @fontsource/roboto-mono');
-  console.log('2. Download manually from https://fonts.google.com and place in public/fonts/');
+
 }
 
 downloadFonts().catch(console.error);

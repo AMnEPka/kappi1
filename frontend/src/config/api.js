@@ -4,8 +4,6 @@ import axios from 'axios';
 const API_URL = process.env.REACT_APP_BACKEND_URL || '/';
 const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:415/ws';
 
-console.log('🚀 API URL configured:', API_URL);
-
 export const api = axios.create({
   baseURL: API_URL,
 });
@@ -115,9 +113,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        console.log('🔄 Access token expired, attempting refresh...');
         const newToken = await refreshAccessToken();
-        console.log('✅ Token refreshed successfully');
         
         processQueue(null, newToken);
         
