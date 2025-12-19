@@ -1,0 +1,333 @@
+/* Material Design 3 Components - Consolidated Styles */
+
+/* ============================================
+   AppBar
+   ============================================ */
+.md3-app-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-2);
+  height: 4rem;
+  display: flex;
+  align-items: center;
+}
+
+.md3-app-bar-content {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--md-sys-spacing-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+
+/* ============================================
+   Sidebar
+   ============================================ */
+.md3-sidebar {
+  position: fixed;
+  top: 4rem;
+  left: 0;
+  bottom: 0;
+  z-index: 900;
+  background-color: var(--md-sys-color-surface);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  transition: width var(--md-sys-motion-duration-medium4) var(--md-sys-motion-easing-standard);
+  overflow: hidden;
+}
+
+.md3-sidebar-expanded {
+  width: 16rem;
+}
+
+.md3-sidebar-collapsed {
+  width: 5rem;
+}
+
+.md3-sidebar-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--md-sys-spacing-2);
+  gap: var(--md-sys-spacing-1);
+  overflow-y: auto;
+}
+
+.md3-sidebar-item {
+  display: flex;
+  align-items: center;
+  padding: var(--md-sys-spacing-3) var(--md-sys-spacing-4);
+  border-radius: var(--md-sys-shape-corner-lg);
+  cursor: pointer;
+  transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  position: relative;
+}
+
+.md3-sidebar-item:hover {
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+
+.md3-sidebar-item-active {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.md3-sidebar-item-active:hover {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+/* Sidebar collapsed button centering */
+.md3-sidebar-collapsed .md3-sidebar-button {
+  display: flex !important;
+  justify-content: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 0.75rem !important;
+  width: 3rem !important;
+  min-width: 3rem !important;
+  max-width: 3rem !important;
+}
+
+.md3-sidebar-collapsed .md3-sidebar-button .md3-icon {
+  margin: 0 !important;
+  display: block !important;
+}
+
+.md3-sidebar-expanded .md3-sidebar-button {
+  justify-content: flex-start !important;
+  width: 100% !important;
+  padding: 0.75rem 1rem !important;
+}
+
+.md3-sidebar-expanded .md3-sidebar-button .md3-icon {
+  margin-right: 0.75rem !important;
+}
+
+/* ============================================
+   Card
+   ============================================ */
+.md3-card {
+  background-color: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  border-radius: var(--md-sys-shape-corner-lg);
+  transition: box-shadow var(--md-sys-motion-duration-medium4) var(--md-sys-motion-easing-standard);
+}
+
+.md3-card-header {
+  padding: var(--md-sys-spacing-6) var(--md-sys-spacing-6) var(--md-sys-spacing-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--md-sys-spacing-1);
+}
+
+.md3-card-title {
+  font-family: var(--md-sys-typescale-title-large-font);
+  font-size: var(--md-sys-typescale-title-large-size);
+  font-weight: var(--md-sys-typescale-title-large-weight);
+  line-height: var(--md-sys-typescale-title-large-line-height);
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.md3-card-description {
+  font-family: var(--md-sys-typescale-body-large-font);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.25rem;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 0;
+}
+
+.md3-card-content {
+  padding: var(--md-sys-spacing-4) var(--md-sys-spacing-6);
+}
+
+.md3-card-footer {
+  padding: var(--md-sys-spacing-4) var(--md-sys-spacing-6) var(--md-sys-spacing-6);
+  display: flex;
+  align-items: center;
+  gap: var(--md-sys-spacing-2);
+}
+
+/* ============================================
+   Input
+   ============================================ */
+.md3-input-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--md-sys-spacing-1);
+}
+
+.md3-input {
+  width: 100%;
+  height: 3.5rem;
+  padding: var(--md-sys-spacing-4) var(--md-sys-spacing-4) var(--md-sys-spacing-2);
+  background-color: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-md);
+  font-family: var(--md-sys-typescale-body-large-font);
+  font-size: var(--md-sys-typescale-body-large-size);
+  font-weight: var(--md-sys-typescale-body-large-weight);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  color: var(--md-sys-color-on-surface);
+  transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  outline: none;
+}
+
+.md3-input::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.6;
+}
+
+.md3-input:hover {
+  border-color: var(--md-sys-color-on-surface);
+}
+
+.md3-input:focus {
+  border-color: var(--md-sys-color-primary);
+  border-width: 2px;
+  padding: calc(var(--md-sys-spacing-4) - 1px) calc(var(--md-sys-spacing-4) - 1px) calc(var(--md-sys-spacing-2) - 1px);
+}
+
+.md3-input:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-color: var(--md-sys-color-outline);
+}
+
+.md3-input-error {
+  border-color: var(--md-sys-color-error);
+}
+
+.md3-input-error:focus {
+  border-color: var(--md-sys-color-error);
+}
+
+.md3-input-error-text {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--md-sys-color-error);
+  padding: 0 var(--md-sys-spacing-4);
+}
+
+/* ============================================
+   Textarea
+   ============================================ */
+.md3-textarea-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--md-sys-spacing-1);
+}
+
+.md3-textarea {
+  width: 100%;
+  min-height: 3.5rem;
+  padding: var(--md-sys-spacing-4);
+  background-color: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-md);
+  font-family: var(--md-sys-typescale-body-large-font);
+  font-size: var(--md-sys-typescale-body-large-size);
+  font-weight: var(--md-sys-typescale-body-large-weight);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+  color: var(--md-sys-color-on-surface);
+  resize: vertical;
+  transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  outline: none;
+}
+
+.md3-textarea::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.6;
+}
+
+.md3-textarea:hover {
+  border-color: var(--md-sys-color-on-surface);
+}
+
+.md3-textarea:focus {
+  border-color: var(--md-sys-color-primary);
+  border-width: 2px;
+  padding: calc(var(--md-sys-spacing-4) - 1px);
+}
+
+.md3-textarea:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-color: var(--md-sys-color-outline);
+}
+
+.md3-textarea-error {
+  border-color: var(--md-sys-color-error);
+}
+
+.md3-textarea-error:focus {
+  border-color: var(--md-sys-color-error);
+}
+
+.md3-textarea-error-text {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--md-sys-color-error);
+  padding: 0 var(--md-sys-spacing-4);
+}
+
+/* ============================================
+   Label
+   ============================================ */
+.md3-label {
+  font-family: var(--md-sys-typescale-label-large-font);
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  color: var(--md-sys-color-on-surface);
+  display: block;
+  margin-bottom: var(--md-sys-spacing-1);
+}
+
+/* ============================================
+   Badge
+   ============================================ */
+.md3-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--md-sys-spacing-2);
+  height: 1.5rem;
+  border-radius: var(--md-sys-shape-corner-sm);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1rem;
+  letter-spacing: 0.03125rem;
+  white-space: nowrap;
+}
+
+.md3-badge-filled {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.md3-badge-outlined {
+  background-color: transparent;
+  color: var(--md-sys-color-primary);
+  border: 1px solid var(--md-sys-color-outline);
+}
+
+.md3-badge-tonal {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+

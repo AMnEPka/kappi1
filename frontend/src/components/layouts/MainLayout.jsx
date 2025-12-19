@@ -14,7 +14,7 @@ import {
   Home,
   ChevronLeft,
 } from "lucide-react";
-import { Button, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui-new';
+import { Button, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui/md3';
 import { useAuth } from '@/contexts/AuthContext';
 import './MainLayout.css';
 
