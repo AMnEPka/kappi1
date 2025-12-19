@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, CheckCircle2, Loader2, History } from "lucide-react";
-import { toast } from "sonner";
-import { api } from '@/config/api';
 import { AdvancedCodeEditor } from "@/components/ui/advanced-code-editor";
 import { useAuth } from '@/contexts/AuthContext';
 

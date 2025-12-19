@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CategoriesPage from "@/pages/CategoriesPage";
 import SystemsPage from "@/pages/SystemsPage";

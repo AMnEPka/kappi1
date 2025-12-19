@@ -4,13 +4,14 @@ Scheduler services for managing recurring jobs
 """
 
 import asyncio
-from datetime import datetime, timezone, timedelta, time as datetime_time, date
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, Tuple
 import logging
 
 from config.config_init import logger, db, SCHEDULER_POLL_SECONDS
 from models.models_init import SchedulerJob
-from services.services_init import _parse_time_of_day, _normalize_run_times
+from services.services_init import _normalize_run_times
+from scheduler.scheduler_utils import next_recurring_occurrence
 
 
 def _calculate_next_run(
@@ -41,56 +42,9 @@ def _calculate_next_run(
         return min(future_times) if future_times else None
     
     elif job_type == "recurring":
-        return _next_daily_occurrence(config, reference=reference, initial=initial)
+        return next_recurring_occurrence(config, reference=reference, initial=initial)
     
     return None
-
-
-def _next_daily_occurrence(
-    config: Dict[str, Any],
-    *,
-    reference: datetime,
-    initial: bool = False
-) -> Optional[datetime]:
-    """
-    Calculate next daily occurrence based on config
-    """
-    try:
-        recurrence_time_str = config.get("recurrence_time", "00:00")
-        recurrence_time = _parse_time_of_day(recurrence_time_str)
-        start_date = config.get("recurrence_start_date")
-        
-        if isinstance(start_date, str):
-            start_date = datetime.fromisoformat(start_date).date()
-        
-        # Start from reference date
-        current_date = reference.date()
-        
-        while True:
-            if start_date and current_date < start_date:
-                current_date = start_date
-            
-            # Create datetime for this date at recurrence_time
-            next_run = datetime.combine(
-                current_date,
-                recurrence_time,
-                tzinfo=timezone.utc
-            )
-            
-            # If this time is in the future, use it
-            if next_run > reference:
-                return next_run
-            
-            # Move to next day
-            current_date += timedelta(days=1)
-            
-            # Safety check to prevent infinite loops
-            if (current_date - reference.date()).days > 365:
-                return None
-    
-    except Exception as e:
-        logger.error(f"Error calculating next daily occurrence: {e}")
-        return None
 
 
 async def _consume_streaming_response(streaming_response) -> Tuple[Optional[str], Optional[str]]:
