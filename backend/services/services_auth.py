@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import HTTPException, Depends, status, Query  # pyright: ignore[reportMissingImports]
 from fastapi.security import HTTPAuthorizationCredentials # pyright: ignore[reportMissingImports]
 
-from config.config_init import security, decode_token, logger, db
+from config.config_init import security, decode_token, logger, db, PERMISSIONS
 from models.models_init import User
 
 async def get_current_user_from_token(token: str) -> User:
@@ -96,12 +96,8 @@ async def get_user_permissions(user: User) -> List[str]:
     Get all permissions for a user from their roles
     """
     if user.is_admin:
-        # Admin has all permissions
-        all_roles = await db.roles.find().to_list(None)
-        permissions = set()
-        for role in all_roles:
-            permissions.update(role.get("permissions", []))
-        return list(permissions)
+        # Admin has ALL permissions defined in the system, regardless of roles
+        return list(PERMISSIONS.keys())
     
     # Get user's roles
     user_roles = await db.user_roles.find({"user_id": user.id}).to_list(None)
@@ -123,6 +119,9 @@ async def has_permission(user: User, permission: str) -> bool:
     """
     Check if user has specific permission
     """
+    # Admin always has all permissions
+    if user.is_admin:
+        return True
     permissions = await get_user_permissions(user)
     return permission in permissions
 
@@ -131,6 +130,10 @@ async def require_permission(user: User, *permissions: str) -> None:
     """
     Require one or more permissions, raise 403 if not authorized
     """
+    # Admin always has all permissions
+    if user.is_admin:
+        return
+    
     user_permissions = await get_user_permissions(user)
     
     # Check if user has at least one of the required permissions

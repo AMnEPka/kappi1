@@ -7,7 +7,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import { Checkbox } from "../components/ui/checkbox";
-import { PlusCircle, Edit, Trash2, Shield, Lock } from "lucide-react";
+import { Infinity, PlusCircle, Edit, Trash2, Shield, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -74,31 +74,60 @@ export default function RolesPage() {
   }, [editingRole, formData, refetch]);
 
   const handleDelete = useCallback(async (roleId) => {
+    // Находим роль по ID
+    const roleToDelete = roles?.find(role => role.id === roleId);
+    
+    // Проверяем, является ли роль "Администратором"
+    if (roleToDelete?.name === "Администратор") {
+      toast.error("Роль 'Администратор' нельзя удалить", {
+        description: "Эта роль является системной и необходима для управления доступом"
+      });
+      return;
+    }
+  
     const confirmed = await showConfirm(
       "Удаление роли",
-      "Вы уверены, что хотите удалить эту роль? Все пользователи с этой ролью потеряют связанные с ней права.",
+      `Вы уверены, что хотите удалить роль "${roleToDelete?.name || 'эту роль'}"? Все пользователи с этой ролью потеряют связанные с ней права.`,
       {
         variant: "destructive",
         confirmText: "Удалить",
         cancelText: "Отмена"
       }
     );
-
+  
     if (!confirmed) return;
-
+  
     try {
       await api.delete(`/api/roles/${roleId}`);
-      toast.success("Роль удалена");
+      toast.success("Роль удалена", {
+        description: `Роль "${roleToDelete?.name}" была успешно удалена`
+      });
       refetch();
     } catch (error) {
       console.error('Error deleting role:', error);
+      
+      // Обработка ошибок
       if (error.response?.status === 403) {
-        toast.error("Недостаточно прав для удаления ролей");
+        toast.error("Недостаточно прав для удаления ролей", {
+          description: "Обратитесь к администратору системы"
+        });
+      } else if (error.response?.status === 400) {
+        // Проверяем, не пытаемся ли удалить роль, которая используется
+        const errorMessage = error.response?.data?.detail || error.message;
+        if (errorMessage.includes('пользователи') || errorMessage.includes('используется')) {
+          toast.error("Нельзя удалить роль", {
+            description: "Эта роль назначена пользователям. Сначала измените роли пользователей."
+          });
+        } else {
+          toast.error(errorMessage || "Не удалось удалить роль");
+        }
       } else {
-        toast.error(error.response?.data?.detail || "Не удалось удалить роль");
+        toast.error(error.response?.data?.detail || "Не удалось удалить роль", {
+          description: "Попробуйте еще раз или обратитесь в поддержку"
+        });
       }
     }
-  }, [showConfirm, refetch]);
+  }, [showConfirm, refetch, roles]);
 
   const openEditDialog = useCallback((role) => {
     setEditingRole(role);
@@ -159,8 +188,11 @@ export default function RolesPage() {
               <div className="flex-1">
                 <CardTitle className="flex items-center gap-2">
                   {role.name}
-                  <Badge variant="outline" className="ml-2">
-                    Права: {role.permissions?.length || 0}
+                  <Badge 
+                    variant="outline" 
+                    className={`ml-2 ${role.name === "Администратор" ? 'border-green-200 text-green-800 bg-green-50' : ''}`}
+                  >
+                    Права: {role.name === "Администратор" ? "∞" : role.permissions?.length || 0}
                   </Badge>
                 </CardTitle>
                 {role.description && (
@@ -285,64 +317,96 @@ export default function RolesPage() {
           <p className="text-gray-600 mt-1">Создание ролей и управление правами доступа</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="yellow" onClick={resetForm}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Создать роль
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingRole ? 'Редактировать роль' : 'Новая роль'}</DialogTitle>
-              <DialogDescription>
-                {editingRole ? 'Обновите информацию о роли и её правах доступа' : 'Создайте новую роль с набором прав доступа'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <Label htmlFor="name">Название роли</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleFormChange('name', e.target.value)}
-                  placeholder="Например: Менеджер проектов"
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="description">Описание</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleFormChange('description', e.target.value)}
-                  placeholder="Краткое описание роли и её назначения"
-                  rows={2}
-                />
-              </div>
+  <DialogTrigger asChild>
+    <Button variant="yellow" onClick={resetForm}>
+      <PlusCircle className="mr-2 h-4 w-4" />
+      Создать роль
+    </Button>
+  </DialogTrigger>
+  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>{editingRole ? 'Редактировать роль' : 'Новая роль'}</DialogTitle>
+      <DialogDescription>
+        {editingRole ? 'Обновите информацию о роли и её правах доступа' : 'Создайте новую роль с набором прав доступа'}
+      </DialogDescription>
+    </DialogHeader>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div>
+        <Label htmlFor="name">Название роли</Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => handleFormChange('name', e.target.value)}
+          placeholder="Например: Менеджер проектов"
+          required
+          disabled={editingRole?.name === "Администратор"} // Запрещаем редактирование названия для роли Администратор
+        />
+        {editingRole?.name === "Администратор" && (
+          <p className="text-sm text-gray-500 mt-1">Название роли "Администратор" нельзя изменить</p>
+        )}
+      </div>
+      
+      <div>
+        <Label htmlFor="description">Описание</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => handleFormChange('description', e.target.value)}
+          placeholder="Краткое описание роли и её назначения"
+          rows={2}
+          disabled={editingRole?.name === "Администратор"} // Запрещаем редактирование описания для роли Администратор
+        />
+      </div>
 
-              <div className="space-y-4">
-                <Label className="text-base font-semibold">Права</Label>
-                <p className="text-sm text-gray-500">Выберите права доступа для этой роли</p>
-                {permissionGroups}
-              </div>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label className="text-base font-semibold">Права</Label>
+          {editingRole?.name === "Администратор" && (
+            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+              <Infinity className="h-3 w-3 mr-1" />
+              Полный доступ
+            </Badge>
+          )}
+        </div>
+        <p className="text-sm text-gray-500">Выберите права доступа для этой роли</p>
+        
+        {/* Если редактируем роль Администратор, показываем сообщение вместо списка прав */}
+        {editingRole?.name === "Администратор" ? (
+          <div className="p-4 bg-blue-50 rounded-md border border-blue-200">
+            <div className="flex items-center">
+              <Shield className="h-5 w-5 text-blue-500 mr-2" />
+              <p className="text-blue-700 font-medium">Роль "Администратор" имеет все права доступа по умолчанию</p>
+            </div>
+            <p className="text-blue-600 text-sm mt-1">
+              Эта роль обладает неограниченными правами в системе. Для изменения прав создайте другую роль.
+            </p>
+          </div>
+        ) : (
+          permissionGroups
+        )}
+      </div>
 
-              <div className="flex gap-2 pt-4 border-t">
-                <Button type="submit" className="flex-1" variant="yellow">
-                  {editingRole ? 'Сохранить изменения' : 'Создать роль'}
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setDialogOpen(false)} 
-                  className="flex-1"
-                >
-                  Отмена
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+      <div className="flex gap-2 pt-4 border-t">
+        <Button 
+          type="submit" 
+          className="flex-1" 
+          variant="yellow"
+          disabled={editingRole?.name === "Администратор"} // Запрещаем сохранение изменений для Администратора
+        >
+          {editingRole ? 'Сохранить изменения' : 'Создать роль'}
+        </Button>
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={() => setDialogOpen(false)} 
+          className="flex-1"
+        >
+          Отмена
+        </Button>
+      </div>
+    </form>
+  </DialogContent>
+</Dialog>
       </div>
 
       {loading ? (

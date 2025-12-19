@@ -8,10 +8,6 @@ import "@/components/layouts/MainLayout.css";
 import App from "@/App";
 import { Toaster } from "@/components/ui/sonner";
 
-// ============================================
-// Comprehensive ResizeObserver error suppression
-// ============================================
-
 // Method 1: Error event listener with capture
 window.addEventListener('error', e => {
   if (e.message && (

@@ -12,12 +12,19 @@ import { useNavigate } from 'react-router-dom';
 import { SelectNative } from "@/components/ui/select-native";
 import DateTimePicker from '../components/ui/datetime-picker';
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 
 
 const JOB_TYPES = [
   { value: "one_time", label: "Одиночный запуск" },
   { value: "multi_run", label: "Несколько запусков" },
-  { value: "recurring", label: "Ежедневно" },
+  { value: "recurring", label: "Периодически" },
 ];
 
 const statusMap = {
@@ -55,6 +62,64 @@ const formatDateTime = (value) => {
   return formatter.format(date);
 };
 
+// Simple cron parser for preview (shows next 5 runs)
+const getNextRuns = (cronExpression, count = 5) => {
+  try {
+    const parts = cronExpression.trim().split(/\s+/);
+    if (parts.length !== 5) return ["Неверный формат cron"];
+    
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+    const results = [];
+    let date = new Date();
+    
+    // Simple parsing for common patterns
+    const parseField = (field, max, offset = 0) => {
+      if (field === '*') return Array.from({ length: max }, (_, i) => i + offset);
+      if (field.includes('/')) {
+        const [, step] = field.split('/');
+        return Array.from({ length: Math.ceil(max / parseInt(step)) }, (_, i) => (i * parseInt(step)) + offset);
+      }
+      if (field.includes('-')) {
+        const [start, end] = field.split('-').map(Number);
+        return Array.from({ length: end - start + 1 }, (_, i) => i + start);
+      }
+      if (field.includes(',')) {
+        return field.split(',').map(Number);
+      }
+      return [parseInt(field)];
+    };
+    
+    const minutes = parseField(minute, 60, 0);
+    const hours = parseField(hour, 24, 0);
+    
+    // Find next N occurrences
+    for (let attempts = 0; attempts < 1000 && results.length < count; attempts++) {
+      date = new Date(date.getTime() + 60000); // Add 1 minute
+      
+      if (!minutes.includes(date.getMinutes())) continue;
+      if (!hours.includes(date.getHours())) continue;
+      
+      // Check day of week (0=Sun, 1=Mon, etc)
+      if (dayOfWeek !== '*') {
+        const dows = parseField(dayOfWeek, 7, 0);
+        if (!dows.includes(date.getDay())) continue;
+      }
+      
+      // Check day of month
+      if (dayOfMonth !== '*') {
+        const days = parseField(dayOfMonth, 31, 1);
+        if (!days.includes(date.getDate())) continue;
+      }
+      
+      results.push(formatDateTime(date));
+    }
+    
+    return results.length > 0 ? results : ["Не удалось рассчитать"];
+  } catch {
+    return ["Ошибка в выражении"];
+  }
+};
+
 const toInputDateTime = (value) => {
   if (!value) return "";
   const date = new Date(value);
@@ -81,8 +146,15 @@ const SchedulerPage = () => {
     job_type: "one_time",
     run_at: "",
     run_times: [""],
-    recurrence_time: "10:00",
+    // Recurring job settings
+    schedule_mode: "simple",
+    recurrence_frequency: "daily",
+    recurrence_interval: 30,
+    recurrence_time: "09:00",
+    recurrence_days: [1], // Monday
+    recurrence_day_of_month: 1,
     recurrence_start_date: "",
+    cron_expression: "0 9 * * *",
   });
   const [confirmationDialog, setConfirmationDialog] = useState({
     open: false,
@@ -140,8 +212,14 @@ const SchedulerPage = () => {
       job_type: "one_time",
       run_at: "",
       run_times: [""],
-      recurrence_time: "10:00",
+      schedule_mode: "simple",
+      recurrence_frequency: "daily",
+      recurrence_interval: 30,
+      recurrence_time: "09:00",
+      recurrence_days: [1],
+      recurrence_day_of_month: 1,
       recurrence_start_date: "",
+      cron_expression: "0 9 * * *",
     });
     setShowJobForm(false);
   };
@@ -174,9 +252,17 @@ const SchedulerPage = () => {
       return;
     }
 
-    if (form.job_type === "recurring" && !form.recurrence_time) {
-      toast.error("Укажите время ежедневного запуска");
-      return;
+    if (form.job_type === "recurring") {
+      if (form.schedule_mode === "advanced" && !form.cron_expression) {
+        toast.error("Укажите cron выражение");
+        return;
+      }
+      if (form.schedule_mode !== "advanced" && 
+          ["daily", "weekly", "monthly"].includes(form.recurrence_frequency) && 
+          !form.recurrence_time) {
+        toast.error("Укажите время запуска");
+        return;
+      }
     }
 
     setLoading(true);
@@ -195,7 +281,28 @@ const SchedulerPage = () => {
           .filter(Boolean)
           .map((value) => new Date(value).toISOString());
       } else if (form.job_type === "recurring") {
-        payload.recurrence_time = form.recurrence_time;
+        payload.schedule_mode = form.schedule_mode || "simple";
+        
+        if (form.schedule_mode === "advanced") {
+          payload.cron_expression = form.cron_expression;
+        } else {
+          payload.recurrence_frequency = form.recurrence_frequency || "daily";
+          
+          if (["minutes", "hours"].includes(form.recurrence_frequency)) {
+            payload.recurrence_interval = form.recurrence_interval || 30;
+          } else {
+            payload.recurrence_time = form.recurrence_time;
+          }
+          
+          if (form.recurrence_frequency === "weekly") {
+            payload.recurrence_days = form.recurrence_days || [1];
+          }
+          
+          if (form.recurrence_frequency === "monthly") {
+            payload.recurrence_day_of_month = form.recurrence_day_of_month || 1;
+          }
+        }
+        
         if (form.recurrence_start_date) {
           payload.recurrence_start_date = form.recurrence_start_date;
         }
@@ -294,15 +401,19 @@ const SchedulerPage = () => {
   
     // Поля в зависимости от типа задания
     if (job.job_type === "one_time") {
-      // Для одиночного запуска - используем run_at из данных задания
       baseForm.run_at = job.run_at ? toInputDateTime(job.run_at) : "";
     } else if (job.job_type === "multi_run") {
-      // Для множественного запуска - используем run_times из данных задания
       baseForm.run_times = (job.run_times || []).map((value) => toInputDateTime(value));
     } else if (job.job_type === "recurring") {
-      // Для ежедневного - используем данные из schedule_config
-      baseForm.recurrence_time = job.schedule_config?.recurrence_time || "10:00";
-      baseForm.recurrence_start_date = job.schedule_config?.recurrence_start_date || "";
+      const config = job.schedule_config || {};
+      baseForm.schedule_mode = config.schedule_mode || "simple";
+      baseForm.recurrence_frequency = config.recurrence_frequency || "daily";
+      baseForm.recurrence_interval = config.recurrence_interval || 30;
+      baseForm.recurrence_time = config.recurrence_time || "09:00";
+      baseForm.recurrence_days = config.recurrence_days || [1];
+      baseForm.recurrence_day_of_month = config.recurrence_day_of_month || 1;
+      baseForm.recurrence_start_date = config.recurrence_start_date || "";
+      baseForm.cron_expression = config.cron_expression || "0 9 * * *";
     }
   
     setForm(baseForm);
@@ -565,32 +676,224 @@ const SchedulerPage = () => {
                 </div>
               )}
   
-              {form.job_type === "recurring" && (
-                <div className="space-y-2">
-                  <Label>Ежедневный запуск</Label>
-                  <div className="flex flex-wrap gap-3 items-end">
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-sm">Время</Label>
-                      <Input
-                        type="time"
-                        value={form.recurrence_time}
-                        onChange={(e) => setForm({ ...form, recurrence_time: e.target.value })}
-                        required
-                        className="w-[200px]"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-sm">Дата начала (опционально)</Label>
-                      <Input
-                        type="date"
-                        value={form.recurrence_start_date}
-                        onChange={(e) => setForm({ ...form, recurrence_start_date: e.target.value })}
-                        className="w-[200px]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+  {form.job_type === "recurring" && (
+  <div className="space-y-4">
+    <Label>Повторяющийся запуск</Label>
+    
+    <div className="space-y-3">
+      {/* Режим выбора: простой или расширенный */}
+      <div className="flex gap-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="radio"
+            id="simple-mode"
+            name="interval-mode"
+            checked={form.schedule_mode !== "advanced"}
+            onChange={() => setForm({ ...form, schedule_mode: "simple" })}
+            className="h-4 w-4"
+          />
+          <Label htmlFor="simple-mode" className="cursor-pointer">Простой интервал</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="radio"
+            id="advanced-mode"
+            name="interval-mode"
+            checked={form.schedule_mode === "advanced"}
+            onChange={() => setForm({ ...form, schedule_mode: "advanced" })}
+            className="h-4 w-4"
+          />
+          <Label htmlFor="advanced-mode" className="cursor-pointer">Расширенный (Cron)</Label>
+        </div>
+      </div>
+
+      {form.schedule_mode === "advanced" ? (
+        // Расширенный режим - Cron выражение
+        <div className="space-y-3">
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm">Cron выражение</Label>
+            <Input
+              value={form.cron_expression || "0 9 * * *"}
+              onChange={(e) => setForm({ ...form, cron_expression: e.target.value })}
+              placeholder="0 9 * * *"
+              className="font-mono"
+            />
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>Формат: <code className="bg-gray-100 px-1 rounded">минута час день месяц день_недели</code></p>
+              <p>Примеры: 
+                <span className="block"><code>0 */2 * * *</code> - каждые 2 часа</span>
+                <span className="block"><code>0 9 * * 1-5</code> - в 9:00 по будням</span>
+                <span className="block"><code>*/15 * * * *</code> - каждые 15 минут</span>
+              </p>
+            </div>
+          </div>
+          
+          {/* Предпросмотр расписания */}
+          {form.cron_expression && (
+            <div className="p-3 bg-blue-50 rounded text-sm">
+              <p className="font-medium mb-1">Ближайшие запуски:</p>
+              <ul className="text-gray-700 space-y-1">
+                {getNextRuns(form.cron_expression).map((time, i) => (
+                  <li key={i}>• {time}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ) : (
+        // Простой режим - интервалы
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Частота */}
+          <div className="space-y-2">
+            <Label className="text-sm">Частота</Label>
+            <Select
+              value={form.recurrence_frequency || "daily"}
+              onValueChange={(value) => {
+                const updates = { recurrence_frequency: value };
+                // Сброс зависимых полей при смене частоты
+                if (value === "weekly") updates.recurrence_days = [1];
+                if (value === "monthly") updates.recurrence_day_of_month = 1;
+                setForm({ ...form, ...updates });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="minutes">Каждые X минут</SelectItem>
+                <SelectItem value="hours">Каждые X часов</SelectItem>
+                <SelectItem value="daily">Ежедневно</SelectItem>
+                <SelectItem value="weekly">Еженедельно</SelectItem>
+                <SelectItem value="monthly">Ежемесячно</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Детали в зависимости от частоты */}
+          {["minutes", "hours"].includes(form.recurrence_frequency) && (
+            <div className="space-y-2">
+              <Label className="text-sm">
+                {form.recurrence_frequency === "minutes" ? "Минуты" : "Часы"}
+              </Label>
+              <Input
+                type="number"
+                min="1"
+                max={form.recurrence_frequency === "minutes" ? "1440" : "720"}
+                value={form.recurrence_interval || 1}
+                onChange={(e) => setForm({ 
+                  ...form, 
+                  recurrence_interval: parseInt(e.target.value) || 1 
+                })}
+              />
+            </div>
+          )}
+
+          {form.recurrence_frequency === "weekly" && (
+            <div className="space-y-2">
+              <Label className="text-sm">Дни недели</Label>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { value: 1, label: "Пн" },
+                  { value: 2, label: "Вт" },
+                  { value: 3, label: "Ср" },
+                  { value: 4, label: "Чт" },
+                  { value: 5, label: "Пт" },
+                  { value: 6, label: "Сб" },
+                  { value: 0, label: "Вс" }
+                ].map(day => (
+                  <Button
+                    key={day.value}
+                    type="button"
+                    variant={form.recurrence_days?.includes(day.value) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const days = form.recurrence_days || [];
+                      const newDays = days.includes(day.value)
+                        ? days.filter(d => d !== day.value)
+                        : [...days, day.value].sort((a, b) => a - b);
+                      setForm({ ...form, recurrence_days: newDays });
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    {day.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {form.recurrence_frequency === "monthly" && (
+            <div className="space-y-2">
+              <Label className="text-sm">День месяца</Label>
+              <Select
+                value={form.recurrence_day_of_month?.toString() || "1"}
+                onValueChange={(value) => setForm({ 
+                  ...form, 
+                  recurrence_day_of_month: parseInt(value) 
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                    <SelectItem key={day} value={day.toString()}>
+                      {day} число
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="last">Последний день</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Время запуска (для daily, weekly, monthly) */}
+          {["daily", "weekly", "monthly"].includes(form.recurrence_frequency) && (
+            <div className="space-y-2">
+              <Label className="text-sm">Время запуска</Label>
+              <Input
+                type="time"
+                value={form.recurrence_time || "09:00"}
+                onChange={(e) => setForm({ ...form, recurrence_time: e.target.value })}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Дата начала (опционально) */}
+      <div className="pt-2">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="has-start-date"
+            checked={!!form.recurrence_start_date}
+            onChange={(e) => setForm({ 
+              ...form, 
+              recurrence_start_date: e.target.checked ? new Date().toISOString().split('T')[0] : null 
+            })}
+            className="h-4 w-4"
+          />
+          <Label htmlFor="has-start-date" className="cursor-pointer">
+            Указать дату начала
+          </Label>
+        </div>
+        
+        {form.recurrence_start_date && (
+          <div className="mt-2">
+            <Input
+              type="date"
+              value={form.recurrence_start_date}
+              onChange={(e) => setForm({ ...form, recurrence_start_date: e.target.value })}
+              min={new Date().toISOString().split('T')[0]}
+              className="w-full md:w-48"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
   
               <div className="flex gap-2">
                 <Button type="submit" disabled={loading}>

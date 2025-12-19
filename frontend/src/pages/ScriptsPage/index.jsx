@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectNative } from "@/components/ui/select-native";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '@/config/api';

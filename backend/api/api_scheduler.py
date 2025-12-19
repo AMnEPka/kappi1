@@ -8,7 +8,7 @@ from config.config_init import db
 from models.execution_models import SchedulerJob, SchedulerJobCreate, SchedulerJobUpdate, SchedulerRun
 from models.auth_models import User
 from services.services_auth import get_current_user, require_permission, can_access_project
-from scheduler.scheduler_utils import normalize_run_times, next_daily_occurrence, calculate_next_run
+from scheduler.scheduler_utils import normalize_run_times, next_recurring_occurrence, calculate_next_run
 from utils.db_utils import prepare_for_mongo, parse_from_mongo
 from utils.audit_utils import log_audit
 
@@ -87,14 +87,43 @@ async def create_scheduler_job(job_input: SchedulerJobCreate, current_user: User
         job.remaining_runs = len(job.run_times)
         job.next_run_at = job.run_times[0]
     elif job.job_type == "recurring":
-        if not job_input.recurrence_time:
-            raise HTTPException(status_code=400, detail="Укажите время повторения")
-        start_date = job_input.recurrence_start_date or now.date()
+        # Build schedule_config from input
+        schedule_mode = job_input.schedule_mode or "simple"
+        frequency = job_input.recurrence_frequency or "daily"
+        
         job.schedule_config = {
-            "recurrence_time": job_input.recurrence_time,
-            "recurrence_start_date": start_date.isoformat()
+            "schedule_mode": schedule_mode,
+            "recurrence_frequency": frequency,
         }
-        job.next_run_at = next_daily_occurrence(job.schedule_config, reference=now, initial=True)
+        
+        if schedule_mode == "advanced":
+            # Cron expression mode
+            if not job_input.cron_expression:
+                raise HTTPException(status_code=400, detail="Укажите cron выражение")
+            job.schedule_config["cron_expression"] = job_input.cron_expression
+        else:
+            # Simple mode - frequency-based
+            if frequency in ("minutes", "hours"):
+                job.schedule_config["recurrence_interval"] = job_input.recurrence_interval or (30 if frequency == "minutes" else 1)
+            elif frequency == "daily":
+                if not job_input.recurrence_time:
+                    raise HTTPException(status_code=400, detail="Укажите время запуска")
+                job.schedule_config["recurrence_time"] = job_input.recurrence_time
+            elif frequency == "weekly":
+                if not job_input.recurrence_time:
+                    raise HTTPException(status_code=400, detail="Укажите время запуска")
+                job.schedule_config["recurrence_time"] = job_input.recurrence_time
+                job.schedule_config["recurrence_days"] = job_input.recurrence_days or [1]  # Default Monday
+            elif frequency == "monthly":
+                if not job_input.recurrence_time:
+                    raise HTTPException(status_code=400, detail="Укажите время запуска")
+                job.schedule_config["recurrence_time"] = job_input.recurrence_time
+                job.schedule_config["recurrence_day_of_month"] = job_input.recurrence_day_of_month or 1
+        
+        if job_input.recurrence_start_date:
+            job.schedule_config["recurrence_start_date"] = job_input.recurrence_start_date.isoformat()
+        
+        job.next_run_at = next_recurring_occurrence(job.schedule_config, reference=now, initial=True)
     else:
         raise HTTPException(status_code=400, detail="Неверный тип задания")
     doc = prepare_for_mongo(job.model_dump())
@@ -150,23 +179,63 @@ async def update_scheduler_job(job_id: str, job_update: SchedulerJobUpdate, curr
     
     if job.job_type == "recurring":
         recurrence_changed = False
+        
+        # Update schedule mode
+        if job_update.schedule_mode is not None:
+            job.schedule_config["schedule_mode"] = job_update.schedule_mode
+            recurrence_changed = True
+        
+        # Update frequency
+        if job_update.recurrence_frequency is not None:
+            job.schedule_config["recurrence_frequency"] = job_update.recurrence_frequency
+            recurrence_changed = True
+            updated_fields.append("частота")
+        
+        # Update interval for minutes/hours
+        if job_update.recurrence_interval is not None:
+            job.schedule_config["recurrence_interval"] = job_update.recurrence_interval
+            recurrence_changed = True
+            updated_fields.append("интервал")
+        
+        # Update time
         if job_update.recurrence_time:
             job.schedule_config["recurrence_time"] = job_update.recurrence_time
             recurrence_changed = True
             updated_fields.append("время повторения")
+        
+        # Update days of week
+        if job_update.recurrence_days is not None:
+            job.schedule_config["recurrence_days"] = job_update.recurrence_days
+            recurrence_changed = True
+            updated_fields.append("дни недели")
+        
+        # Update day of month
+        if job_update.recurrence_day_of_month is not None:
+            job.schedule_config["recurrence_day_of_month"] = job_update.recurrence_day_of_month
+            recurrence_changed = True
+            updated_fields.append("день месяца")
+        
+        # Update cron expression
+        if job_update.cron_expression is not None:
+            job.schedule_config["cron_expression"] = job_update.cron_expression
+            recurrence_changed = True
+            updated_fields.append("cron выражение")
+        
+        # Update start date
         if job_update.recurrence_start_date:
             job.schedule_config["recurrence_start_date"] = job_update.recurrence_start_date.isoformat()
             recurrence_changed = True
             updated_fields.append("дата начала")
+        
         if recurrence_changed:
-            job.next_run_at = next_daily_occurrence(job.schedule_config, reference=now, initial=True)
+            job.next_run_at = next_recurring_occurrence(job.schedule_config, reference=now, initial=True)
             changed = True
     
     if job_update.status in {"active", "paused"}:
         job.status = job_update.status
         status_label = "активен" if job_update.status == "active" else "приостановлен"
         if job.status == "active" and job.job_type == "recurring":
-            job.next_run_at = job.next_run_at or next_daily_occurrence(job.schedule_config, reference=now, initial=True)
+            job.next_run_at = job.next_run_at or next_recurring_occurrence(job.schedule_config, reference=now, initial=True)
         changed = True
         updated_fields.append(f"статус ({status_label})")
     
