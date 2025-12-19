@@ -76,3 +76,5 @@ urllib3==2.5.0
 uvicorn==0.25.0
 watchfiles==1.1.0
 xmltodict==1.0.2
+slowapi==0.1.9
+tenacity==8.2.3

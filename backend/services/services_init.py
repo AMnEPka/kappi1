@@ -31,7 +31,8 @@ from services.services_execution import (
     _check_ssh_login_and_sudo,
     _check_winrm_login,
     _check_admin_access,
-    _check_sudo_access_linux
+    _check_sudo_access_linux,
+    save_failed_executions
 )
 
 # Scheduler
@@ -92,6 +93,7 @@ __all__ = [
     "_check_winrm_login",
     "_check_admin_access",
     "_check_sudo_access_linux",
+    "save_failed_executions",
     
     # Scheduler
     "scheduler_worker",

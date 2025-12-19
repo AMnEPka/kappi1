@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, Request  # pyrigh
 
 from config.config_init import db
 from config.config_security import verify_password, create_access_token
+from config.config_rate_limit import limiter, LOGIN_RATE_LIMIT
 from models.auth_models import User, UserResponse, LoginRequest, LoginResponse
 from services.services_auth import get_current_user, get_user_permissions
 from utils.audit_utils import log_audit
@@ -12,7 +13,8 @@ router = APIRouter()
 
 
 @router.post("/auth/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest, request: Request):
+@limiter.limit(LOGIN_RATE_LIMIT)
+async def login(request: Request, login_data: LoginRequest):
     """Login and get JWT token"""
     # Получаем IP клиента
     client_ip = request.client.host if request.client else None

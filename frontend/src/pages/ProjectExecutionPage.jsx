@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '../config/api';
+import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
 
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
@@ -154,6 +155,23 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
           
           // Add log entry - but replace previous progress if new progress comes
           setLogs(prev => {
+            // Skip task_error if we already showed check_network/check_login/check_sudo error for this host
+            if (data.type === 'task_error') {
+              // Check if there was a check error for this host recently
+              const hasCheckError = prev.some(log => 
+                log.host_name === data.host_name &&
+                (
+                  (log.type === 'check_network' && !log.success) ||
+                  (log.type === 'check_login' && !log.success) ||
+                  (log.type === 'check_sudo' && !log.success)
+                )
+              );
+              if (hasCheckError) {
+                // Skip this task_error as it's a duplicate of the check error
+                return prev;
+              }
+            }
+            
             if (data.type === 'script_progress') {
               // Replace last progress entry if it exists
               const lastIndex = prev.length - 1;
@@ -284,12 +302,24 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const getLogMessage = (log) => {
     switch (log.type) {
       case 'status':
-        // Если статус завершен, показываем исходное сообщение
         return log.message;
       case 'info':
         return log.message;
       case 'error':
+        // Попробуем извлечь информацию об ошибке
+        const errorCode = extractErrorCode(log.message);
+        if (errorCode && ERROR_CODES[errorCode]) {
+          const errorInfo = getErrorDescription(errorCode);
+          return `${log.message}\n  → ${errorInfo.category}: ${errorInfo.error} (${errorInfo.description})`;
+        }
         return log.message;
+      case 'task_error':
+        const taskErrorCode = extractErrorCode(log.error);
+        if (taskErrorCode && ERROR_CODES[taskErrorCode]) {
+          const taskErrorInfo = getErrorDescription(taskErrorCode);
+          return `Ошибка на хосте ${log.host_name}: ${log.error}\n  → ${taskErrorInfo.category}: ${taskErrorInfo.error}`;
+        }
+        return `Ошибка на хосте ${log.host_name}: ${log.error}`;      
       case 'task_start':
         return `\nХост ${log.host_name}`;
       case 'check_network':
@@ -302,8 +332,6 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         return `Проверки проведены ${log.completed}/${log.total}`;
       case 'task_complete':
         return 'Проверки завершены';
-      case 'task_error':
-        return `Ошибка на хосте ${log.host_name}: ${log.error}`;
       case 'complete':
         const totalHosts = log.total;
         const successfulHosts = log.successful_hosts || log.completed;

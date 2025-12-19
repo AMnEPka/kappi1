@@ -7,30 +7,34 @@ import asyncio
 import socket
 import paramiko
 import winrm  # pyright: ignore[reportMissingImports]
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 import logging
+from contextlib import contextmanager
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import os
 
 from config.config_init import logger, decrypt_password, db
-from models.models_init import Host, ExecutionResult
+from models.models_init import Host, ExecutionResult, Execution, Script, System
+from utils.error_codes import get_error_description, extract_error_code_from_output, get_error_code_for_check_type
+from utils.db_utils import prepare_for_mongo
+
+# SSH connection settings from environment
+SSH_CONNECT_TIMEOUT = int(os.environ.get('SSH_CONNECT_TIMEOUT', '10'))
+SSH_COMMAND_TIMEOUT = int(os.environ.get('SSH_COMMAND_TIMEOUT', '60'))
+SSH_RETRY_ATTEMPTS = int(os.environ.get('SSH_RETRY_ATTEMPTS', '3'))
+WINRM_TIMEOUT = int(os.environ.get('WINRM_TIMEOUT', '30'))
 
 
-def _check_network_access(host: Host) -> Tuple[bool, str]:
-    """Check if host is reachable"""
+@contextmanager
+def ssh_connection(host: Host):
+    """
+    Context manager for SSH connections with automatic cleanup.
+    Reuses connection for multiple commands when used properly.
+    """
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
     try:
-        socket.create_connection((host.hostname, host.port), timeout=5)
-        return True, "Network access OK"
-    except socket.timeout:
-        return False, f"Connection timeout to {host.hostname}:{host.port}"
-    except socket.error as e:
-        return False, f"Network error: {str(e)}"
-
-
-def _check_ssh_login(host: Host) -> Tuple[bool, str]:
-    """Check SSH login credentials"""
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
         if host.auth_type == "password":
             password = decrypt_password(host.password) if host.password else ""
             ssh.connect(
@@ -38,7 +42,9 @@ def _check_ssh_login(host: Host) -> Tuple[bool, str]:
                 port=host.port,
                 username=host.username,
                 password=password,
-                timeout=10
+                timeout=SSH_CONNECT_TIMEOUT,
+                banner_timeout=SSH_CONNECT_TIMEOUT,
+                auth_timeout=SSH_CONNECT_TIMEOUT
             )
         else:  # key-based
             ssh.connect(
@@ -46,13 +52,53 @@ def _check_ssh_login(host: Host) -> Tuple[bool, str]:
                 port=host.port,
                 username=host.username,
                 key_filename=host.ssh_key,
-                timeout=10
+                timeout=SSH_CONNECT_TIMEOUT,
+                banner_timeout=SSH_CONNECT_TIMEOUT,
+                auth_timeout=SSH_CONNECT_TIMEOUT
             )
-        
-        ssh.close()
-        return True, "SSH login OK"
+        yield ssh
+    finally:
+        try:
+            ssh.close()
+        except Exception:
+            pass
+
+
+@retry(
+    stop=stop_after_attempt(SSH_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((socket.error, socket.timeout, paramiko.SSHException)),
+    reraise=True
+)
+def _check_network_access(host: Host) -> Tuple[bool, str]:
+    """Check if host is reachable with retry logic"""
+    try:
+        sock = socket.create_connection((host.hostname, host.port), timeout=5)
+        sock.close()
+        return True, "Сетевой доступ получен"
+    except socket.timeout:
+        return False, "Нет сетевого доступа: Недоступен сервер или порт"
+    except socket.error as e:
+        return False, f"Нет сетевого доступа: {str(e)}"
+
+
+@retry(
+    stop=stop_after_attempt(SSH_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((socket.error, socket.timeout)),
+    reraise=True
+)
+def _check_ssh_login(host: Host) -> Tuple[bool, str]:
+    """Check SSH login credentials with retry logic"""
+    try:
+        with ssh_connection(host):
+            return True, "SSH login OK"
+    except paramiko.AuthenticationException:
+        return False, "Неверные учётные данные"
+    except paramiko.SSHException as e:
+        return False, f"Ошибка SSH: {str(e)}"
     except Exception as e:
-        return False, f"SSH login failed: {str(e)}"
+        return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
 
 
 def _check_ssh_login_and_sudo(host: Host) -> Tuple[bool, str, bool, str]:
@@ -69,129 +115,121 @@ def _check_ssh_login_and_sudo(host: Host) -> Tuple[bool, str, bool, str]:
     return login_ok, login_msg, sudo_ok, sudo_msg
 
 
+@retry(
+    stop=stop_after_attempt(SSH_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((socket.error, socket.timeout)),
+    reraise=True
+)
 def _check_sudo_access_linux(host: Host) -> Tuple[bool, str]:
-    """Check sudo access on Linux host"""
+    """Check sudo access on Linux host with retry logic"""
     try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        if host.auth_type == "password":
-            password = decrypt_password(host.password) if host.password else ""
-            ssh.connect(
-                hostname=host.hostname,
-                port=host.port,
-                username=host.username,
-                password=password,
-                timeout=10
-            )
-        else:
-            ssh.connect(
-                hostname=host.hostname,
-                port=host.port,
-                username=host.username,
-                key_filename=host.ssh_key,
-                timeout=10
-            )
-        
-        # Check sudo without password
-        stdin, stdout, stderr = ssh.exec_command("sudo -n id")
-        exit_code = stdout.channel.recv_exit_status()
-        
-        ssh.close()
-        
-        if exit_code == 0:
-            return True, "Sudo access OK (no password required)"
-        else:
-            return False, "Sudo access requires password"
+        with ssh_connection(host) as ssh:
+            # Check sudo without password
+            stdin, stdout, stderr = ssh.exec_command("sudo -n id", timeout=SSH_COMMAND_TIMEOUT)
+            exit_code = stdout.channel.recv_exit_status()
+            
+            if exit_code == 0:
+                return True, "Sudo access OK (no password required)"
+            else:
+                return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
+    except paramiko.AuthenticationException:
+        return False, "Недостаточно прав (sudo): Ошибка аутентификации"
     except Exception as e:
-        return False, f"Sudo check failed: {str(e)}"
+        return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
 
 
+def _create_winrm_session(host: Host) -> winrm.Session:
+    """Create WinRM session with configured timeout"""
+    return winrm.Session(
+        f"http://{host.hostname}:{host.port}",
+        auth=(host.username, decrypt_password(host.password) if host.password else ""),
+        transport='ntlm',
+        read_timeout_sec=WINRM_TIMEOUT,
+        operation_timeout_sec=WINRM_TIMEOUT
+    )
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True
+)
 def _check_admin_access(host: Host) -> Tuple[bool, str]:
-    """Check admin access on Windows host"""
+    """Check admin access on Windows host with retry logic"""
     try:
-        session = winrm.Session(
-            f"http://{host.hostname}:{host.port}",
-            auth=(host.username, decrypt_password(host.password) if host.password else "")
-        )
+        session = _create_winrm_session(host)
         # Run simple command to verify access
         r = session.run_cmd("whoami")
         if r.status_code == 0:
             return True, "Admin access OK"
         else:
-            return False, "Admin access check failed"
+            return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
     except Exception as e:
-        return False, f"Admin access check failed: {str(e)}"
+        return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True
+)
 def _check_winrm_login(host: Host) -> Tuple[bool, str]:
-    """Check WinRM login credentials"""
+    """Check WinRM login credentials with retry logic"""
     try:
-        session = winrm.Session(
-            f"http://{host.hostname}:{host.port}",
-            auth=(host.username, decrypt_password(host.password) if host.password else "")
-        )
+        session = _create_winrm_session(host)
         r = session.run_cmd("echo test")
         if r.status_code == 0:
             return True, "WinRM login OK"
         else:
-            return False, "WinRM login failed"
+            return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
     except Exception as e:
-        return False, f"WinRM login failed: {str(e)}"
+        return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
 
 
+@retry(
+    stop=stop_after_attempt(SSH_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((socket.error, socket.timeout)),
+    reraise=True
+)
 def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
     """
-    Connect to host via SSH and execute command
+    Connect to host via SSH and execute command with retry logic.
+    Uses ssh_connection context manager for automatic cleanup.
     
     Returns: (success, output, error)
     """
     try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        if host.auth_type == "password":
-            password = decrypt_password(host.password) if host.password else ""
-            ssh.connect(
-                hostname=host.hostname,
-                port=host.port,
-                username=host.username,
-                password=password,
-                timeout=30
-            )
-        else:
-            ssh.connect(
-                hostname=host.hostname,
-                port=host.port,
-                username=host.username,
-                key_filename=host.ssh_key,
-                timeout=30
-            )
-        
-        stdin, stdout, stderr = ssh.exec_command(command, timeout=60)
-        exit_code = stdout.channel.recv_exit_status()
-        
-        output = stdout.read().decode('utf-8', errors='ignore')
-        error = stderr.read().decode('utf-8', errors='ignore') if exit_code != 0 else ""
-        
-        ssh.close()
-        
-        return exit_code == 0, output, error
+        with ssh_connection(host) as ssh:
+            stdin, stdout, stderr = ssh.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
+            exit_code = stdout.channel.recv_exit_status()
+            
+            output = stdout.read().decode('utf-8', errors='ignore')
+            error = stderr.read().decode('utf-8', errors='ignore') if exit_code != 0 else ""
+            
+            return exit_code == 0, output, error
+    except paramiko.AuthenticationException as e:
+        return False, "", f"Authentication failed: {str(e)}"
+    except paramiko.SSHException as e:
+        return False, "", f"SSH error: {str(e)}"
     except Exception as e:
         return False, "", str(e)
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True
+)
 def _winrm_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
     """
-    Connect to host via WinRM and execute command
+    Connect to host via WinRM and execute command with retry logic.
     
     Returns: (success, output, error)
     """
     try:
-        session = winrm.Session(
-            f"http://{host.hostname}:{host.port}",
-            auth=(host.username, decrypt_password(host.password) if host.password else "")
-        )
+        session = _create_winrm_session(host)
         
         r = session.run_cmd(command)
         
@@ -296,30 +334,51 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         processor_result = type('obj', (object,), {
             'output': result.stdout,
             'error': result.stderr if result.returncode != 0 else None,
-            'success': result.returncode == 0
+            'success': result.returncode == 0,
+            'returncode': result.returncode
         })()
+        
+        # Extract error code from exit code or output
+        error_code = None
+        error_description = None
+        
+        # First, check if returncode is an error code (>= 1000, as per error codes table)
+        if processor_result.returncode >= 1000:
+            error_code = processor_result.returncode
+            error_info = get_error_description(error_code)
+            error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+        else:
+            # Try to extract from output
+            error_code = extract_error_code_from_output(processor_result.output)
+            if error_code:
+                error_info = get_error_description(error_code)
+                error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
         
         # Parse processor output to determine check result
         output = processor_result.output.strip()
         check_status = None
         
-        # Look for status keywords
-        for line in output.split('\n'):
-            line_stripped = line.strip()
-            line_lower = line_stripped.lower()
-            
-            if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
-                check_status = 'Пройдена'
-                break
-            elif 'не пройдена' in line_lower:
-                check_status = 'Не пройдена'
-                break
-            elif 'оператор' in line_lower:
-                check_status = 'Оператор'
-                break            
-            else:
-                check_status = 'Ошибка'
-                break
+        # If we have an error code, set status to 'Ошибка'
+        if error_code:
+            check_status = 'Ошибка'
+        else:
+            # Look for status keywords
+            for line in output.split('\n'):
+                line_stripped = line.strip()
+                line_lower = line_stripped.lower()
+                
+                if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
+                    check_status = 'Пройдена'
+                    break
+                elif 'не пройдена' in line_lower:
+                    check_status = 'Не пройдена'
+                    break
+                elif 'оператор' in line_lower:
+                    check_status = 'Оператор'
+                    break            
+                else:
+                    check_status = 'Ошибка'
+                    break
 
         
         # Build result message - only command output and final status
@@ -331,7 +390,9 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             success=(check_status == 'Пройдена'),
             output=result_output,
             error=processor_result.error if processor_result.error else None,
-            check_status=check_status
+            check_status=check_status,
+            error_code=error_code,
+            error_description=error_description
         )
         
     except Exception as e:
@@ -422,4 +483,59 @@ def _check_ssh_login_original(host: Host) -> tuple[bool, str]:
 # Keep for backward compatibility
 async def execute_ssh_command(host: Host, command: str) -> ExecutionResult:
     """Execute command on host via SSH"""
-    return await execute_command(host, command)        
+    return await execute_command(host, command)
+
+
+async def save_failed_executions(
+    scripts: List[Script],
+    project_id: str,
+    task_id: str,
+    session_id: str,
+    host: Host,
+    system: System,
+    error_msg: str,
+    check_type: str,
+    user_id: str
+) -> None:
+    """
+    Save failed execution records for all scripts when a preliminary check fails.
+    
+    Args:
+        scripts: List of scripts that failed
+        project_id: Project ID
+        task_id: Project task ID
+        session_id: Execution session ID
+        host: Host where execution failed
+        system: System being checked
+        error_msg: Error message to save
+        check_type: Type of check that failed ('network', 'login', 'sudo', 'admin')
+        user_id: ID of user who initiated execution
+    """
+    # Get error code and description for the check type
+    error_code = get_error_code_for_check_type(check_type)
+    error_description = None
+    
+    if error_code:
+        error_info = get_error_description(error_code)
+        error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+    
+    # Save execution record for each script
+    for script in scripts:
+        execution = Execution(
+            project_id=project_id,
+            project_task_id=task_id,
+            execution_session_id=session_id,
+            host_id=host.id,
+            system_id=system.id,
+            script_id=script.id,
+            script_name=script.name,
+            success=False,
+            output="",
+            error=error_msg,
+            check_status="Ошибка",
+            error_code=error_code,
+            error_description=error_description,
+            executed_by=user_id
+        )
+        exec_doc = prepare_for_mongo(execution.model_dump())
+        await db.executions.insert_one(exec_doc)        

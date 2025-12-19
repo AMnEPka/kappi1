@@ -16,6 +16,8 @@ class ExecutionResult(BaseModel):
     output: str
     error: Optional[str] = None
     check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
+    error_code: Optional[int] = None  # Exit code from script (e.g., 5000)
+    error_description: Optional[str] = None  # Human-readable error description
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -34,6 +36,8 @@ class Execution(BaseModel):
     output: str
     error: Optional[str] = None
     check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
+    error_code: Optional[int] = None  # Exit code from script (e.g., 5000)
+    error_description: Optional[str] = None  # Human-readable error description
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     executed_by: Optional[str] = None
 

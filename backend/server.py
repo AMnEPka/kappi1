@@ -48,7 +48,6 @@ async def get_permissions_list():
 @api_router.get("/projects/{project_id}/execute")
 async def execute_project(project_id: str, token: Optional[str] = None, skip_audit_log: bool = False):
     """Execute project with real-time updates via Server-Sent Events (requires projects_execute permission and access to project)"""
-    
     # Get current user from token parameter (for SSE which doesn't support headers)
     if not token:
         raise HTTPException(status_code=401, detail="Token required for SSE connection")
@@ -159,23 +158,17 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 
                 if not network_ok:
                     # Mark all scripts as failed with network error
-                    for script in scripts:
-                        execution = Execution(
-                            project_id=project_id,
-                            project_task_id=task_obj.id,
-                            execution_session_id=session_id,
-                            host_id=host.id,
-                            system_id=system.id,
-                            script_id=script.id,
-                            script_name=script.name,
-                            success=False,
-                            output="",
-                            error=network_msg,
-                            check_status="Ошибка",
-                            executed_by=user_id
-                        )
-                        exec_doc = prepare_for_mongo(execution.model_dump())
-                        await db.executions.insert_one(exec_doc)
+                    await save_failed_executions(
+                        scripts=scripts,
+                        project_id=project_id,
+                        task_id=task_obj.id,
+                        session_id=session_id,
+                        host=host,
+                        system=system,
+                        error_msg=network_msg,
+                        check_type='network',
+                        user_id=user_id
+                    )
                     
                     await db.project_tasks.update_one(
                         {"id": task_obj.id},
@@ -193,23 +186,17 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                     
                     if not login_ok:
                         # Mark all scripts as failed with login error
-                        for script in scripts:
-                            execution = Execution(
-                                project_id=project_id,
-                                project_task_id=task_obj.id,
-                                execution_session_id=session_id,
-                                host_id=host.id,
-                                system_id=system.id,
-                                script_id=script.id,
-                                script_name=script.name,
-                                success=False,
-                                output="",
-                                error=login_msg,
-                                check_status="Ошибка",
-                            executed_by=user_id
-                            )
-                            exec_doc = prepare_for_mongo(execution.model_dump())
-                            await db.executions.insert_one(exec_doc)
+                        await save_failed_executions(
+                            scripts=scripts,
+                            project_id=project_id,
+                            task_id=task_obj.id,
+                            session_id=session_id,
+                            host=host,
+                            system=system,
+                            error_msg=login_msg,
+                            check_type='login',
+                            user_id=user_id
+                        )
                         
                         await db.project_tasks.update_one(
                             {"id": task_obj.id},
@@ -229,23 +216,17 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                     
                     if not login_ok:
                         # Mark all scripts as failed with login error
-                        for script in scripts:
-                            execution = Execution(
-                                project_id=project_id,
-                                project_task_id=task_obj.id,
-                                execution_session_id=session_id,
-                                host_id=host.id,
-                                system_id=system.id,
-                                script_id=script.id,
-                                script_name=script.name,
-                                success=False,
-                                output="",
-                                error=login_msg,
-                                check_status="Ошибка",
-                            executed_by=user_id
-                            )
-                            exec_doc = prepare_for_mongo(execution.model_dump())
-                            await db.executions.insert_one(exec_doc)
+                        await save_failed_executions(
+                            scripts=scripts,
+                            project_id=project_id,
+                            task_id=task_obj.id,
+                            session_id=session_id,
+                            host=host,
+                            system=system,
+                            error_msg=login_msg,
+                            check_type='login',
+                            user_id=user_id
+                        )
                         
                         await db.project_tasks.update_one(
                             {"id": task_obj.id},
@@ -260,23 +241,18 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 
                 if not sudo_ok:
                     # Mark all scripts as failed with sudo error
-                    for script in scripts:
-                        execution = Execution(
-                            project_id=project_id,
-                            project_task_id=task_obj.id,
-                            execution_session_id=session_id,
-                            host_id=host.id,
-                            system_id=system.id,
-                            script_id=script.id,
-                            script_name=script.name,
-                            success=False,
-                            output="",
-                            error=sudo_msg,
-                            check_status="Ошибка",
-                            executed_by=user_id
-                        )
-                        exec_doc = prepare_for_mongo(execution.model_dump())
-                        await db.executions.insert_one(exec_doc)
+                    check_type = 'admin' if host.connection_type == 'winrm' else 'sudo'
+                    await save_failed_executions(
+                        scripts=scripts,
+                        project_id=project_id,
+                        task_id=task_obj.id,
+                        session_id=session_id,
+                        host=host,
+                        system=system,
+                        error_msg=sudo_msg,
+                        check_type=check_type,
+                        user_id=user_id
+                    )
                     
                     await db.project_tasks.update_one(
                         {"id": task_obj.id},
@@ -319,6 +295,8 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                             output=result.output,
                             error=result.error,
                             check_status=result.check_status,
+                            error_code=result.error_code,
+                            error_description=result.error_description,
                             executed_by=user_id
                         )
                         
@@ -584,6 +562,8 @@ async def execute_script(execute_req: ExecuteRequest, current_user: User = Depen
             output=result.output,
             error=result.error,
             check_status=result.check_status,
+            error_code=result.error_code,
+            error_description=result.error_description,
             executed_by=current_user.id
         )
         
@@ -646,9 +626,17 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
     if not executions:
         raise HTTPException(status_code=404, detail="Результаты выполнения не найдены")
     
-    # Get scripts cache for methodology and criteria
-    scripts_cache = {}
-    hosts_cache = {}
+    # Pre-fetch all scripts and hosts in batch to avoid N+1 queries
+    script_ids = list(set(e.get("script_id") for e in executions if e.get("script_id")))
+    host_ids = list(set(e.get("host_id") for e in executions if e.get("host_id")))
+    
+    # Batch fetch scripts
+    scripts_docs = await db.scripts.find({"id": {"$in": script_ids}}, {"_id": 0}).to_list(len(script_ids))
+    scripts_cache = {s["id"]: s for s in scripts_docs}
+    
+    # Batch fetch hosts
+    hosts_docs = await db.hosts.find({"id": {"$in": host_ids}}, {"_id": 0}).to_list(len(host_ids))
+    hosts_cache = {h["id"]: h for h in hosts_docs}
     
     # Create workbook and worksheet
     wb = Workbook()
@@ -703,16 +691,8 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
     for idx, execution_data in enumerate(executions, 1):
         execution = Execution(**parse_from_mongo(execution_data))
         
-        # Get script info (with caching)
-        if execution.script_id not in scripts_cache:
-            script_doc = await db.scripts.find_one({"id": execution.script_id}, {"_id": 0})
-            scripts_cache[execution.script_id] = script_doc
+        # Get script and host info from pre-fetched cache (no N+1 queries)
         script = scripts_cache.get(execution.script_id, {})
-        
-        # Get host info (with caching)
-        if execution.host_id not in hosts_cache:
-            host_doc = await db.hosts.find_one({"id": execution.host_id}, {"_id": 0})
-            hosts_cache[execution.host_id] = host_doc
         host = hosts_cache.get(execution.host_id, {})
         
         # Prepare data
@@ -727,6 +707,13 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
             "Оператор": "Требует участия оператора"
         }
         result = result_map.get(execution.check_status, execution.check_status or "Не определён")
+        
+        # Add error description to comments if error occurred
+        comments = ""
+        if execution.error_code and execution.error_description:
+            comments = f"Код ошибки: {execution.error_code}. {execution.error_description}"
+        elif execution.error:
+            comments = execution.error
         
         # Level of criticality column - host and username info
         host_info = ""
@@ -743,7 +730,7 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
             test_methodology,  # Описание методики
             success_criteria,  # Критерий успешного прохождения
             result,  # Результат
-            "",  # Комментарии (пусто)
+            comments,  # Комментарии (с описанием ошибки, если есть)
             host_info  # Уровень критичности
         ]
         
@@ -804,23 +791,45 @@ async def get_permissions(current_user: User = Depends(get_current_user)):
 # Include the routers in the main app
 app.include_router(auth_api_router)  # Auth routes from api/ package
 app.include_router(api_router)  # Remaining routes
-# Минимальная рабочая CORS конфигурация
+
+# Setup rate limiting
+from config.config_rate_limit import setup_rate_limiting
+setup_rate_limiting(app)
+
+# CORS configuration
+# TODO: In production, replace with specific origins from CORS_ORIGINS env variable
+CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Просто хардкодим для теста
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
 )
 
 @app.get("/api/health")
-def health():
-    return {"status": "healthy"}
+async def health():
+    """Health check endpoint with database status"""
+    from config.config_init import check_db_health
+    
+    db_health = await check_db_health()
+    overall_status = "healthy" if db_health["status"] == "healthy" else "degraded"
+    
+    return {
+        "status": overall_status,
+        "database": db_health,
+        "version": "1.0.0"
+    }
 
 @app.on_event("startup")
 async def startup_db_init():
     """Initialize database on startup if needed"""
+    from config.config_init import ensure_indexes
+    
     try:
+        # Ensure MongoDB indexes are created
+        await ensure_indexes()
+        
         # Check if admin user exists
         existing_admin = await db.users.find_one({"username": "admin"})
         
