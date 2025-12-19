@@ -27,6 +27,9 @@ ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', '')
 # JWT Configuration
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production-please-use-strong-random-key')
 JWT_ALGORITHM = "HS256"
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRE_MINUTES', '30'))
+JWT_REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get('JWT_REFRESH_TOKEN_EXPIRE_DAYS', '30'))
+# Legacy support
 JWT_ACCESS_TOKEN_EXPIRE_HOURS = 24
 
 # Scheduler Configuration

@@ -5,7 +5,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
-import { api } from '../config/api';
+import { api, getAccessToken } from '../config/api';
 import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
 
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
@@ -145,7 +145,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       // The backend endpoint will start execution when first connected
       // Dynamically construct backend URL to work from any host in local network
       const backendUrl = process.env.REACT_APP_BACKEND_URL;
-      const token = localStorage.getItem('token');
+      const token = getAccessToken();
       const eventSource = new EventSource(`${backendUrl}/api/projects/${projectId}/execute?token=${token}`);
       eventSourceRef.current = eventSource;
 

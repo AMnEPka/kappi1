@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Server, Plus, Edit, Trash2, Loader2, EthernetPort, Upload, HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from '../config/api';
+import { api, getAccessToken } from '../config/api';
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
 export const saveHost = async (hostData) => {
@@ -70,7 +70,7 @@ export default function HostsPage() {
 
   const fetchHosts = async () => {
     // Check if token exists before making request
-    const token = localStorage.getItem('token');
+    const token = getAccessToken();
     if (!token) {
       return; // Don't fetch if not authenticated
     }

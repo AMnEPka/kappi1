@@ -79,6 +79,11 @@ async def ensure_indexes():
         await db.roles.create_index("name", unique=True)
         await db.user_roles.create_index([("user_id", 1), ("role_id", 1)], unique=True)
         
+        # Refresh tokens collection
+        await db.refresh_tokens.create_index("token_id", unique=True)
+        await db.refresh_tokens.create_index("user_id")
+        await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)  # TTL index - auto-delete expired
+        
         # Categories and systems
         await db.categories.create_index("name")
         await db.systems.create_index("category_id")
