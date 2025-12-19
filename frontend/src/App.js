@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from "react-router-dom";
 import { ThemeProvider } from './providers/ThemeProvider';
 import { Suspense, lazy } from 'react';
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Lazy loaded pages
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
@@ -85,40 +86,44 @@ const ProjectResultsPageWrapper = () => {
 
 function App() {
   return (
-    <ThemeProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/*" element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Suspense fallback={<PageLoader />}>
-                      <Routes>
-                        <Route path="/" element={<ProjectsPageWrapper />} />
-                        <Route path="/hosts" element={<HostsPage />} />
-                        <Route path="/scripts" element={<ScriptsPage />} />
-                        <Route path="/execute" element={<ExecutePage />} />
-                        <Route path="/new" element={<ProjectWizardWrapper />} />
-                        <Route path="/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
-                        <Route path="/:projectId/results" element={<ProjectResultsPageWrapper />} />
-                        <Route path="/history" element={<HistoryPage />} />
-                        <Route path="/scheduler" element={<SchedulerPage />} />
-                        <Route path="/logs" element={<LogsPage />} />
-                        <Route path="/admin" element={<AdminPage />} />
-                        <Route path="/users" element={<UsersPage />} />
-                        <Route path="/roles" element={<RolesPage />} />
-                      </Routes>
-                    </Suspense>
-                  </MainLayout>
-                </ProtectedRoute>
-              } />
-            </Routes>
-          </Suspense>
-        </AuthProvider>
-      </BrowserRouter>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/*" element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <ErrorBoundary>
+                        <Suspense fallback={<PageLoader />}>
+                          <Routes>
+                            <Route path="/" element={<ProjectsPageWrapper />} />
+                            <Route path="/hosts" element={<HostsPage />} />
+                            <Route path="/scripts" element={<ScriptsPage />} />
+                            <Route path="/execute" element={<ExecutePage />} />
+                            <Route path="/new" element={<ProjectWizardWrapper />} />
+                            <Route path="/:projectId/execute" element={<ProjectExecutionPageWrapper />} />
+                            <Route path="/:projectId/results" element={<ProjectResultsPageWrapper />} />
+                            <Route path="/history" element={<HistoryPage />} />
+                            <Route path="/scheduler" element={<SchedulerPage />} />
+                            <Route path="/logs" element={<LogsPage />} />
+                            <Route path="/admin" element={<AdminPage />} />
+                            <Route path="/users" element={<UsersPage />} />
+                            <Route path="/roles" element={<RolesPage />} />
+                          </Routes>
+                        </Suspense>
+                      </ErrorBoundary>
+                    </MainLayout>
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </Suspense>
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
