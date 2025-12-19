@@ -1,8 +1,9 @@
 """Authentication API endpoints"""
 
 from fastapi import APIRouter, HTTPException, Depends, status, Request  # pyright: ignore[reportMissingImports]
+from typing import Dict, Any
 
-from config.config_init import db
+from config.config_init import db, PERMISSIONS, PERMISSION_GROUPS
 from config.config_security import verify_password, create_access_token
 from config.config_rate_limit import limiter, LOGIN_RATE_LIMIT
 from models.auth_models import User, UserResponse, LoginRequest, LoginResponse
@@ -127,4 +128,13 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     return {
         "user": user_response,
         "permissions": permissions
+    }
+
+
+@router.get("/permissions", response_model=Dict[str, Any])
+async def get_permissions_list():
+    """Get all available permissions with descriptions and groups"""
+    return {
+        "permissions": PERMISSIONS,
+        "groups": PERMISSION_GROUPS
     }
