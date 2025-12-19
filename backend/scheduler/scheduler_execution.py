@@ -96,7 +96,7 @@ async def execute_scheduler_job(job: SchedulerJob) -> Tuple[Optional[str], Optio
         RuntimeError: If job creator user not found
     """
     # Import here to avoid circular dependency
-    from server import execute_project
+    from api.api_executions import execute_project
     from config.config_security import create_access_token  # Импортируем функцию создания токена
     
     user_doc = await db.users.find_one({"id": job.created_by}, {"_id": 0})
