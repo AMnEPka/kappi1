@@ -53,8 +53,35 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
+    expires_in: int  # Access token expiration in seconds
     user: UserResponse
+
+
+class RefreshToken(BaseModel):
+    """Stored refresh token for tracking active sessions"""
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    token_id: str  # jti from JWT - for revocation
+    device_info: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request to refresh access token"""
+    refresh_token: str
+
+
+class TokenRefreshResponse(BaseModel):
+    """Response with new access token"""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int  # seconds
 
 
 class Role(BaseModel):

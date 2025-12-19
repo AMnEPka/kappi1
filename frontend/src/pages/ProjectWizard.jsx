@@ -17,7 +17,7 @@ import {
 } from "../components/ui/select";
 import { Server, ChevronLeft, ChevronRight, Check, Plus, Trash2, HelpCircle, Loader2, Upload, Edit, Copy } from "lucide-react";
 import { toast } from "sonner";
-import { api } from '../config/api';
+import { api, getAccessToken } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ProjectWizard({ onNavigate }) {
@@ -58,7 +58,7 @@ useEffect(() => {
     }
     
     console.log('👤 Пользователь авторизован:', currentUser.username);
-    console.log('🔑 Токен есть:', !!localStorage.getItem('token'));
+    console.log('🔑 Токен есть:', !!getAccessToken());
     
     // Даем небольшую задержку
     await new Promise(resolve => setTimeout(resolve, 500));

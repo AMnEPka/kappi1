@@ -11,7 +11,7 @@ import { PlusCircle, Edit, Trash2, Shield, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from '../contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { api } from '../config/api';
+import { api, getAccessToken, clearTokens } from '../config/api';
 import { useDialog } from "@/hooks/useDialog";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 
@@ -79,34 +79,19 @@ export default function RolesPage() {
       console.log('🔄 Fetching roles...');
       
       // Добавим детальную отладку
-      const token = localStorage.getItem('token');
-      console.log('📝 Token from localStorage:', token);
-      
-      // Проверим заголовки которые отправляются
-      console.log('🔑 API instance headers:', api.defaults.headers);
+      const token = getAccessToken();
+      console.log('📝 Token:', !!token);
       
       const response = await api.get(`/api/roles`);
       console.log('✅ Roles loaded:', response.data);
       setRoles(response.data);
     } catch (error) {
       console.error('❌ Error fetching roles:', error);
-      console.log('🔍 Full error object:', error);
-      console.log('📊 Response data:', error.response?.data);
-      console.log('📊 Response status:', error.response?.status);
-      console.log('📊 Response headers:', error.response?.headers);
-      
-      // Проверим конфигурацию запроса
-      console.log('🌐 Request config:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        headers: error.config?.headers,
-        baseURL: error.config?.baseURL
-      });
       
       if (error.response?.status === 401) {
         toast.error("Ошибка авторизации. Проверьте токен.");
-        // Попробуем обновить токен или разлогинить
-        localStorage.removeItem('token');
+        // Token refresh handled by interceptor - clear tokens if still failing
+        clearTokens();
         window.location.reload();
       } else if (error.response?.status === 403) {
         toast.error("Недостаточно прав для просмотра ролей");

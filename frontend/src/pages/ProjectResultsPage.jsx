@@ -19,7 +19,7 @@ import {
 } from "../components/ui/dialog";
 import { ChevronLeft, CheckCircle, XCircle, Eye, Download, BarChart3, X } from "lucide-react";
 import { toast } from "sonner";
-import { api } from '../config/api';
+import { api, getAccessToken } from '../config/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
 
@@ -122,7 +122,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     try {
       setLoading(true);
       console.log('Запрашиваем проект с ID:', projectId);
-      console.log('Токен пользователя:', localStorage.getItem('token'));
+      console.log('Токен пользователя:', !!getAccessToken());
 
       
       // ... в useEffect или перед fetchProjectAndSessions
