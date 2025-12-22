@@ -297,7 +297,9 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                         {"id": task_obj.id},
                         {"$set": {"status": "failed"}}
                     )
-                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': str(e)})}\n\n"
+                    # Log detailed error server-side, send generic error to client
+                    logger.error(f"Error during task execution on host '{host.name}' for task '{task_obj.id}': {e}")
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': 'Internal error during task execution'})}\n\n"
             
             # Send completion event (don't update project status - project is reusable)
             successful_hosts = completed_tasks
@@ -305,8 +307,9 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
             yield f"data: {json.dumps({'type': 'complete', 'status': final_status, 'completed': completed_tasks, 'failed': failed_tasks, 'total': total_tasks, 'successful_hosts': successful_hosts, 'session_id': session_id})}\n\n"
         
         except Exception as e:
-            logger.error(f"Error during project execution: {str(e)}")
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Ошибка: {str(e)}'})}\n\n"
+            logger.error(f"Error during project execution: {e}")
+            # Send a generic error message without exposing internal exception details
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Произошла внутренняя ошибка при выполнении проекта. Обратитесь к администратору.'})}\n\n"
     
     return StreamingResponse(
         event_generator(),
