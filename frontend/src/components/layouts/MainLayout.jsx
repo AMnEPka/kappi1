@@ -13,8 +13,9 @@ import {
   ChevronRight,
   Home,
   ChevronLeft,
+  Bot,
 } from "lucide-react";
-import { Button, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui-new';
+import { Button, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui/md3';
 import { useAuth } from '@/contexts/AuthContext';
 import './MainLayout.css';
 
@@ -99,22 +100,6 @@ export const MainLayout = ({ children }) => {
             </Button>
           </Link>
 
-          <Link 
-            to="/hosts" 
-            className="md3-sidebar-item-link"
-            onClick={(e) => e.preventDefault()} // ← блокируем переход
-            style={{ cursor: 'not-allowed' }}
-          >
-            <Button
-              variant={isActive('/hosts') ? "tonal" : "text"}
-              className={`md3-sidebar-button ${isActive('/hosts') ? 'md3-sidebar-button-active' : ''} md3-sidebar-button-inactive`}
-              disabled={true}
-            >
-              <Server className="md3-icon" />
-              {isSidebarExpanded && "Хосты"}
-            </Button>
-          </Link>
-
           <Link to="/scripts" className="md3-sidebar-item-link">
             <Button
               variant={isActive('/scripts') ? "tonal" : "text"}
@@ -136,6 +121,16 @@ export const MainLayout = ({ children }) => {
               </Button>
             </Link>
           )}
+
+          <Link to="/ai-test" className="md3-sidebar-item-link">
+            <Button
+              variant={isActive('/ai-test') ? "tonal" : "text"}
+              className={`md3-sidebar-button ${isActive('/ai-test') ? 'md3-sidebar-button-active' : ''}`}
+            >
+              <Bot className="md3-icon" />
+              {isSidebarExpanded && "Тест ИИ"}
+            </Button>
+          </Link>
 
           {/* Admin Section Separator */}
           {isAdmin && (
@@ -242,6 +237,7 @@ const getPageTitle = (pathname) => {
     '/hosts': 'Хосты',
     '/scripts': 'Проверки',
     '/scheduler': 'Планировщик',
+    '/ai-test': 'Тест ИИ',
     '/logs': 'Логи системы',
     '/admin': 'Админ-панель',
     '/users': 'Пользователи',

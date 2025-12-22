@@ -26,6 +26,10 @@ async def create_host(host_input: HostCreate, current_user: User = Depends(get_c
     if host_dict.get('password'):
         host_dict['password'] = encrypt_password(host_dict['password'])
     
+    # Encrypt SSH key if provided
+    if host_dict.get('ssh_key'):
+        host_dict['ssh_key'] = encrypt_password(host_dict['ssh_key'])
+    
     host_obj = Host(**host_dict, created_by=current_user.id)
     doc = prepare_for_mongo(host_obj.model_dump())
     
@@ -120,6 +124,10 @@ async def update_host(host_id: str, host_update: HostUpdate, current_user: User 
     # Encrypt password if provided
     if 'password' in update_data and update_data['password']:
         update_data['password'] = encrypt_password(update_data['password'])
+    
+    # Encrypt SSH key if provided
+    if 'ssh_key' in update_data and update_data['ssh_key']:
+        update_data['ssh_key'] = encrypt_password(update_data['ssh_key'])
     
     if not update_data:
         raise HTTPException(status_code=400, detail="Нет данных для обновления")

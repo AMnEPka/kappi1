@@ -86,7 +86,6 @@ export default function ProjectsPage({ onNavigate }) {
 
   const handleDeleteProject = async (projectId, projectName) => {
 
-    console.log('Кнопка удаления нажата:', projectId, projectName);
     const confirmed = await showConfirm(
       'Удаление проекта',
       `Вы уверены, что хотите удалить проект <strong>"${projectName}"</strong>? Это действие нельзя отменить.`,
@@ -96,8 +95,6 @@ export default function ProjectsPage({ onNavigate }) {
         cancelText: "Отмена"
       }
     );
-
-    console.log('Диалог закрыт. Результат:', confirmed);
 
     if (!confirmed) {
       return;

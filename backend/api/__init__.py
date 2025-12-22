@@ -14,6 +14,10 @@ from .api_projects import router as projects_router
 from .api_users import router as users_router
 from .api_scheduler import router as scheduler_router
 from .api_check_groups import router as check_groups_router
+from .api_executions import router as executions_router
+from .api_audit import router as audit_router
+from .api_export import router as export_router
+from .api_ai import router as ai_router
 
 # Create main API router with /api prefix
 api_router = APIRouter(prefix="/api")
@@ -27,5 +31,9 @@ api_router.include_router(projects_router, tags=["projects"])
 api_router.include_router(users_router, tags=["users"])
 api_router.include_router(scheduler_router, tags=["scheduler"])
 api_router.include_router(check_groups_router, tags=["check-groups"])
+api_router.include_router(executions_router, tags=["executions"])
+api_router.include_router(audit_router, tags=["audit"])
+api_router.include_router(export_router, tags=["export"])
+api_router.include_router(ai_router, tags=["ai"])
 
 __all__ = ['api_router']

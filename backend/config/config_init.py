@@ -24,7 +24,11 @@ from config.config_security import ( # pyright: ignore[reportMissingImports]
     verify_password,
     security,
     create_access_token,
+    create_refresh_token,
+    create_token_pair,
     decode_token,
+    is_refresh_token,
+    is_access_token,
     encrypt_password,
     decrypt_password
 )
@@ -56,7 +60,11 @@ __all__ = [
     "verify_password",
     "security",
     "create_access_token",
+    "create_refresh_token",
+    "create_token_pair",
     "decode_token",
+    "is_refresh_token",
+    "is_access_token",
     "encrypt_password",
     "decrypt_password",
 

@@ -220,7 +220,9 @@ class TestUserPermissions:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_get_user_permissions_admin(self, mock_db):
-        """Test that admin user gets all permissions"""
+        """Test that admin user gets all permissions from PERMISSIONS dict"""
+        from config.config_settings import PERMISSIONS
+        
         # Create admin user
         admin_user = User(
             id="admin-1",
@@ -228,19 +230,17 @@ class TestUserPermissions:
             is_admin=True
         )
         
-        # Create some roles with permissions
-        await mock_db.roles.insert_many([
-            {"id": "role-1", "permissions": ["perm1", "perm2"]},
-            {"id": "role-2", "permissions": ["perm3", "perm4"]}
-        ])
-        
+        # Admin should get ALL permissions from PERMISSIONS dict,
+        # regardless of what roles exist in the database
         with patch('services.services_auth.db', mock_db):
             permissions = await get_user_permissions(admin_user)
             
-            assert "perm1" in permissions
-            assert "perm2" in permissions
-            assert "perm3" in permissions
-            assert "perm4" in permissions
+            # Admin should have all system permissions
+            for perm in PERMISSIONS.keys():
+                assert perm in permissions
+            
+            # The count should match exactly
+            assert len(permissions) == len(PERMISSIONS)
     
     @pytest.mark.asyncio
     @pytest.mark.unit

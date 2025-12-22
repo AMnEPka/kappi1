@@ -25,6 +25,39 @@ SSH_RETRY_ATTEMPTS = int(os.environ.get('SSH_RETRY_ATTEMPTS', '3'))
 WINRM_TIMEOUT = int(os.environ.get('WINRM_TIMEOUT', '30'))
 
 
+def _load_private_key(key_data: str):
+    """
+    Load private key from string, trying different key formats.
+    SSH keys are stored encrypted, so decrypt first.
+    """
+    from io import StringIO
+    
+    # Decrypt the SSH key
+    decrypted_key = decrypt_password(key_data)
+    
+    # Try different key formats
+    key_file = StringIO(decrypted_key)
+    try:
+        return paramiko.RSAKey.from_private_key(key_file)
+    except:
+        pass
+    
+    key_file = StringIO(decrypted_key)
+    try:
+        return paramiko.DSSKey.from_private_key(key_file)
+    except:
+        pass
+    
+    key_file = StringIO(decrypted_key)
+    try:
+        return paramiko.ECDSAKey.from_private_key(key_file)
+    except:
+        pass
+    
+    key_file = StringIO(decrypted_key)
+    return paramiko.Ed25519Key.from_private_key(key_file)
+
+
 @contextmanager
 def ssh_connection(host: Host):
     """
@@ -47,11 +80,14 @@ def ssh_connection(host: Host):
                 auth_timeout=SSH_CONNECT_TIMEOUT
             )
         else:  # key-based
+            if not host.ssh_key:
+                raise ValueError("SSH key not provided for key-based authentication")
+            pkey = _load_private_key(host.ssh_key)
             ssh.connect(
                 hostname=host.hostname,
                 port=host.port,
                 username=host.username,
-                key_filename=host.ssh_key,
+                pkey=pkey,
                 timeout=SSH_CONNECT_TIMEOUT,
                 banner_timeout=SSH_CONNECT_TIMEOUT,
                 auth_timeout=SSH_CONNECT_TIMEOUT
@@ -431,23 +467,11 @@ def _check_ssh_login_original(host: Host) -> tuple[bool, str]:
                 gss_deleg_creds=False
             )
         else:  # key-based auth
-            from io import StringIO
             if not host.ssh_key:
                 return False, "SSH ключ не указан"
-            key_file = StringIO(host.ssh_key)
-            try:
-                pkey = paramiko.RSAKey.from_private_key(key_file)
-            except:
-                key_file = StringIO(host.ssh_key)
-                try:
-                    pkey = paramiko.DSSKey.from_private_key(key_file)
-                except:
-                    key_file = StringIO(host.ssh_key)
-                    try:
-                        pkey = paramiko.ECDSAKey.from_private_key(key_file)
-                    except:
-                        key_file = StringIO(host.ssh_key)
-                        pkey = paramiko.Ed25519Key.from_private_key(key_file)
+            
+            # Decrypt and load SSH key
+            pkey = _load_private_key(host.ssh_key)
             
             ssh.connect(
                 hostname=host.hostname,

@@ -67,16 +67,30 @@ class SchedulerJobCreate(BaseModel):
     job_type: Literal["one_time", "multi_run", "recurring"]
     run_at: Optional[datetime] = None
     run_times: Optional[List[datetime]] = None
-    recurrence_time: Optional[str] = None  # HH:MM format
+    # Recurring job settings
+    schedule_mode: Optional[Literal["simple", "advanced"]] = "simple"
+    recurrence_frequency: Optional[Literal["minutes", "hours", "daily", "weekly", "monthly"]] = "daily"
+    recurrence_interval: Optional[int] = None  # For minutes/hours: interval value
+    recurrence_time: Optional[str] = None  # HH:MM format for daily/weekly/monthly
+    recurrence_days: Optional[List[int]] = None  # For weekly: days of week (0=Sun, 1=Mon, etc)
+    recurrence_day_of_month: Optional[int] = None  # For monthly: 1-31 or -1 for last day
     recurrence_start_date: Optional[date] = None  # yyyy-mm-dd
+    cron_expression: Optional[str] = None  # For advanced mode
 
 
 class SchedulerJobUpdate(BaseModel):
     name: Optional[str] = None
     run_at: Optional[datetime] = None
     run_times: Optional[List[datetime]] = None
+    # Recurring job settings
+    schedule_mode: Optional[Literal["simple", "advanced"]] = None
+    recurrence_frequency: Optional[Literal["minutes", "hours", "daily", "weekly", "monthly"]] = None
+    recurrence_interval: Optional[int] = None
     recurrence_time: Optional[str] = None
+    recurrence_days: Optional[List[int]] = None
+    recurrence_day_of_month: Optional[int] = None
     recurrence_start_date: Optional[date] = None
+    cron_expression: Optional[str] = None
     status: Optional[Literal["active", "paused"]] = None
 
 

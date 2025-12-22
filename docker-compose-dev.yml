@@ -42,9 +42,9 @@ services:
     volumes:
       - ./backend:/app/backend
       - /app/backend/__pycache__
-    command: uvicorn server:app --host 0.0.0.0 --port 435 --reload  # Поменяли порт на 435
+    command: uvicorn server:app --host 0.0.0.0 --port 435 --reload
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:435/api/hosts"]  # Поменяли порт на 435
+      test: ["CMD", "curl", "-f", "http://localhost:435/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -59,12 +59,12 @@ services:
     container_name: ssh-runner-frontend
     restart: unless-stopped
     ports:
-      - "415:415"   # Поменяли порт на 415
+      - "415:415"
     depends_on:
       - backend
     environment:
-      - REACT_APP_BACKEND_URL=http://localhost:435  # Обновили ссылку на backend
-      - REACT_APP_WS_URL=ws://localhost:435/ws     # Обновили ссылку на websocket
+      - REACT_APP_BACKEND_URL=http://localhost:435
+      - REACT_APP_WS_URL=ws://localhost:435/ws
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
       - FAST_REFRESH=true      
@@ -76,6 +76,42 @@ services:
     tty: true
     networks:
       - ssh-runner-network
+
+  # llama-server:   
+  #     image: ghcr.io/ggml-org/llama.cpp:server
+  #     container_name: ssh-runner-llama-cpp
+  #     restart: unless-stopped
+  #     volumes:
+  #       - ./models:/models  
+  #       - ./ai:/app/ai:ro
+  #     ports:
+  #       - "8000:8000"
+  #     command: >
+  #       -m /models/Trinity-Mini-Q4_K_L.gguf
+  #       -c 512
+  #       -t 4
+  #       --port 8000
+  #       --cont-batching
+  #       --embedding
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '6'
+  #           memory: 16G
+  #         reservations:
+  #           cpus: '4'
+  #           memory: 8G
+  #     networks:
+  #       - ssh-runner-network
+  #     healthcheck:
+  #       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  #       interval: 30s
+  #       timeout: 10s
+  #       retries: 3
+  #       start_period: 40s
+
+
+
 
 volumes:
   mongodb_data:
