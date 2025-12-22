@@ -532,9 +532,10 @@ async def export_all_scripts(current_user: User = Depends(get_current_user)):
     groups_docs = await db.check_groups.find({}, {"_id": 0}).to_list(4000)
     scripts_docs = await db.scripts.find({}, {"_id": 0}).to_list(10000)
     
-    categories_map = {cat["id"]: cat for cat in categories_docs}
-    systems_map = {sys["id"]: sys for sys in systems_docs}
-    group_map = {grp["id"]: grp for grp in groups_docs}
+    # Use .get to avoid KeyError for legacy documents without id
+    categories_map = {cat.get("id"): cat for cat in categories_docs if cat.get("id")}
+    systems_map = {sys.get("id"): sys for sys in systems_docs if sys.get("id")}
+    group_map = {grp.get("id"): grp for grp in groups_docs if grp.get("id")}
     
     systems_export = []
     for system in systems_docs:
@@ -567,13 +568,16 @@ async def export_all_scripts(current_user: User = Depends(get_current_user)):
             grp = group_map.get(group_id)
             if grp:
                 group_names.append(grp.get("name"))
+
+        processor_version = decoded.get("processor_script_version") or {}
+        processor_comment = processor_version.get("comment") if isinstance(processor_version, dict) else None
         
         scripts_export.append({
             "name": decoded.get("name"),
             "description": decoded.get("description"),
             "content": decoded.get("content", ""),
             "processor_script": decoded.get("processor_script"),
-            "processor_script_comment": decoded.get("processor_script_version", {}).get("comment"),
+            "processor_script_comment": processor_comment,
             "has_reference_files": decoded.get("has_reference_files", False),
             "test_methodology": decoded.get("test_methodology"),
             "success_criteria": decoded.get("success_criteria"),
