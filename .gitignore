@@ -81,4 +81,6 @@ android-sdk/ -e
 # Environment files
 *.env
 *.env.*
--e 
+
+# models
+models/Trinity-Mini-Q4_K_L.gguf
