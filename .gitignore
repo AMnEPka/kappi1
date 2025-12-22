@@ -83,4 +83,4 @@ android-sdk/ -e
 *.env.*
 
 # models
-models\Trinity-Mini-Q4_K_L.gguf
+models/Trinity-Mini-Q4_K_L.gguf
