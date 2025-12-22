@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectNative } from "@/components/ui/select-native";
-import { Plus } from "lucide-react";
+import { Plus, Upload, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '@/config/api';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -41,6 +41,7 @@ export default function ScriptsPage() {
     editingScript,
     setEditingScript,
     fetchScripts,
+    refreshAll,
     resetForm,
     handleCategoryChangeInForm,
     openEditDialog,
@@ -55,6 +56,9 @@ export default function ScriptsPage() {
   const [isSyntaxCheckDialogOpen, setIsSyntaxCheckDialogOpen] = useState(false);
   const [syntaxCheckResult, setSyntaxCheckResult] = useState(null);
   const [isCheckingSyntax, setIsCheckingSyntax] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Submit handler
   const handleSubmit = useCallback(async (e) => {
@@ -173,6 +177,51 @@ export default function ScriptsPage() {
     }
   }, [editingScript?.id, fetchScripts, setFormData]);
 
+  const handleExport = useCallback(async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const response = await api.get('/api/scripts/export/all', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `scripts-export-${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Экспорт завершен");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Ошибка экспорта");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [isExporting]);
+
+  const handleImportClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleImportFileChange = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const content = await file.text();
+      const payload = JSON.parse(content);
+      await api.post('/api/scripts/import/bulk', payload);
+      toast.success("Импорт завершен");
+      await refreshAll();
+    } catch (error) {
+      const detail = error.response?.data?.detail || error.message || "Ошибка импорта";
+      toast.error(detail);
+    } finally {
+      setIsImporting(false);
+      event.target.value = "";
+    }
+  }, [refreshAll]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -182,6 +231,24 @@ export default function ScriptsPage() {
           <p className="text-slate-600 mt-1">Создание, редактирование и удаление проверок</p>
         </div>
         <div className="flex gap-2">
+          {canCreateScript() && (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={handleExport}
+                disabled={isExporting}
+              >
+                <Download className="mr-2 h-4 w-4" /> {isExporting ? "Экспорт..." : "Экспорт"}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleImportClick}
+                disabled={isImporting}
+              >
+                <Upload className="mr-2 h-4 w-4" /> {isImporting ? "Импорт..." : "Импорт"}
+              </Button>
+            </>
+          )}
           {canCreateScript() && (
             <Button 
               variant="outline" 
@@ -307,6 +374,13 @@ export default function ScriptsPage() {
         onConfirm={dialogState.onConfirm || (() => {})}
         onCancel={dialogState.onCancel}
         variant={dialogState.variant}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={handleImportFileChange}
       />
     </div>
   );

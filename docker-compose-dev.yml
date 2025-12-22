@@ -77,38 +77,38 @@ services:
     networks:
       - ssh-runner-network
 
-  llama-server:   
-      image: ghcr.io/ggml-org/llama.cpp:server
-      container_name: ssh-runner-llama-cpp
-      restart: unless-stopped
-      volumes:
-        - ./models:/models  
-        - ./ai:/app/ai:ro
-      ports:
-        - "8000:8000"
-      command: >
-        -m /models/Trinity-Mini-Q4_K_L.gguf
-        -c 512
-        -t 4
-        --port 8000
-        --cont-batching
-        --embedding
-      deploy:
-        resources:
-          limits:
-            cpus: '6'
-            memory: 16G
-          reservations:
-            cpus: '4'
-            memory: 8G
-      networks:
-        - ssh-runner-network
-      healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-        start_period: 40s
+  # llama-server:   
+  #     image: ghcr.io/ggml-org/llama.cpp:server
+  #     container_name: ssh-runner-llama-cpp
+  #     restart: unless-stopped
+  #     volumes:
+  #       - ./models:/models  
+  #       - ./ai:/app/ai:ro
+  #     ports:
+  #       - "8000:8000"
+  #     command: >
+  #       -m /models/Trinity-Mini-Q4_K_L.gguf
+  #       -c 512
+  #       -t 4
+  #       --port 8000
+  #       --cont-batching
+  #       --embedding
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: '6'
+  #           memory: 16G
+  #         reservations:
+  #           cpus: '4'
+  #           memory: 8G
+  #     networks:
+  #       - ssh-runner-network
+  #     healthcheck:
+  #       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  #       interval: 30s
+  #       timeout: 10s
+  #       retries: 3
+  #       start_period: 40s
 
 
 

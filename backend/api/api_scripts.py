@@ -1,11 +1,13 @@
 """Scripts API endpoints"""
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request  # pyright: ignore[reportMissingImports]
-from typing import Optional
+from fastapi.responses import JSONResponse
+from typing import Optional, List
+from pydantic import BaseModel, Field
 import hashlib
 
 from config.config_init import db
-from models.content_models import Script, ScriptCreate, ScriptUpdate
+from models.content_models import Script, ScriptCreate, ScriptUpdate, Category, System, CheckGroup
 from models.auth_models import User
 from services.services_auth import get_current_user, has_permission, require_permission
 from utils.db_utils import (
@@ -19,6 +21,49 @@ from datetime import datetime, timezone
 from utils.audit_utils import log_audit
 
 router = APIRouter()
+
+
+class CategoryImportPayload(BaseModel):
+    name: str
+    icon: Optional[str] = "📁"
+    description: Optional[str] = None
+
+
+class SystemImportPayload(BaseModel):
+    name: str
+    category_name: str
+    description: Optional[str] = None
+    os_type: str = "linux"
+
+
+class CheckGroupImportPayload(BaseModel):
+    name: str
+
+
+class ScriptImportPayload(BaseModel):
+    name: str
+    description: Optional[str] = None
+    content: str
+    processor_script: Optional[str] = None
+    processor_script_comment: Optional[str] = None
+    has_reference_files: bool = False
+    test_methodology: Optional[str] = None
+    success_criteria: Optional[str] = None
+    order: int = 0
+    category_name: str
+    category_icon: Optional[str] = "📁"
+    system_name: str
+    system_os_type: str = "linux"
+    group_names: List[str] = Field(default_factory=list)
+
+
+class ScriptsImportRequest(BaseModel):
+    """Payload for importing checks with dependencies"""
+    version: int = 1
+    categories: List[CategoryImportPayload] = Field(default_factory=list)
+    systems: List[SystemImportPayload] = Field(default_factory=list)
+    check_groups: List[CheckGroupImportPayload] = Field(default_factory=list)
+    scripts: List[ScriptImportPayload]
 
 
 @router.post("/systems/{system_id}/scripts", response_model=Script)
@@ -474,6 +519,225 @@ async def rollback_processor_script_version(
     )
     
     return {"message": f"Откат к версии {version_number} выполнен"}
+
+
+@router.get("/scripts/export/all")
+async def export_all_scripts(current_user: User = Depends(get_current_user)):
+    """Export all checks with categories, systems and groups (bulk export)"""
+    if not (await has_permission(current_user, 'checks_edit_all') or await has_permission(current_user, 'checks_create')):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для экспорта проверок")
+    
+    categories_docs = await db.categories.find({}, {"_id": 0}).to_list(2000)
+    systems_docs = await db.systems.find({}, {"_id": 0}).to_list(4000)
+    groups_docs = await db.check_groups.find({}, {"_id": 0}).to_list(4000)
+    scripts_docs = await db.scripts.find({}, {"_id": 0}).to_list(10000)
+    
+    categories_map = {cat["id"]: cat for cat in categories_docs}
+    systems_map = {sys["id"]: sys for sys in systems_docs}
+    group_map = {grp["id"]: grp for grp in groups_docs}
+    
+    systems_export = []
+    for system in systems_docs:
+        category = categories_map.get(system.get("category_id", ""))
+        systems_export.append({
+            "name": system.get("name"),
+            "description": system.get("description"),
+            "os_type": system.get("os_type", "linux"),
+            "category_name": category.get("name") if category else "",
+        })
+    
+    categories_export = [{
+        "name": cat.get("name"),
+        "icon": cat.get("icon", "📁"),
+        "description": cat.get("description")
+    } for cat in categories_docs]
+    
+    groups_export = [{"name": grp.get("name")} for grp in groups_docs]
+    
+    scripts_export = []
+    for script_doc in scripts_docs:
+        parsed = parse_from_mongo(script_doc)
+        decoded = decode_script_from_storage(parsed)
+        system = systems_map.get(decoded.get("system_id", ""))
+        category = categories_map.get(system.get("category_id")) if system else None
+        
+        # Build group names list
+        group_names = []
+        for group_id in decoded.get("group_ids", []):
+            grp = group_map.get(group_id)
+            if grp:
+                group_names.append(grp.get("name"))
+        
+        scripts_export.append({
+            "name": decoded.get("name"),
+            "description": decoded.get("description"),
+            "content": decoded.get("content", ""),
+            "processor_script": decoded.get("processor_script"),
+            "processor_script_comment": decoded.get("processor_script_version", {}).get("comment"),
+            "has_reference_files": decoded.get("has_reference_files", False),
+            "test_methodology": decoded.get("test_methodology"),
+            "success_criteria": decoded.get("success_criteria"),
+            "order": decoded.get("order", 0),
+            "category_name": category.get("name") if category else "",
+            "category_icon": category.get("icon", "📁") if category else "📁",
+            "system_name": system.get("name") if system else "",
+            "system_os_type": system.get("os_type", "linux") if system else "linux",
+            "group_names": group_names
+        })
+    
+    payload = {
+        "version": 1,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "categories": categories_export,
+        "systems": systems_export,
+        "check_groups": groups_export,
+        "scripts": scripts_export
+    }
+    
+    filename = f"scripts-export-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
+    
+    return JSONResponse(
+        content=payload,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.post("/scripts/import/bulk")
+async def import_scripts(
+    payload: ScriptsImportRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Import checks with their categories, systems and groups"""
+    if not (await has_permission(current_user, 'checks_edit_all') or await has_permission(current_user, 'checks_create')):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для импорта проверок")
+    
+    if not payload.scripts:
+        raise HTTPException(status_code=400, detail="Нет данных для импорта")
+    
+    # Load existing entities
+    categories_docs = await db.categories.find({}, {"_id": 0}).to_list(2000)
+    systems_docs = await db.systems.find({}, {"_id": 0}).to_list(4000)
+    groups_docs = await db.check_groups.find({}, {"_id": 0}).to_list(4000)
+    
+    categories_map = {cat["name"].lower(): cat for cat in categories_docs}
+    systems_map = {}
+    for sys in systems_docs:
+        key = f"{sys.get('category_id', '')}:{sys.get('name', '').lower()}"
+        systems_map[key] = sys
+    groups_map = {grp["name"].lower(): grp for grp in groups_docs}
+    
+    # Helpers to reuse payload metadata
+    category_payload_map = {cat.name.lower(): cat for cat in payload.categories}
+    system_payload_map = {}
+    for sys in payload.systems:
+        key = f"{sys.category_name.lower()}:{sys.name.lower()}"
+        system_payload_map[key] = sys
+    
+    created = {"categories": 0, "systems": 0, "check_groups": 0, "scripts": 0}
+    
+    for script in payload.scripts:
+        # Resolve category
+        category_key = script.category_name.strip().lower()
+        category = categories_map.get(category_key)
+        if not category:
+            cat_meta = category_payload_map.get(category_key)
+            new_category = Category(
+                name=script.category_name,
+                icon=(script.category_icon or "📁"),
+                description=cat_meta.description if cat_meta else None,
+                created_by=current_user.id
+            )
+            cat_doc = prepare_for_mongo(new_category.model_dump())
+            await db.categories.insert_one(cat_doc)
+            category = new_category.model_dump()
+            categories_map[category_key] = category
+            created["categories"] += 1
+        
+        # Resolve system
+        system_key = f"{category.get('id')}:{script.system_name.strip().lower()}"
+        system = systems_map.get(system_key)
+        if not system:
+            sys_meta = system_payload_map.get(f"{category_key}:{script.system_name.strip().lower()}")
+            new_system = System(
+                name=script.system_name,
+                category_id=category.get("id"),
+                description=sys_meta.description if sys_meta else None,
+                os_type=sys_meta.os_type if sys_meta else script.system_os_type,
+                created_by=current_user.id
+            )
+            sys_doc = prepare_for_mongo(new_system.model_dump())
+            await db.systems.insert_one(sys_doc)
+            system = new_system.model_dump()
+            systems_map[system_key] = system
+            created["systems"] += 1
+        
+        # Resolve groups
+        group_ids = []
+        for group_name in script.group_names:
+            group_key = group_name.strip().lower()
+            group = groups_map.get(group_key)
+            if not group:
+                new_group = CheckGroup(
+                    name=group_name,
+                    created_by=current_user.id
+                )
+                group_doc = prepare_for_mongo(new_group.model_dump())
+                await db.check_groups.insert_one(group_doc)
+                group = new_group.model_dump()
+                groups_map[group_key] = group
+                created["check_groups"] += 1
+            group_ids.append(group.get("id"))
+        
+        # Check duplicate script in the resolved system
+        existing_script = await db.scripts.find_one({
+            "system_id": system.get("id"),
+            "name": script.name
+        })
+        if existing_script:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Проверка '{script.name}' в системе '{script.system_name}' уже существует. Импорт отменен."
+            )
+        
+        # Prepare script data similar to creation flow
+        script_input = ScriptCreate(
+            system_id=system.get("id"),
+            name=script.name,
+            description=script.description,
+            content=script.content,
+            processor_script=script.processor_script,
+            processor_script_comment=script.processor_script_comment or "Импортированная версия",
+            has_reference_files=script.has_reference_files,
+            test_methodology=script.test_methodology,
+            success_criteria=script.success_criteria,
+            order=script.order,
+            group_ids=group_ids
+        )
+        
+        script_obj = Script(**script_input.model_dump(), created_by=current_user.id)
+        script_dict = script_obj.model_dump()
+        
+        if script_dict.get('processor_script'):
+            processor_script = script_dict.pop('processor_script')
+            processor_comment = script_dict.pop('processor_script_comment', None) or 'Импортированная версия'
+            script_dict['processor_script_version'] = {
+                'content': processor_script,
+                'version_number': 1,
+                'comment': processor_comment,
+                'created_at': datetime.now(timezone.utc),
+                'created_by': current_user.id
+            }
+            script_dict['processor_script_versions'] = []
+        
+        script_dict = encode_script_for_storage(script_dict)
+        script_doc = prepare_for_mongo(script_dict)
+        await db.scripts.insert_one(script_doc)
+        created["scripts"] += 1
+    
+    return {
+        "message": "Импорт завершен",
+        "created": created
+    }
 
 
 @router.post("/scripts/validate-syntax")

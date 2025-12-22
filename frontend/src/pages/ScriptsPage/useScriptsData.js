@@ -74,6 +74,19 @@ export const useScriptsData = () => {
     }
   }, []);
 
+  const refreshAll = useCallback(async () => {
+    await Promise.all([
+      fetchCategories(),
+      fetchCheckGroups()
+    ]);
+
+    if (selectedCategory && selectedCategory !== "all") {
+      await fetchSystemsByCategory(selectedCategory);
+    }
+
+    await fetchScripts();
+  }, [fetchCategories, fetchCheckGroups, fetchSystemsByCategory, fetchScripts, selectedCategory]);
+
   // Initial load
   useEffect(() => {
     fetchCategories();
@@ -185,6 +198,8 @@ export const useScriptsData = () => {
     // Actions
     fetchScripts,
     fetchCheckGroups,
+    fetchCategories,
+    refreshAll,
     resetForm,
     handleCategoryChangeInForm,
     openEditDialog,
