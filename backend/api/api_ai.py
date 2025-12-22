@@ -351,9 +351,10 @@ async def ai_health_check():
                     "note": "Could not reach llama server"
                 }
     except Exception as e:
+        logger.error("Unexpected error during AI health check", exc_info=True)
         return {
             "status": "unavailable",
-            "error": str(e),
+            "error": "Internal error while checking AI server status. See server logs for details.",
             "llama_server_url": LLAMA_SERVER_URL
         }
 
