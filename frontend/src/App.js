@@ -14,6 +14,7 @@ const HostsPage = lazy(() => import("@/pages/HostsPage"));
 const ScriptsPage = lazy(() => import("@/pages/ScriptsPage"));
 const ExecutePage = lazy(() => import("@/pages/ExecutePage"));
 const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
+const AITestPage = lazy(() => import("@/pages/AITestPage"));
 
 // Page wrappers (pages that need router props)
 import {
@@ -68,6 +69,7 @@ function App() {
                             <Route path="/admin" element={<AdminPage />} />
                             <Route path="/users" element={<UsersPage />} />
                             <Route path="/roles" element={<RolesPage />} />
+                            <Route path="/ai-test" element={<AITestPage />} />
                           </Routes>
                         </Suspense>
                       </ErrorBoundary>

@@ -6,7 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, getAccessToken } from '../config/api';
-import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
+import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorCodes';
 
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);

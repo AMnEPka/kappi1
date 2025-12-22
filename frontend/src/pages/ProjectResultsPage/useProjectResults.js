@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, getAccessToken } from '@/config/api';
 import { toast } from 'sonner';
-import { ERROR_CODES, getErrorDescription, extractErrorCode } from '@/config/errorcodes';
+import { ERROR_CODES, getErrorDescription, extractErrorCode } from '@/config/errorCodes';
 
 export const useProjectResults = (projectId) => {
   const [searchParams, setSearchParams] = useSearchParams();
