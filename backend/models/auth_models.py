@@ -58,7 +58,6 @@ class LoginResponse(BaseModel):
     expires_in: int  # Access token expiration in seconds
     user: UserResponse
 
-
 class RefreshToken(BaseModel):
     """Stored refresh token for tracking active sessions"""
     model_config = ConfigDict(extra="ignore")
