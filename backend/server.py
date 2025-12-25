@@ -64,6 +64,21 @@ async def startup_db_init():
     """Initialize database on startup if needed"""
     from config.config_init import ensure_indexes
     from scheduler.scheduler_worker import scheduler_worker
+    import logging
+    
+    # Setup filtered access logging for health checks
+    access_logger = logging.getLogger("uvicorn.access")
+    
+    class HealthCheckFilter(logging.Filter):
+        """Filter to suppress /api/health requests from access logs"""
+        def filter(self, record: logging.LogRecord) -> bool:
+            message = record.getMessage()
+            if "/api/health" in message:
+                return False  # Suppress this log
+            return True
+    
+    # Add filter to access logger
+    access_logger.addFilter(HealthCheckFilter())
     
     try:
         # Ensure MongoDB indexes are created
