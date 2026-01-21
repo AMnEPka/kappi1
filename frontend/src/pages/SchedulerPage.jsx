@@ -137,7 +137,7 @@ const SchedulerPage = () => {
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState(3000); // 3 секунды
+  const [refreshInterval, setRefreshInterval] = useState(10000); // 10 секунд
   const [showJobForm, setShowJobForm] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
   const [form, setForm] = useState({
@@ -178,11 +178,18 @@ const SchedulerPage = () => {
     if (!autoRefresh || !canSchedule) return;
 
     const interval = setInterval(() => {
-      fetchJobs(); // Обновляем список заданий
+      // Обновляем только если есть активные задачи (не на паузе и не завершённые)
+      const hasActiveJobs = jobs.some(job => 
+        job.status === 'active' || job.status === 'running'
+      );
+      
+      if (hasActiveJobs || jobs.length === 0) {
+        fetchJobs(); // Обновляем список заданий
+      }
     }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, refreshInterval, canSchedule]);  
+  }, [autoRefresh, refreshInterval, canSchedule, jobs]);  
 
   const fetchJobs = async () => {
     try {
