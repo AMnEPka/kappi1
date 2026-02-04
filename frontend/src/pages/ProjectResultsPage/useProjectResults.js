@@ -145,9 +145,17 @@ export const useProjectResults = (projectId) => {
   }, [groupedExecutions]);
 
   const getErrorInfo = useCallback((execution) => {
-    if (!execution || execution.check_status !== 'Ошибка') return null;
+    // Show error info for both "Ошибка" and "Не пройдена" statuses
+    if (!execution) return null;
     
-    if (execution.error_code && execution.error_description) {
+    // Only show for error/failed statuses
+    const hasErrorInfo = execution.check_status === 'Ошибка' || 
+                         execution.check_status === 'Не пройдена';
+    
+    if (!hasErrorInfo) return null;
+    
+    // If we have error_description, use it (even without error_code)
+    if (execution.error_description) {
       const parts = execution.error_description.split(': ');
       if (parts.length >= 2) {
         const category = parts[0];
@@ -160,15 +168,42 @@ export const useProjectResults = (projectId) => {
         };
       }
       return {
-        category: 'Ошибка',
+        category: execution.check_status === 'Не пройдена' ? 'Проверка не пройдена' : 'Ошибка',
         error: execution.error_description,
         description: execution.error_description
       };
     }
     
+    // If we have error_code but no description, get description from error codes
+    if (execution.error_code) {
+      return getErrorDescription(execution.error_code);
+    }
+    
+    // Try to extract error code from output
     const errorCode = safeExtractErrorCode(execution.output);
     if (errorCode) {
       return getErrorDescription(errorCode);
+    }
+    
+    // Fallback: show generic message for "Не пройдена" without specific info
+    if (execution.check_status === 'Не пройдена') {
+      // Check if error_description mentions "эталон" (reference data)
+      const hasReferenceMention = execution.error_description && 
+                                  execution.error_description.toLowerCase().includes('эталон');
+      
+      if (hasReferenceMention) {
+        return {
+          category: 'Конфигурация',
+          error: 'Несоответствие эталонным данным',
+          description: 'Результат проверки не соответствует эталонным данным'
+        };
+      }
+      
+      return {
+        category: 'Проверка не пройдена',
+        error: 'Результат проверки не соответствует требованиям',
+        description: 'Проверка завершилась неудачно. Уточните причину в выводе команды.'
+      };
     }
     
     return null;

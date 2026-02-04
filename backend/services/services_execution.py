@@ -15,8 +15,9 @@ import os
 
 from config.config_init import logger, decrypt_password, db
 from models.models_init import Host, ExecutionResult, Execution, Script, System
-from utils.error_codes import get_error_description, extract_error_code_from_output, get_error_code_for_check_type
+from utils.error_codes import get_error_description, extract_error_code_from_output, get_error_code_for_check_type, detect_command_error, is_check_failure_code
 from utils.db_utils import prepare_for_mongo
+from utils.ssh_logger import log_ssh_connection, log_ssh_command, log_ssh_check, log_processor_script
 
 # SSH connection settings from environment
 SSH_CONNECT_TIMEOUT = int(os.environ.get('SSH_CONNECT_TIMEOUT', '10'))
@@ -109,12 +110,16 @@ def ssh_connection(host: Host):
 def _check_network_access(host: Host) -> Tuple[bool, str]:
     """Check if host is reachable with retry logic"""
     try:
+        logger.info(f"Attempting network connection to {host.hostname}:{host.port}")
         sock = socket.create_connection((host.hostname, host.port), timeout=5)
         sock.close()
+        logger.info(f"Network connection successful to {host.hostname}:{host.port}")
         return True, "Сетевой доступ получен"
     except socket.timeout:
+        logger.warning(f"Network connection timeout to {host.hostname}:{host.port}")
         return False, "Нет сетевого доступа: Недоступен сервер или порт"
     except socket.error as e:
+        logger.warning(f"Network connection error to {host.hostname}:{host.port}: {str(e)}")
         return False, f"Нет сетевого доступа: {str(e)}"
 
 
@@ -128,13 +133,20 @@ def _check_ssh_login(host: Host) -> Tuple[bool, str]:
     """Check SSH login credentials with retry logic"""
     try:
         with ssh_connection(host):
+            log_ssh_connection(host, "login", success=True)
             return True, "SSH login OK"
-    except paramiko.AuthenticationException:
-        return False, "Неверные учётные данные"
+    except paramiko.AuthenticationException as e:
+        error_msg = "Неверные учётные данные"
+        log_ssh_connection(host, "login", success=False, error=str(e))
+        return False, error_msg
     except paramiko.SSHException as e:
-        return False, f"Ошибка SSH: {str(e)}"
+        error_msg = f"Ошибка SSH: {str(e)}"
+        log_ssh_connection(host, "login", success=False, error=str(e))
+        return False, error_msg
     except Exception as e:
-        return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
+        error_msg = "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
+        log_ssh_connection(host, "login", success=False, error=str(e))
+        return False, error_msg
 
 
 def _check_ssh_login_and_sudo(host: Host) -> Tuple[bool, str, bool, str]:
@@ -159,19 +171,49 @@ def _check_ssh_login_and_sudo(host: Host) -> Tuple[bool, str, bool, str]:
 )
 def _check_sudo_access_linux(host: Host) -> Tuple[bool, str]:
     """Check sudo access on Linux host with retry logic"""
+    command = "sudo -n id"
     try:
         with ssh_connection(host) as ssh:
             # Check sudo without password
-            stdin, stdout, stderr = ssh.exec_command("sudo -n id", timeout=SSH_COMMAND_TIMEOUT)
+            stdin, stdout, stderr = ssh.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
             exit_code = stdout.channel.recv_exit_status()
+            
+            # Читаем вывод до получения exit_code
+            stdout_text = stdout.read().decode('utf-8', errors='ignore')
+            stderr_text = stderr.read().decode('utf-8', errors='ignore')
+            
+            success = exit_code == 0
+            log_ssh_check(
+                host=host,
+                check_type="sudo",
+                command=command,
+                stdout=stdout_text,
+                stderr=stderr_text,
+                exit_code=exit_code,
+                success=success
+            )
             
             if exit_code == 0:
                 return True, "Sudo access OK (no password required)"
             else:
                 return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
-    except paramiko.AuthenticationException:
+    except paramiko.AuthenticationException as e:
+        log_ssh_check(
+            host=host,
+            check_type="sudo",
+            command=command,
+            stderr=str(e),
+            success=False
+        )
         return False, "Недостаточно прав (sudo): Ошибка аутентификации"
     except Exception as e:
+        log_ssh_check(
+            host=host,
+            check_type="sudo",
+            command=command,
+            stderr=str(e),
+            success=False
+        )
         return False, "Недостаточно прав (sudo): Нет полномочий на выполнение команды"
 
 
@@ -244,13 +286,44 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
             output = stdout.read().decode('utf-8', errors='ignore')
             error = stderr.read().decode('utf-8', errors='ignore') if exit_code != 0 else ""
             
+            # Логируем команду и результат
+            log_ssh_command(
+                host=host,
+                command=command,
+                stdout=output,
+                stderr=error,
+                exit_code=exit_code,
+                success=(exit_code == 0)
+            )
+            
             return exit_code == 0, output, error
     except paramiko.AuthenticationException as e:
-        return False, "", f"Authentication failed: {str(e)}"
+        error_msg = f"Authentication failed: {str(e)}"
+        log_ssh_command(
+            host=host,
+            command=command,
+            stderr=error_msg,
+            success=False
+        )
+        return False, "", error_msg
     except paramiko.SSHException as e:
-        return False, "", f"SSH error: {str(e)}"
+        error_msg = f"SSH error: {str(e)}"
+        log_ssh_command(
+            host=host,
+            command=command,
+            stderr=error_msg,
+            success=False
+        )
+        return False, "", error_msg
     except Exception as e:
-        return False, "", str(e)
+        error_msg = str(e)
+        log_ssh_command(
+            host=host,
+            command=command,
+            stderr=error_msg,
+            success=False
+        )
+        return False, "", error_msg
 
 
 @retry(
@@ -319,43 +392,85 @@ async def execute_command(host: Host, command: str) -> ExecutionResult:
         )
 
 
-async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, reference_data: Optional[str] = None) -> ExecutionResult:
-    """Execute check command and process results with optional reference data"""
-    # Step 1: Execute the main command
+async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, 
+                                        reference_data: Optional[str] = None, script_id: Optional[str] = None, 
+                                        script_name: Optional[str] = None) -> ExecutionResult:
+    """
+    Execute check command and process results with optional reference data.
+    
+    Two-stage process:
+    1. Execute command on remote host - detect technical errors (file not found, permission denied, etc.)
+    2. Run processor script locally - analyze output for check pass/fail
+    
+    Status mapping:
+    - "Ошибка" - Technical errors (1xxx, 2xxx, 3xxx, 5xxx codes)
+    - "Не пройдена" - Check failures (4xxx codes) - config issues found
+    - "Пройдена" - Check passed
+    - "Оператор" - Manual review required
+    """
+    import subprocess
+    
+    # Step 1: Execute the main command on remote host
     main_result = await execute_command(host, command)
     
     if not processor_script:
         # No processor - return as is
         return main_result
     
+    # Step 1.5: Check for technical errors in command execution
     if not main_result.success:
-        # Main command failed - return error
+        # Try to detect specific error from command output
+        # Get exit code from the error message if available
+        exit_code = 1  # Default
+        
+        # Detect error type from stderr/output
+        cmd_error_code = detect_command_error(
+            exit_code=exit_code,
+            stdout=main_result.output or "",
+            stderr=main_result.error or ""
+        )
+        
+        if cmd_error_code:
+            error_info = get_error_description(cmd_error_code)
+            error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+            
+            result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Ошибка ===\n{main_result.error}\n\n=== Статус проверки ===\nОшибка"
+            
+            return ExecutionResult(
+                host_id=host.id,
+                host_name=host.name,
+                success=False,
+                output=result_output,
+                error=main_result.error,
+                check_status="Ошибка",
+                error_code=cmd_error_code,
+                error_description=error_description
+            )
+        
+        # Generic command failure
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Ошибка ===\n{main_result.error}\n\n=== Статус проверки ===\nОшибка"
+        
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
             success=False,
-            output=main_result.output,
-            error=main_result.error
+            output=result_output,
+            error=main_result.error,
+            check_status="Ошибка",
+            error_code=5000,
+            error_description="Критическая: Неизвестная ошибка - Непредвиденная ошибка в скрипте-обработчике"
         )
     
     # Step 2: Run processor script LOCALLY with main command output as input
     try:
-        loop = asyncio.get_event_loop()
-        
-        # Execute processor script LOCALLY on our server
-        # This avoids command line length limits and doesn't require write permissions on remote hosts
-        import subprocess
-        import os
-        
         # Set environment variables for the local process
         env = os.environ.copy()
         env['CHECK_OUTPUT'] = main_result.output
         env['ETALON_INPUT'] = reference_data or ''
         
-        print(f"[DEBUG] Executing processor script locally, output size: {len(main_result.output)} bytes")
+        logger.info(f"Executing processor script locally for {host.name}, output size: {len(main_result.output)} bytes")
         
         # Execute processor script locally using bash
-        # User should write processor scripts in bash regardless of target OS
         result = subprocess.run(
             ['bash', '-c', processor_script],
             env=env,
@@ -364,80 +479,204 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             timeout=30
         )
         
-        print(f"[DEBUG] Local processor execution completed, return code: {result.returncode}")
+        logger.info(f"Local processor execution completed for {host.name}, return code: {result.returncode}")
         
-        # Create processor result from local execution
-        processor_result = type('obj', (object,), {
-            'output': result.stdout,
-            'error': result.stderr if result.returncode != 0 else None,
-            'success': result.returncode == 0,
-            'returncode': result.returncode
-        })()
+        # Log processor script execution
+        log_processor_script(
+            host=host,
+            script_id=script_id or "",
+            script_name=script_name or "",
+            processor_script=processor_script,
+            input_data=main_result.output,
+            reference_data=reference_data or "",
+            stdout=result.stdout,
+            stderr=result.stderr,
+            exit_code=result.returncode,
+            success=(result.returncode == 0)
+        )
         
-        # Extract error code from exit code or output
+        # Determine error code and status
         error_code = None
         error_description = None
-        
-        # First, check if returncode is an error code (>= 1000, as per error codes table)
-        if processor_result.returncode >= 1000:
-            error_code = processor_result.returncode
-            error_info = get_error_description(error_code)
-            error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
-        else:
-            # Try to extract from output
-            error_code = extract_error_code_from_output(processor_result.output)
-            if error_code:
-                error_info = get_error_description(error_code)
-                error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
-        
-        # Parse processor output to determine check result
-        output = processor_result.output.strip()
         check_status = None
         
-        # If we have an error code, set status to 'Ошибка'
-        if error_code:
-            check_status = 'Ошибка'
-        else:
-            # Look for status keywords
-            for line in output.split('\n'):
-                line_stripped = line.strip()
-                line_lower = line_stripped.lower()
-                
-                if 'пройдена' in line_lower and 'не пройдена' not in line_lower:
-                    check_status = 'Пройдена'
-                    break
-                elif 'не пройдена' in line_lower:
-                    check_status = 'Не пройдена'
-                    break
-                elif 'оператор' in line_lower:
-                    check_status = 'Оператор'
-                    break            
-                else:
-                    check_status = 'Ошибка'
-                    break
-
+        output = result.stdout.strip()
+        output_lower = output.lower()
+        stderr = result.stderr.strip() if result.stderr else ""
         
-        # Build result message - only command output and final status
-        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\n{check_status or 'Не определён'}"
+        # FIRST: Check if returncode is a known error code (>= 1000)
+        # This is the primary way scripts should return error codes
+        if result.returncode >= 1000:
+            error_code = result.returncode
+            error_info = get_error_description(error_code)
+            error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+            
+            # Determine status based on error code category
+            if is_check_failure_code(error_code):
+                # 4xxx codes = check failures = "Не пройдена"
+                check_status = "Не пройдена"
+            else:
+                # 1xxx, 2xxx, 3xxx, 5xxx = technical errors = "Ошибка"
+                check_status = "Ошибка"
+        
+        else:
+            # SECOND: Always check stdout for status keywords (regardless of exit code)
+            # This handles cases where script uses set -e and exits with code 1
+            
+            # Try to extract error code from output first (before determining status)
+            extracted_code = extract_error_code_from_output(result.stdout)
+            if extracted_code and extracted_code >= 1000:
+                error_code = extracted_code
+                error_info = get_error_description(error_code)
+                error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+                
+                # Determine status based on error code
+                if is_check_failure_code(error_code):
+                    check_status = "Не пройдена"
+                else:
+                    check_status = "Ошибка"
+            elif 'пройдена' in output_lower and 'не пройдена' not in output_lower:
+                check_status = 'Пройдена'
+            elif 'не пройдена' in output_lower:
+                check_status = 'Не пройдена'
+                # Try to extract error code from output even if status is determined by keyword
+                if not error_code:
+                    extracted_code = extract_error_code_from_output(result.stdout)
+                    if extracted_code and extracted_code >= 1000:
+                        error_code = extracted_code
+                        error_info = get_error_description(error_code)
+                        error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+                    else:
+                        # If no code found but status is "Не пройдена", try to infer from context
+                        # This is a fallback - ideally scripts should return error codes
+                        logger.info(f"Processor script returned 'Не пройдена' without error code for {host.name}")
+            elif 'оператор' in output_lower:
+                check_status = 'Оператор'
+            elif result.returncode == 0:
+                # Exit code 0 without explicit status = passed
+                check_status = 'Пройдена'
+            else:
+                # Non-zero exit code without status keyword
+                # Check stderr for critical errors (syntax errors, etc.)
+                stderr_lower = stderr.lower()
+                is_critical_error = any(pattern in stderr_lower for pattern in [
+                    'syntax error', 'command not found', 'no such file',
+                    'permission denied', 'segmentation fault', 'killed',
+                    'ошибка синтаксиса', 'команда не найдена'
+                ])
+                
+                if is_critical_error:
+                    # Real script error
+                    error_code = 5000
+                    error_info = get_error_description(error_code)
+                    error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+                    check_status = "Ошибка"
+                    logger.warning(f"Processor script error for {host.name}, exit code: {result.returncode}, stderr: {stderr[:200]}")
+                else:
+                    # Non-zero exit without critical error = check failed (e.g., grep returned 1)
+                    check_status = 'Не пройдена'
+                    # Try to extract error code from output
+                    extracted_code = extract_error_code_from_output(result.stdout)
+                    if extracted_code and extracted_code >= 1000:
+                        error_code = extracted_code
+                        error_info = get_error_description(error_code)
+                        error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+                    logger.info(f"Processor script returned exit code {result.returncode} for {host.name}, treating as check failure")
+        
+        # If status is "Не пройдена" but no error code was found, add a generic message
+        if check_status == "Не пройдена" and not error_code:
+            # Try one more time to extract from output
+            extracted_code = extract_error_code_from_output(result.stdout)
+            if extracted_code and extracted_code >= 1000:
+                error_code = extracted_code
+                error_info = get_error_description(error_code)
+                error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+            else:
+                # Fallback: check if reference data was used
+                if reference_data and reference_data.strip():
+                    # If reference data was provided, it's a mismatch with reference
+                    error_description = "Конфигурация: Несоответствие эталонным данным - Результат проверки не соответствует эталонным данным"
+                else:
+                    # No reference data - generic failure
+                    error_description = "Конфигурация: Проверка не пройдена - Результат проверки не соответствует требованиям"
+                logger.info(f"Processor script returned 'Не пройдена' without error code for {host.name}, reference_data used: {bool(reference_data and reference_data.strip())}")
+        
+        # Build result message
+        status_line = check_status or 'Не определён'
+        if error_description:
+            status_line = f"{check_status}\n{error_description}"
+        
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\n{status_line}"
+        
+        # Add stderr info if there was an error (for debugging)
+        if stderr and check_status == "Ошибка":
+            result_output += f"\n\n=== Ошибка скрипта-обработчика ===\n{stderr}"
         
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
             success=(check_status == 'Пройдена'),
             output=result_output,
-            error=processor_result.error if processor_result.error else None,
+            error=result.stderr if result.stderr else None,
             check_status=check_status,
             error_code=error_code,
             error_description=error_description
         )
         
-    except Exception as e:
+    except subprocess.TimeoutExpired:
+        # Processor script timed out
+        error_code = 3004
+        error_info = get_error_description(error_code)
+        error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+        
+        log_processor_script(
+            host=host,
+            script_id=script_id or "",
+            script_name=script_name or "",
+            processor_script=processor_script,
+            input_data=main_result.output,
+            reference_data=reference_data or "",
+            stderr="Таймаут выполнения скрипта-обработчика",
+            success=False
+        )
+        
         return ExecutionResult(
             host_id=host.id,
             host_name=host.name,
             success=False,
-            output=main_result.output,
-            error=f"Ошибка обработчика: {str(e)}"
+            output=f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\nОшибка\n{error_description}",
+            error="Таймаут выполнения скрипта-обработчика",
+            check_status="Ошибка",
+            error_code=error_code,
+            error_description=error_description
+        )
+        
+    except Exception as e:
+        # Log processor script error
+        log_processor_script(
+            host=host,
+            script_id=script_id or "",
+            script_name=script_name or "",
+            processor_script=processor_script,
+            input_data=main_result.output,
+            reference_data=reference_data or "",
+            stderr=f"Ошибка обработчика: {str(e)}",
+            success=False
+        )
+        
+        error_code = 5000
+        error_info = get_error_description(error_code)
+        error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+        
+        return ExecutionResult(
+            host_id=host.id,
+            host_name=host.name,
+            success=False,
+            output=f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\nОшибка\n{error_description}",
+            error=f"Ошибка обработчика: {str(e)}",
+            check_status="Ошибка",
+            error_code=error_code,
+            error_description=error_description
         )
 
 # Keep for backward compatibility

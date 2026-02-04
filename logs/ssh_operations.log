@@ -1,0 +1,186 @@
+[2026-02-04 10:07:58.869] SSH LOG FILE CLEARED - Starting new project execution
+================================================================================
+
+2026-02-04 10:07:58 [INFO] SSH log file cleared at 2026-02-04 10:07:58.869
+2026-02-04 10:07:58 [INFO] 
+================================================================================
+[2026-02-04 10:07:58.981] SSH CONNECTION: login - SUCCESS
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+Auth Type: password
+Connection Type: ssh
+================================================================================
+
+2026-02-04 10:07:59 [INFO] 
+================================================================================
+[2026-02-04 10:07:59.247] SSH CHECK: SUDO - SUCCESS
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+sudo -n id
+
+>>> EXIT CODE: 0
+
+>>> STDOUT:
+uid=0(root) gid=0(root) группы=0(root)
+
+================================================================================
+
+2026-02-04 10:07:59 [INFO] 
+================================================================================
+[2026-02-04 10:07:59.404] SSH COMMAND EXECUTION - SUCCESS
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+cat /etc/hostname
+
+>>> EXIT CODE: 0
+
+>>> STDOUT:
+astra
+
+
+>>> STDERR:
+(empty)
+================================================================================
+
+2026-02-04 10:07:59 [INFO] 
+================================================================================
+[2026-02-04 10:07:59.420] PROCESSOR SCRIPT EXECUTION - SUCCESS
+Host: Linux Server 1 (192.168.56.102:22)
+Script ID: e805f78c-75e1-4713-85ab-0617e2672aec
+Script Name: Проверка hostname
+
+>>> INPUT DATA (CHECK_OUTPUT):
+astra
+
+
+>>> REFERENCE DATA (ETALON_INPUT):
+(empty)
+
+>>> EXIT CODE: 0
+
+>>> STDOUT:
+Пройдена
+
+
+>>> STDERR:
+(empty)
+================================================================================
+
+2026-02-04 10:07:59 [INFO] 
+================================================================================
+[2026-02-04 10:07:59.576] SSH COMMAND EXECUTION - SUCCESS
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+cat /etc/hosts
+
+>>> EXIT CODE: 0
+
+>>> STDOUT:
+127.0.0.1	localhost
+127.0.1.1	astra
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+
+>>> STDERR:
+(empty)
+================================================================================
+
+2026-02-04 10:07:59 [INFO] 
+================================================================================
+[2026-02-04 10:07:59.589] PROCESSOR SCRIPT EXECUTION - FAILED
+Host: Linux Server 1 (192.168.56.102:22)
+Script ID: abb306bc-11b2-430b-902d-b8f58c3ecc0b
+Script Name: 2
+
+>>> INPUT DATA (CHECK_OUTPUT):
+127.0.0.1	localhost
+127.0.1.1	astra
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+
+>>> REFERENCE DATA (ETALON_INPUT):
+user2
+
+>>> EXIT CODE: 1
+
+>>> STDOUT:
+Ошибка
+
+
+>>> STDERR:
+(empty)
+================================================================================
+
+2026-02-04 10:07:59 [INFO] 
+================================================================================
+[2026-02-04 10:07:59.763] SSH COMMAND EXECUTION - SUCCESS
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+sudo cat /etc/sssd/sssd.conf
+
+>>> EXIT CODE: 0
+
+>>> STDOUT:
+[sssd]
+config_version=2
+services = pam
+
+[domain/ad.example.com]
+auth_provider = ad
+
+#simple_allow_users = user1,user2,user3
+simple_allow_groups = group1,group1,group3
+
+
+>>> STDERR:
+(empty)
+================================================================================
+
+2026-02-04 10:07:59 [INFO] 
+================================================================================
+[2026-02-04 10:07:59.773] PROCESSOR SCRIPT EXECUTION - FAILED
+Host: Linux Server 1 (192.168.56.102:22)
+Script ID: 9d1c22b4-713e-4b7f-ba5c-1385c25bf586
+Script Name: sssd.conf
+
+>>> INPUT DATA (CHECK_OUTPUT):
+[sssd]
+config_version=2
+services = pam
+
+[domain/ad.example.com]
+auth_provider = ad
+
+#simple_allow_users = user1,user2,user3
+simple_allow_groups = group1,group1,group3
+
+
+>>> REFERENCE DATA (ETALON_INPUT):
+user1
+user2
+
+>>> EXIT CODE: 162
+
+>>> STDOUT:
+(empty)
+
+>>> STDERR:
+(empty)
+================================================================================
+

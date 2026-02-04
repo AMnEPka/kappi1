@@ -34,7 +34,7 @@ services:
       - PYTHONPATH=/app
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
     volumes:
-      - backend_logs:/app/logs
+      - ./logs:/app/logs
     networks:
       - ssh-runner-network
     logging:
@@ -95,6 +95,4 @@ volumes:
   mongodb_data:
     driver: local
   mongodb_config:
-    driver: local
-  backend_logs:
     driver: local

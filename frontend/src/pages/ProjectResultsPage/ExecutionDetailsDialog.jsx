@@ -35,15 +35,31 @@ export default function ExecutionDetailsDialog({
             {getCheckStatusBadge(execution)}
           </div>
 
-          {/* Error info block */}
+          {/* Error/Failure info block */}
           {errorInfo && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h3 className="font-bold mb-2 text-red-700">Описание ошибки:</h3>
+            <div className={`border rounded-lg p-4 ${
+              execution.check_status === 'Ошибка' 
+                ? 'bg-red-50 border-red-200' 
+                : 'bg-yellow-50 border-yellow-200'
+            }`}>
+              <h3 className={`font-bold mb-2 ${
+                execution.check_status === 'Ошибка' 
+                  ? 'text-red-700' 
+                  : 'text-yellow-700'
+              }`}>
+                {execution.check_status === 'Ошибка' 
+                  ? 'Описание ошибки:' 
+                  : 'Причина непрохождения проверки:'}
+              </h3>
               <div className="space-y-2">
                 {execution.error_code && (
                   <div>
-                    <span className="font-medium">Код ошибки: </span>
-                    <span className="font-mono bg-red-100 px-2 py-1 rounded">
+                    <span className="font-medium">Код: </span>
+                    <span className={`font-mono px-2 py-1 rounded ${
+                      execution.check_status === 'Ошибка' 
+                        ? 'bg-red-100' 
+                        : 'bg-yellow-100'
+                    }`}>
                       {execution.error_code}
                     </span>
                   </div>
@@ -53,7 +69,9 @@ export default function ExecutionDetailsDialog({
                   <span>{errorInfo.category}</span>
                 </div>
                 <div>
-                  <span className="font-medium">Ошибка: </span>
+                  <span className="font-medium">
+                    {execution.check_status === 'Ошибка' ? 'Ошибка: ' : 'Проблема: '}
+                  </span>
                   <span>{errorInfo.error}</span>
                 </div>
                 <div>

@@ -85,7 +85,7 @@ ERROR_CODES = {
     5000: {
         "category": "Критическая",
         "error": "Неизвестная ошибка",
-        "description": "Непредвиденная ошибка в скрипте"
+        "description": "Непредвиденная ошибка в скрипте-обработчике"
     },
     5001: {
         "category": "Критическая",
@@ -170,3 +170,129 @@ def get_error_code_for_check_type(check_type: str) -> Optional[int]:
     }
     return error_code_map.get(check_type.lower())
 
+
+def detect_command_error(exit_code: int, stdout: str, stderr: str) -> Optional[int]:
+    """
+    Detect error code from command execution result.
+    Analyzes exit code and stderr/stdout to determine specific error.
+    
+    Args:
+        exit_code: Command exit code
+        stdout: Command stdout
+        stderr: Command stderr
+        
+    Returns:
+        Error code if detected, None if command succeeded
+    """
+    if exit_code == 0:
+        return None
+    
+    # Combine output for analysis
+    combined = f"{stdout}\n{stderr}".lower()
+    
+    # File not found patterns
+    file_not_found_patterns = [
+        "no such file or directory",
+        "нет такого файла или каталога",
+        "cannot access",
+        "не удаётся получить доступ",
+        "not found",
+        "file not found",
+    ]
+    for pattern in file_not_found_patterns:
+        if pattern in combined:
+            return 2001  # Файл не найден
+    
+    # Permission denied patterns  
+    permission_patterns = [
+        "permission denied",
+        "отказано в доступе",
+        "access denied",
+        "operation not permitted",
+        "операция не позволена",
+    ]
+    for pattern in permission_patterns:
+        if pattern in combined:
+            # Check if it's sudo-related
+            if "sudo" in combined or exit_code == 1 and "sudo" in stdout.lower():
+                return 1003  # Недостаточно прав (sudo)
+            return 2002  # Не хватает прав на файл
+    
+    # Command not found patterns
+    command_not_found_patterns = [
+        "command not found",
+        "команда не найдена",
+        "not recognized as",
+        "не является внутренней или внешней командой",
+        ": not found",
+    ]
+    for pattern in command_not_found_patterns:
+        if pattern in combined:
+            return 3001  # Команда не найдена
+    
+    # Service not found patterns
+    service_not_found_patterns = [
+        "service not found",
+        "unit not found",
+        "could not find unit",
+        "no such unit",
+        "unknown service",
+        "служба не найдена",
+    ]
+    for pattern in service_not_found_patterns:
+        if pattern in combined:
+            return 3002  # Служба не найдена
+    
+    # Service stopped/inactive patterns
+    service_stopped_patterns = [
+        "inactive (dead)",
+        "not running",
+        "is stopped",
+        "failed to start",
+        "службаостановлена",
+    ]
+    for pattern in service_stopped_patterns:
+        if pattern in combined:
+            return 3003  # Служба остановлена
+    
+    # Timeout patterns
+    timeout_patterns = [
+        "timed out",
+        "timeout",
+        "connection timed out",
+        "превышено время ожидания",
+    ]
+    for pattern in timeout_patterns:
+        if pattern in combined:
+            return 3004  # Таймаут выполнения
+    
+    # File corrupted / wrong format
+    format_patterns = [
+        "syntax error",
+        "parse error",
+        "invalid format",
+        "malformed",
+        "синтаксическая ошибка",
+    ]
+    for pattern in format_patterns:
+        if pattern in combined:
+            return 2003  # Файл повреждён
+    
+    # Generic error - couldn't determine specific cause
+    return None
+
+
+def is_check_failure_code(error_code: int) -> bool:
+    """
+    Determine if error code indicates a check failure (not technical error).
+    
+    Check failures (4xxx codes) should have status "Не пройдена"
+    Technical errors (1xxx, 2xxx, 3xxx, 5xxx) should have status "Ошибка"
+    
+    Args:
+        error_code: Error code number
+        
+    Returns:
+        True if this is a check failure (4xxx), False for technical errors
+    """
+    return 4000 <= error_code < 5000

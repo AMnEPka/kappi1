@@ -24,6 +24,8 @@ from services.services_init import (
 )
 from utils.db_utils import prepare_for_mongo, parse_from_mongo, decode_script_from_storage
 from utils.audit_utils import log_audit
+from utils.ssh_logger import clear_ssh_logs
+from utils.error_codes import get_error_code_for_check_type, get_error_description
 
 router = APIRouter()
 
@@ -31,11 +33,19 @@ router = APIRouter()
 @router.get("/projects/{project_id}/execute")
 async def execute_project(project_id: str, token: Optional[str] = None, skip_audit_log: bool = False):
     """Execute project with real-time updates via Server-Sent Events (requires projects_execute permission and access to project)"""
+    logger.info(f"Execute endpoint called for project_id: {project_id}, token present: {bool(token)}")
+    
     # Get current user from token parameter (for SSE which doesn't support headers)
     if not token:
+        logger.warning(f"Execute endpoint called without token for project_id: {project_id}")
         raise HTTPException(status_code=401, detail="Token required for SSE connection")
     
-    current_user = await get_current_user_from_token(token)
+    try:
+        current_user = await get_current_user_from_token(token)
+        logger.info(f"User authenticated: {current_user.username} (id: {current_user.id})")
+    except Exception as e:
+        logger.error(f"Failed to authenticate user from token: {e}")
+        raise
     
     # Check permission
     if not await has_permission(current_user, 'projects_execute'):
@@ -66,6 +76,9 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
             if not project:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Проект не найден'})}\n\n"
                 return
+            
+            # Clear SSH logs before starting new execution
+            clear_ssh_logs()
             
             # Create unique session ID for this execution
             session_id = str(uuid.uuid4())
@@ -133,8 +146,19 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 loop = asyncio.get_event_loop()
                 
                 # 1. Check network access
+                logger.info(f"Checking network access for host: {host.name} ({host.hostname}:{host.port})")
                 network_ok, network_msg = await loop.run_in_executor(None, _check_network_access, host)
-                yield f"data: {json.dumps({'type': 'check_network', 'host_name': host.name, 'success': network_ok, 'message': network_msg})}\n\n"
+                logger.info(f"Network check result for {host.name}: {network_ok}, message: {network_msg}")
+                
+                # Get error code for network check
+                network_error_code = None
+                network_error_info = None
+                if not network_ok:
+                    network_error_code = get_error_code_for_check_type('network')
+                    if network_error_code:
+                        network_error_info = get_error_description(network_error_code)
+                
+                yield f"data: {json.dumps({'type': 'check_network', 'host_name': host.name, 'success': network_ok, 'message': network_msg, 'error_code': network_error_code, 'error_info': network_error_info})}\n\n"
                 
                 if not network_ok:
                     await save_failed_executions(
@@ -154,14 +178,23 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                         {"$set": {"status": "failed"}}
                     )
                     failed_tasks += 1
-                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': network_msg})}\n\n"
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': network_msg, 'error_code': network_error_code, 'error_info': network_error_info})}\n\n"
                     continue
                 
                 # 2. Check login and sudo (combined for SSH to avoid multiple connections)
                 if host.connection_type == "winrm":
                     # For WinRM, check login first
                     login_ok, login_msg = await loop.run_in_executor(None, _check_winrm_login, host)
-                    yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg})}\n\n"
+                    
+                    # Get error code for login check
+                    login_error_code = None
+                    login_error_info = None
+                    if not login_ok:
+                        login_error_code = get_error_code_for_check_type('login')
+                        if login_error_code:
+                            login_error_info = get_error_description(login_error_code)
+                    
+                    yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg, 'error_code': login_error_code, 'error_info': login_error_info})}\n\n"
                     
                     if not login_ok:
                         await save_failed_executions(
@@ -181,16 +214,34 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                             {"$set": {"status": "failed"}}
                         )
                         failed_tasks += 1
-                        yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg})}\n\n"
+                        yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg, 'error_code': login_error_code, 'error_info': login_error_info})}\n\n"
                         continue
                     
                     # Then check admin access
                     sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_admin_access, host)
-                    yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg})}\n\n"
+                    
+                    # Get error code for admin check
+                    sudo_error_code = None
+                    sudo_error_info = None
+                    if not sudo_ok:
+                        sudo_error_code = get_error_code_for_check_type('admin')
+                        if sudo_error_code:
+                            sudo_error_info = get_error_description(sudo_error_code)
+                    
+                    yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg, 'error_code': sudo_error_code, 'error_info': sudo_error_info})}\n\n"
                 else:
                     # For SSH, check both login and sudo in one connection
                     login_ok, login_msg, sudo_ok, sudo_msg = await loop.run_in_executor(None, _check_ssh_login_and_sudo, host)
-                    yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg})}\n\n"
+                    
+                    # Get error code for login check
+                    login_error_code = None
+                    login_error_info = None
+                    if not login_ok:
+                        login_error_code = get_error_code_for_check_type('login')
+                        if login_error_code:
+                            login_error_info = get_error_description(login_error_code)
+                    
+                    yield f"data: {json.dumps({'type': 'check_login', 'host_name': host.name, 'success': login_ok, 'message': login_msg, 'error_code': login_error_code, 'error_info': login_error_info})}\n\n"
                     
                     if not login_ok:
                         await save_failed_executions(
@@ -210,11 +261,18 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                             {"$set": {"status": "failed"}}
                         )
                         failed_tasks += 1
-                        yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg})}\n\n"
+                        yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': login_msg, 'error_code': login_error_code, 'error_info': login_error_info})}\n\n"
                         continue
                     
-                    # Send sudo check result
-                    yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg})}\n\n"
+                    # Send sudo check result with error code
+                    sudo_error_code = None
+                    sudo_error_info = None
+                    if not sudo_ok:
+                        sudo_error_code = get_error_code_for_check_type('sudo')
+                        if sudo_error_code:
+                            sudo_error_info = get_error_description(sudo_error_code)
+                    
+                    yield f"data: {json.dumps({'type': 'check_sudo', 'host_name': host.name, 'success': sudo_ok, 'message': sudo_msg, 'error_code': sudo_error_code, 'error_info': sudo_error_info})}\n\n"
                 
                 if not sudo_ok:
                     check_type = 'admin' if host.connection_type == 'winrm' else 'sudo'
@@ -235,7 +293,7 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                         {"$set": {"status": "failed"}}
                     )
                     failed_tasks += 1
-                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': sudo_msg})}\n\n"
+                    yield f"data: {json.dumps({'type': 'task_error', 'host_name': host.name, 'error': sudo_msg, 'error_code': sudo_error_code, 'error_info': sudo_error_info})}\n\n"
                     continue
                 
                 # All checks passed, proceed with script execution
@@ -250,7 +308,10 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                         reference_data = task_obj.reference_data.get(script.id, '') if task_obj.reference_data else ''
                         
                         # Use processor if available
-                        result = await execute_check_with_processor(host, script.content, script.processor_script, reference_data)
+                        result = await execute_check_with_processor(
+                            host, script.content, script.processor_script, reference_data,
+                            script_id=script.id, script_name=script.name
+                        )
                         
                         scripts_completed += 1
                         yield f"data: {json.dumps({'type': 'script_progress', 'host_name': host.name, 'completed': scripts_completed, 'total': len(scripts)})}\n\n"
@@ -473,7 +534,7 @@ async def execute_script(execute_req: ExecuteRequest, current_user: User = Depen
         raise HTTPException(status_code=404, detail="Хосты не найдены")
     
     # Execute on all hosts concurrently
-    tasks = [execute_check_with_processor(host, script.content, script.processor_script) for host in hosts]
+    tasks = [execute_check_with_processor(host, script.content, script.processor_script, None, script.id, script.name) for host in hosts]
     results = await asyncio.gather(*tasks)
     
     # Save execution records (one per host)
