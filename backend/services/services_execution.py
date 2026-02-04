@@ -434,7 +434,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             error_info = get_error_description(cmd_error_code)
             error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
             
-            result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Ошибка ===\n{main_result.error}"
+            result_output = main_result.output
             
             return ExecutionResult(
                 host_id=host.id,
@@ -448,7 +448,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             )
         
         # Generic command failure
-        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Ошибка ===\n{main_result.error}"
+        result_output = main_result.output
         
         return ExecutionResult(
             host_id=host.id,
@@ -606,7 +606,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         if error_description:
             status_line = f"{check_status}\n{error_description}"
         
-        result_output = f"=== Результат команды ===\n{main_result.output}"
+        result_output = main_result.output
         
         # Add stderr info if there was an error (for debugging)
         if stderr and check_status == "Ошибка":
@@ -719,7 +719,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             host_id=host.id,
             host_name=host.name,
             success=False,
-            output=f"=== Результат команды ===\n{main_result.output}",
+            output=main_result.output,
             error="Таймаут выполнения скрипта-обработчика",
             check_status="Ошибка",
             error_code=error_code,
@@ -747,7 +747,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             host_id=host.id,
             host_name=host.name,
             success=False,
-            output=f"=== Результат команды ===\n{main_result.output}",
+            output=main_result.output",
             error=f"Ошибка обработчика: {str(e)}",
             check_status="Ошибка",
             error_code=error_code,

@@ -36,13 +36,7 @@ export default function ExecutionDetailsDialog({
             {getCheckStatusBadge(execution)}
           </div>
 
-          {/* Reference Comparison */}
-          {execution.reference_data && execution.actual_data && (
-            <ReferenceComparison
-              referenceData={execution.reference_data}
-              actualData={execution.actual_data}
-            />
-          )}
+
 
           {/* Error/Failure info block */}
           {errorInfo && (
@@ -77,12 +71,12 @@ export default function ExecutionDetailsDialog({
                   <span className="font-medium">Категория: </span>
                   <span className="break-words">{errorInfo.category}</span>
                 </div>
-                <div className="break-words">
+                {/* <div className="break-words">
                   <span className="font-medium">
                     {execution.check_status === 'Ошибка' ? 'Ошибка: ' : 'Проблема: '}
                   </span>
                   <span className="break-words">{errorInfo.error}</span>
-                </div>
+                </div> */}
                 <div className="break-words">
                   <span className="font-medium">Описание: </span>
                   <span className="break-words">{errorInfo.description}</span>
@@ -91,9 +85,17 @@ export default function ExecutionDetailsDialog({
             </div>
           )}
 
+          {/* Reference Comparison */}
+          {execution.reference_data && execution.actual_data && (
+            <ReferenceComparison
+              referenceData={execution.reference_data}
+              actualData={execution.actual_data}
+            />
+          )}
+
           {execution.output && (
             <div>
-              <h3 className="font-bold mb-2">Вывод команды:</h3>
+              <h3 className="font-bold mb-2">Вывод исполненной команды:</h3>
               <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm whitespace-pre-wrap break-words">
                 {execution.output}
               </pre>
