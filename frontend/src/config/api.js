@@ -2,7 +2,12 @@ import axios from 'axios';
 
 // API Configuration
 const API_URL = process.env.REACT_APP_BACKEND_URL || '/';
-const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:415/ws';
+// Определяем WS URL динамически на основе текущего хоста
+const getDefaultWsUrl = () => {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}/ws`;
+};
+const WS_URL = process.env.REACT_APP_WS_URL || getDefaultWsUrl();
 
 export const api = axios.create({
   baseURL: API_URL,

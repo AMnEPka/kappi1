@@ -4,6 +4,20 @@ import { api, getAccessToken } from '@/config/api';
 import { toast } from 'sonner';
 import { ERROR_CODES, getErrorDescription, extractErrorCode } from '@/config/errorcodes';
 
+const fallbackExtractErrorCode = (output) => {
+  if (!output) return null;
+  const text = String(output);
+  const exitMatch = text.match(/exit code:?\s*(\d+)/i);
+  if (exitMatch?.[1]) return Number(exitMatch[1]);
+  const lines = text.trim().split('\n');
+  const lastLine = (lines[lines.length - 1] || '').trim();
+  if (/^\d+$/.test(lastLine)) return Number(lastLine);
+  return null;
+};
+
+const safeExtractErrorCode =
+  typeof extractErrorCode === 'function' ? extractErrorCode : fallbackExtractErrorCode;
+
 export const useProjectResults = (projectId) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState(null);
@@ -152,7 +166,7 @@ export const useProjectResults = (projectId) => {
       };
     }
     
-    const errorCode = extractErrorCode(execution.output);
+    const errorCode = safeExtractErrorCode(execution.output);
     if (errorCode) {
       return getErrorDescription(errorCode);
     }

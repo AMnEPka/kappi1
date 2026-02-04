@@ -194,13 +194,42 @@ CardFooter.displayName = 'CardFooter';
 // ============================================
 // Input
 // ============================================
-const Input = React.forwardRef(({ className, type = "text", error, ...props }, ref) => {
+const Input = React.forwardRef(({ 
+  className, 
+  type = "text", 
+  error, 
+  name,
+  allowAutoComplete = false,
+  autoComplete: explicitAutoComplete,
+  ...props 
+}, ref) => {
+  // Определяем значение autoComplete
+  const getAutoCompleteValue = () => {
+    if (explicitAutoComplete !== undefined) {
+      return explicitAutoComplete;
+    }
+    if (allowAutoComplete) {
+      if (type === 'password') {
+        return 'current-password';
+      }
+      if (name === 'username' || name === 'email') {
+        return 'username';
+      }
+    }
+    if (type === 'password') {
+      return 'new-password';
+    }
+    return 'off';
+  };
+
   return (
     <div className="md3-input-wrapper">
       <input
         type={type}
+        name={name}
         className={cn('md3-input', error && 'md3-input-error', className)}
         ref={ref}
+        autoComplete={getAutoCompleteValue()}
         {...props}
       />
       {error && (

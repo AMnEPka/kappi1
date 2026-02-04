@@ -24,7 +24,7 @@ ERROR_CODES = {
     },
     1004: {
         "category": "Авторизация",
-        "error": "Отказано в доступе",
+        "error": "Отказано в доступе к файлу",
         "description": "Генерал permission denied"
     },
     2001: {

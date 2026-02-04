@@ -8,6 +8,20 @@ import { toast } from "sonner";
 import { api, getAccessToken } from '../config/api';
 import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
 
+const fallbackExtractErrorCode = (output) => {
+  if (!output) return null;
+  const text = String(output);
+  const exitMatch = text.match(/exit code:?\s*(\d+)/i);
+  if (exitMatch?.[1]) return Number(exitMatch[1]);
+  const lines = text.trim().split('\n');
+  const lastLine = (lines[lines.length - 1] || '').trim();
+  if (/^\d+$/.test(lastLine)) return Number(lastLine);
+  return null;
+};
+
+const safeExtractErrorCode =
+  typeof extractErrorCode === 'function' ? extractErrorCode : fallbackExtractErrorCode;
+
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
   const [executing, setExecuting] = useState(false);
@@ -307,14 +321,14 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         return log.message;
       case 'error':
         // Попробуем извлечь информацию об ошибке
-        const errorCode = extractErrorCode(log.message);
+        const errorCode = safeExtractErrorCode(log.message);
         if (errorCode && ERROR_CODES[errorCode]) {
           const errorInfo = getErrorDescription(errorCode);
           return `${log.message}\n  → ${errorInfo.category}: ${errorInfo.error} (${errorInfo.description})`;
         }
         return log.message;
       case 'task_error':
-        const taskErrorCode = extractErrorCode(log.error);
+        const taskErrorCode = safeExtractErrorCode(log.error);
         if (taskErrorCode && ERROR_CODES[taskErrorCode]) {
           const taskErrorInfo = getErrorDescription(taskErrorCode);
           return `Ошибка на хосте ${log.host_name}: ${log.error}\n  → ${taskErrorInfo.category}: ${taskErrorInfo.error}`;
