@@ -194,7 +194,7 @@ def log_processor_script(host, script_id: str = "", script_name: str = "", proce
         host: Объект хоста (Host)
         script_id: ID скрипта
         script_name: Имя скрипта
-        processor_script: Текст скрипта-обработчика (не логируется, только название)
+        processor_script: Текст скрипта-обработчика
         input_data: Входные данные (CHECK_OUTPUT)
         reference_data: Эталонные данные (ETALON_INPUT)
         stdout: Стандартный вывод скрипта
@@ -206,6 +206,33 @@ def log_processor_script(host, script_id: str = "", script_name: str = "", proce
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         status = "SUCCESS" if success else "FAILED"
         
+        # Prepare script preview (first 20 lines or first 1000 chars)
+        script_preview = ""
+        if processor_script:
+            script_lines = processor_script.split('\n')
+            preview_lines = script_lines[:20]
+            script_preview = '\n'.join(preview_lines)
+            if len(script_lines) > 20:
+                script_preview += f"\n... (total {len(script_lines)} lines, {len(processor_script)} chars)"
+        
+        # Analyze exit code
+        exit_code_info = f"{exit_code if exit_code is not None else 'N/A'}"
+        if exit_code is not None:
+            if exit_code == 0:
+                exit_code_info += " (SUCCESS)"
+            elif exit_code >= 1000:
+                exit_code_info += f" (Custom error code)"
+            elif exit_code == 127:
+                exit_code_info += " (Command not found)"
+            elif exit_code == 126:
+                exit_code_info += " (Command not executable)"
+            elif exit_code == 130:
+                exit_code_info += " (Script terminated by SIGINT)"
+            elif exit_code > 128:
+                exit_code_info += f" (Signal {exit_code - 128})"
+            else:
+                exit_code_info += " (Script error)"
+        
         log_entry = f"""
 {'='*80}
 [{timestamp}] PROCESSOR SCRIPT EXECUTION - {status}
@@ -213,18 +240,21 @@ Host: {host.name} ({host.hostname}:{host.port})
 Script ID: {script_id if script_id else 'N/A'}
 Script Name: {script_name if script_name else 'N/A'}
 
->>> INPUT DATA (CHECK_OUTPUT):
+>>> PROCESSOR SCRIPT (preview):
+{script_preview if script_preview else '(empty)'}
+
+>>> INPUT DATA (CHECK_OUTPUT) - {len(input_data)} chars, {len(input_data.split(chr(10)))} lines:
 {input_data if input_data else '(empty)'}
 
->>> REFERENCE DATA (ETALON_INPUT):
+>>> REFERENCE DATA (ETALON_INPUT) - {len(reference_data)} chars, {len(reference_data.split(chr(10)))} lines:
 {reference_data if reference_data else '(empty)'}
 
->>> EXIT CODE: {exit_code if exit_code is not None else 'N/A'}
+>>> EXIT CODE: {exit_code_info}
 
->>> STDOUT:
+>>> STDOUT ({len(stdout)} chars):
 {stdout if stdout else '(empty)'}
 
->>> STDERR:
+>>> STDERR ({len(stderr)} chars):
 {stderr if stderr else '(empty)'}
 {'='*80}
 """

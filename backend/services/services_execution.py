@@ -463,16 +463,60 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
     
     # Step 2: Run processor script LOCALLY with main command output as input
     try:
+        # Normalize line endings: CRLF -> LF (fixes Windows/Linux compatibility issues)
+        # This is critical when scripts are created on Windows but run on Linux
+        normalized_script = processor_script.replace('\r\n', '\n').replace('\r', '\n')
+        normalized_output = (main_result.output or '').replace('\r\n', '\n').replace('\r', '\n')
+        normalized_reference = (reference_data or '').replace('\r\n', '\n').replace('\r', '\n')
+        
+        # Detailed logging for debugging
+        script_preview = normalized_script[:500] + ('...' if len(normalized_script) > 500 else '')
+        script_lines = normalized_script.split('\n')
+        logger.info(f"Processor script preview (first 500 chars): {repr(script_preview)}")
+        logger.info(f"Processor script total length: {len(normalized_script)} chars, {len(script_lines)} lines")
+        logger.info(f"CHECK_OUTPUT size: {len(normalized_output)} chars, {len(normalized_output.split(chr(10)))} lines")
+        logger.info(f"ETALON_INPUT size: {len(normalized_reference)} chars, {len(normalized_reference.split(chr(10)))} lines")
+        logger.info(f"First 3 lines of script: {script_lines[:3]}")
+        
         # Set environment variables for the local process
         env = os.environ.copy()
-        env['CHECK_OUTPUT'] = main_result.output
-        env['ETALON_INPUT'] = reference_data or ''
+        env['CHECK_OUTPUT'] = normalized_output
+        env['ETALON_INPUT'] = normalized_reference
         
-        logger.info(f"Executing processor script locally for {host.name}, output size: {len(main_result.output)} bytes")
+        # Log environment variable sizes (for debugging)
+        logger.info(f"Environment CHECK_OUTPUT size: {len(env.get('CHECK_OUTPUT', ''))} chars")
+        logger.info(f"Environment ETALON_INPUT size: {len(env.get('ETALON_INPUT', ''))} chars")
+        
+        logger.info(f"Executing processor script locally for {host.name}, output size: {len(normalized_output)} bytes")
+        
+        # Check if bash is available
+        try:
+            bash_check = subprocess.run(['bash', '--version'], capture_output=True, text=True, timeout=5)
+            logger.info(f"Bash version check: {bash_check.returncode}, stdout: {bash_check.stdout[:100] if bash_check.stdout else 'N/A'}")
+        except Exception as e:
+            logger.error(f"Failed to check bash availability: {e}")
+        
+        # Execute processor script locally using bash with verbose error reporting
+        # Try to validate script syntax first
+        syntax_check = subprocess.run(
+            ['bash', '-n'],  # -n = check syntax without executing
+            input=normalized_script,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if syntax_check.returncode != 0:
+            logger.error(f"Bash syntax error in script: {syntax_check.stderr}")
+            logger.error(f"Script content (first 1000 chars): {repr(normalized_script[:1000])}")
+            # Log full script for debugging
+            logger.error(f"Full script:\n{normalized_script}")
         
         # Execute processor script locally using bash
+        # TEMPORARY: Use bash -x for debugging to see what's being executed
+        # This will show all commands being executed
+        logger.info("Executing script with bash -x for debugging")
         result = subprocess.run(
-            ['bash', '-c', processor_script],
+            ['bash', '-x', '-c', normalized_script],
             env=env,
             capture_output=True,
             text=True,
@@ -480,15 +524,20 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         )
         
         logger.info(f"Local processor execution completed for {host.name}, return code: {result.returncode}")
+        logger.info(f"STDOUT length: {len(result.stdout)} chars, STDERR length: {len(result.stderr)} chars")
+        if result.stderr:
+            logger.warning(f"STDERR content: {repr(result.stderr[:500])}")
+        if result.returncode != 0 and result.returncode < 1000:
+            logger.warning(f"Non-zero exit code {result.returncode} - script may have failed or bash error occurred")
         
-        # Log processor script execution
+        # Log processor script execution (use normalized data for logging)
         log_processor_script(
             host=host,
             script_id=script_id or "",
             script_name=script_name or "",
-            processor_script=processor_script,
-            input_data=main_result.output,
-            reference_data=reference_data or "",
+            processor_script=normalized_script,
+            input_data=normalized_output,
+            reference_data=normalized_reference,
             stdout=result.stdout,
             stderr=result.stderr,
             exit_code=result.returncode,
@@ -747,7 +796,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             host_id=host.id,
             host_name=host.name,
             success=False,
-            output=main_result.output",
+            output=main_result.output,
             error=f"Ошибка обработчика: {str(e)}",
             check_status="Ошибка",
             error_code=error_code,

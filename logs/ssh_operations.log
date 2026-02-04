@@ -1,19 +1,19 @@
-[2026-02-04 10:36:28.367] SSH LOG FILE CLEARED - Starting new project execution
+[2026-02-04 11:22:31.843] SSH LOG FILE CLEARED - Starting new project execution
 ================================================================================
 
-2026-02-04 10:36:28 [INFO] SSH log file cleared at 2026-02-04 10:36:28.367
-2026-02-04 10:36:28 [INFO] 
+2026-02-04 11:22:31 [INFO] SSH log file cleared at 2026-02-04 11:22:31.843
+2026-02-04 11:22:31 [INFO] 
 ================================================================================
-[2026-02-04 10:36:28.463] SSH CONNECTION: login - SUCCESS
+[2026-02-04 11:22:31.926] SSH CONNECTION: login - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 Auth Type: password
 Connection Type: ssh
 ================================================================================
 
-2026-02-04 10:36:28 [INFO] 
+2026-02-04 11:22:32 [INFO] 
 ================================================================================
-[2026-02-04 10:36:28.631] SSH CHECK: SUDO - SUCCESS
+[2026-02-04 11:22:32.070] SSH CHECK: SUDO - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
@@ -27,107 +27,9 @@ uid=0(root) gid=0(root) группы=0(root)
 
 ================================================================================
 
-2026-02-04 10:36:28 [INFO] 
+2026-02-04 11:22:32 [INFO] 
 ================================================================================
-[2026-02-04 10:36:28.772] SSH COMMAND EXECUTION - SUCCESS
-Host: Linux Server 1 (192.168.56.102:22)
-Username: user
-
->>> COMMAND SENT:
-cat /etc/hostname
-
->>> EXIT CODE: 0
-
->>> STDOUT:
-astra
-
-
->>> STDERR:
-(empty)
-================================================================================
-
-2026-02-04 10:36:28 [INFO] 
-================================================================================
-[2026-02-04 10:36:28.784] PROCESSOR SCRIPT EXECUTION - SUCCESS
-Host: Linux Server 1 (192.168.56.102:22)
-Script ID: e805f78c-75e1-4713-85ab-0617e2672aec
-Script Name: Проверка hostname
-
->>> INPUT DATA (CHECK_OUTPUT):
-astra
-
-
->>> REFERENCE DATA (ETALON_INPUT):
-(empty)
-
->>> EXIT CODE: 0
-
->>> STDOUT:
-Пройдена
-
-
->>> STDERR:
-(empty)
-================================================================================
-
-2026-02-04 10:36:28 [INFO] 
-================================================================================
-[2026-02-04 10:36:28.930] SSH COMMAND EXECUTION - SUCCESS
-Host: Linux Server 1 (192.168.56.102:22)
-Username: user
-
->>> COMMAND SENT:
-cat /etc/hosts
-
->>> EXIT CODE: 0
-
->>> STDOUT:
-127.0.0.1	localhost
-127.0.1.1	astra
-
-# The following lines are desirable for IPv6 capable hosts
-::1     localhost ip6-localhost ip6-loopback
-ff02::1 ip6-allnodes
-ff02::2 ip6-allrouters
-
-
->>> STDERR:
-(empty)
-================================================================================
-
-2026-02-04 10:36:28 [INFO] 
-================================================================================
-[2026-02-04 10:36:28.944] PROCESSOR SCRIPT EXECUTION - FAILED
-Host: Linux Server 1 (192.168.56.102:22)
-Script ID: abb306bc-11b2-430b-902d-b8f58c3ecc0b
-Script Name: 2
-
->>> INPUT DATA (CHECK_OUTPUT):
-127.0.0.1	localhost
-127.0.1.1	astra
-
-# The following lines are desirable for IPv6 capable hosts
-::1     localhost ip6-localhost ip6-loopback
-ff02::1 ip6-allnodes
-ff02::2 ip6-allrouters
-
-
->>> REFERENCE DATA (ETALON_INPUT):
-user2
-
->>> EXIT CODE: 1
-
->>> STDOUT:
-Ошибка
-
-
->>> STDERR:
-(empty)
-================================================================================
-
-2026-02-04 10:36:29 [INFO] 
-================================================================================
-[2026-02-04 10:36:29.168] SSH COMMAND EXECUTION - SUCCESS
+[2026-02-04 11:22:32.200] SSH COMMAND EXECUTION - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
@@ -152,14 +54,37 @@ simple_allow_groups = group1,group1,group3
 (empty)
 ================================================================================
 
-2026-02-04 10:36:29 [INFO] 
+2026-02-04 11:22:32 [INFO] 
 ================================================================================
-[2026-02-04 10:36:29.180] PROCESSOR SCRIPT EXECUTION - FAILED
+[2026-02-04 11:22:32.221] PROCESSOR SCRIPT EXECUTION - FAILED
 Host: Linux Server 1 (192.168.56.102:22)
 Script ID: 9d1c22b4-713e-4b7f-ba5c-1385c25bf586
 Script Name: sssd.conf
 
->>> INPUT DATA (CHECK_OUTPUT):
+>>> PROCESSOR SCRIPT (preview):
+#!/usr/bin/env bash
+set -euo pipefail
+
+# CHECK_OUTPUT — уже содержит вывод команды с хоста
+# ETALON_INPUT — эталонные данные
+
+if [[ -z "${CHECK_OUTPUT:-}" ]]; then
+exit 5001 # Отсутствует переменная
+fi
+
+if [[ -z "${ETALON_INPUT:-}" ]]; then
+exit 5001
+fi
+
+# Ищем строку в полученных данных (НЕ в файле!)
+# ИСПРАВЛЕНИЕ: добавили [^#] чтобы исключить закомментированные строки
+line="$(echo "$CHECK_OUTPUT" | grep -E '^[[:space:]]*[^#]simple_allow_users[[:space:]]*=' || true)"
+
+if [[ -z "$line" ]]; then
+# Проверим, может закомментирована
+... (total 38 lines, 1002 chars)
+
+>>> INPUT DATA (CHECK_OUTPUT) - 167 chars, 10 lines:
 [sssd]
 config_version=2
 services = pam
@@ -171,16 +96,16 @@ auth_provider = ad
 simple_allow_groups = group1,group1,group3
 
 
->>> REFERENCE DATA (ETALON_INPUT):
+>>> REFERENCE DATA (ETALON_INPUT) - 11 chars, 2 lines:
 user1
 user2
 
->>> EXIT CODE: 162
+>>> EXIT CODE: 162 (Signal 34)
 
->>> STDOUT:
+>>> STDOUT (0 chars):
 (empty)
 
->>> STDERR:
+>>> STDERR (0 chars):
 (empty)
 ================================================================================
 
