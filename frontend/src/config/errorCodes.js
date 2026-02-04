@@ -5,92 +5,92 @@
  */
 
 export const ERROR_CODES = {
-  1001: {
+  11: {
     category: 'Подключение',
     error: 'Нет сетевого доступа',
     description: 'Недоступен сервер или порт',
   },
-  1002: {
+  12: {
     category: 'Аутентификация',
     error: 'Неверные учётные данные',
     description: 'Ошибка при входе (логин/пароль/SSH-ключ)',
   },
-  1003: {
+  13: {
     category: 'Авторизация',
     error: 'Недостаточно прав (sudo)',
     description: 'Нет полномочий на выполнение команды',
   },
-  1004: {
+  14: {
     category: 'Авторизация',
     error: 'Отказано в доступе к файлу',
     description: 'Генерал permission denied',
   },
-  2001: {
+  21: {
     category: 'Файловая система',
     error: 'Файл не найден',
     description: 'Нет такого файла или директории',
   },
-  2002: {
+  22: {
     category: 'Файловая система',
     error: 'Не хватает прав на файл',
     description: 'Недостаточные права доступа к файлу',
   },
-  2003: {
+  23: {
     category: 'Файловая система',
     error: 'Файл повреждён',
     description: 'Файл недоступен или в неправильном формате',
   },
-  3001: {
+  31: {
     category: 'Процессы/команды',
     error: 'Команда не найдена',
     description: 'Нет такой команды в системе',
   },
-  3002: {
+  32: {
     category: 'Сервисы',
     error: 'Служба не найдена',
     description: 'Нет такой системной службы',
   },
-  3003: {
+  33: {
     category: 'Сервисы',
     error: 'Служба остановлена',
     description: 'Служба недоступна/не запущена',
   },
-  3004: {
+  34: {
     category: 'Процессы',
     error: 'Таймаут выполнения',
     description: 'Команда превысила время выполнения',
   },
-  4001: {
+  41: {
     category: 'Конфигурация',
     error: 'Строка не найдена',
     description: 'Искомая строка отсутствует в файле',
   },
-  4002: {
+  42: {
     category: 'Конфигурация',
     error: 'Строка закомментирована',
     description: 'Строка есть, но отключена (закомментирована)',
   },
-  4003: {
+  43: {
     category: 'Конфигурация',
     error: 'Неверный формат',
     description: 'Синтаксическая ошибка в конфигурации',
   },
-  4004: {
+  44: {
     category: 'Конфигурация',
     error: 'Неверное значение',
     description: 'Параметр имеет недопустимое значение',
   },
-  5000: {
+  50: {
     category: 'Критическая',
     error: 'Неизвестная ошибка',
     description: 'Непредвиденная ошибка в скрипте',
   },
-  5001: {
+  51: {
     category: 'Критическая',
     error: 'Отсутствует переменная',
     description: 'Нет обязательной переменной окружения',
   },
-  5002: {
+  52: {
     category: 'Критическая',
     error: 'Ошибка синтаксиса',
     description: 'Ошибка в обработке данных скриптом',
@@ -109,7 +109,7 @@ export function getErrorDescription(errorCode) {
 
 /**
  * Extract error code from script output (best-effort).
- * Supports patterns like "exit code: 1001" or last line being just a number.
+ * Supports patterns like "exit code: 11" or last line being just a number.
  */
 export function extractErrorCode(output) {
   if (!output) return null;

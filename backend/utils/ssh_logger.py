@@ -220,8 +220,16 @@ def log_processor_script(host, script_id: str = "", script_name: str = "", proce
         if exit_code is not None:
             if exit_code == 0:
                 exit_code_info += " (SUCCESS)"
-            elif exit_code >= 1000:
-                exit_code_info += f" (Custom error code)"
+            elif 11 <= exit_code <= 52:
+                # Known error codes from error_codes.py
+                error_descriptions = {
+                    41: " (Строка не найдена)",
+                    42: " (Строка закомментирована)",
+                    43: " (Неверный формат)",
+                    44: " (Неверное значение)",
+                    51: " (Отсутствует переменная)",
+                }
+                exit_code_info += error_descriptions.get(exit_code, f" (Custom error code)")
             elif exit_code == 127:
                 exit_code_info += " (Command not found)"
             elif exit_code == 126:

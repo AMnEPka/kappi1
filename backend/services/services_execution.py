@@ -9,6 +9,7 @@ import paramiko
 import winrm  # pyright: ignore[reportMissingImports]
 from typing import Tuple, Optional, List
 import logging
+import re
 from contextlib import contextmanager
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import os
@@ -403,12 +404,13 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
     2. Run processor script locally - analyze output for check pass/fail
     
     Status mapping:
-    - "Ошибка" - Technical errors (1xxx, 2xxx, 3xxx, 5xxx codes)
-    - "Не пройдена" - Check failures (4xxx codes) - config issues found
+    - "Ошибка" - Technical errors (1x, 2x, 3x, 5x codes)
+    - "Не пройдена" - Check failures (4x codes) - config issues found
     - "Пройдена" - Check passed
     - "Оператор" - Manual review required
     """
     import subprocess
+    # re is imported at module level, use it directly
     
     # Step 1: Execute the main command on remote host
     main_result = await execute_command(host, command)
@@ -417,7 +419,9 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         # No processor - return as is
         return main_result
     
-    # Step 1.5: Check for technical errors in command execution
+    # Step 1.5: Check for critical technical errors in command execution
+    # Only block processor script execution for critical errors (command not found, permission denied, etc.)
+    # For expected failures (like "group not found"), let the processor script handle it
     if not main_result.success:
         # Try to detect specific error from command output
         # Get exit code from the error message if available
@@ -430,7 +434,11 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             stderr=main_result.error or ""
         )
         
-        if cmd_error_code:
+        # Only block processor execution for critical errors (not for expected failures)
+        # Critical errors: command not found (31), permission denied (13, 22), file not found for critical files (21)
+        # Expected failures: group not found, user not found, etc. - let processor script handle these
+        if cmd_error_code and cmd_error_code in [11, 12, 13, 21, 22, 31, 32, 33, 34]:
+            # Critical technical error - don't run processor script
             error_info = get_error_description(cmd_error_code)
             error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
             
@@ -447,19 +455,9 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                 error_description=error_description
             )
         
-        # Generic command failure
-        result_output = main_result.output
-        
-        return ExecutionResult(
-            host_id=host.id,
-            host_name=host.name,
-            success=False,
-            output=result_output,
-            error=main_result.error,
-            check_status="Ошибка",
-            error_code=5000,
-            error_description="Критическая: Неизвестная ошибка - Непредвиденная ошибка в скрипте-обработчике"
-        )
+        # For other errors (including expected failures like "group not found"),
+        # continue to processor script - it will handle the output appropriately
+        # This allows scripts to check for "group not found" and treat it as success
     
     # Step 2: Run processor script LOCALLY with main command output as input
     try:
@@ -525,10 +523,54 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         
         logger.info(f"Local processor execution completed for {host.name}, return code: {result.returncode}")
         logger.info(f"STDOUT length: {len(result.stdout)} chars, STDERR length: {len(result.stderr)} chars")
+        
+        # Extract actual exit code from stderr if bash -x was used
+        # bash -x shows "+ exit 42" in stderr, but system truncates exit codes > 255
+        actual_exit_code = result.returncode
         if result.stderr:
-            logger.warning(f"STDERR content: {repr(result.stderr[:500])}")
-        if result.returncode != 0 and result.returncode < 1000:
+            # Log full stderr for debugging (bash -x output goes to stderr)
+            logger.warning(f"STDERR content (first 1000 chars): {repr(result.stderr[:1000])}")
+            if len(result.stderr) > 1000:
+                logger.warning(f"STDERR content (full):\n{result.stderr}")
+            
+            # Try to extract actual exit code from bash -x output
+            # Look for patterns like "+ exit 42" or "exit 42"
+            exit_pattern = r'\+?\s*exit\s+(\d+)'
+            matches = re.findall(exit_pattern, result.stderr)
+            if matches:
+                # Get the last exit command (the actual one that was executed)
+                last_exit = matches[-1]
+                try:
+                    extracted_code = int(last_exit)
+                    # Check if it's a known error code (11-52 range)
+                    if 11 <= extracted_code <= 52:
+                        actual_exit_code = extracted_code
+                        logger.info(f"Extracted actual exit code {extracted_code} from STDERR (system returned {result.returncode})")
+                except ValueError:
+                    pass
+        
+        if result.stdout:
+            logger.info(f"STDOUT content: {repr(result.stdout[:500])}")
+        
+        # Update result.returncode with actual exit code if we extracted it
+        if actual_exit_code != result.returncode:
+            logger.info(f"Using extracted exit code {actual_exit_code} instead of system return code {result.returncode}")
+            # Create a new result object with corrected return code
+            class CorrectedResult:
+                def __init__(self, original_result, corrected_returncode):
+                    self.stdout = original_result.stdout
+                    self.stderr = original_result.stderr
+                    self.returncode = corrected_returncode
+            result = CorrectedResult(result, actual_exit_code)
+        
+        # Check if return code is a known error code (11-52) or system error
+        is_known_error_code = 11 <= result.returncode <= 52
+        if result.returncode != 0 and not is_known_error_code:
             logger.warning(f"Non-zero exit code {result.returncode} - script may have failed or bash error occurred")
+            # Exit codes > 128 usually indicate signal termination
+            if result.returncode > 128:
+                signal_num = result.returncode - 128
+                logger.error(f"Script terminated by signal {signal_num} (exit code {result.returncode})")
         
         # Log processor script execution (use normalized data for logging)
         log_processor_script(
@@ -553,19 +595,19 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         output_lower = output.lower()
         stderr = result.stderr.strip() if result.stderr else ""
         
-        # FIRST: Check if returncode is a known error code (>= 1000)
+        # FIRST: Check if returncode is a known error code (11-52)
         # This is the primary way scripts should return error codes
-        if result.returncode >= 1000:
+        if 11 <= result.returncode <= 52:
             error_code = result.returncode
             error_info = get_error_description(error_code)
             error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
             
             # Determine status based on error code category
             if is_check_failure_code(error_code):
-                # 4xxx codes = check failures = "Не пройдена"
+                # 4x codes (41-44) = check failures = "Не пройдена"
                 check_status = "Не пройдена"
             else:
-                # 1xxx, 2xxx, 3xxx, 5xxx = technical errors = "Ошибка"
+                # 1x, 2x, 3x, 5x = technical errors = "Ошибка"
                 check_status = "Ошибка"
         
         else:
@@ -574,7 +616,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             
             # Try to extract error code from output first (before determining status)
             extracted_code = extract_error_code_from_output(result.stdout)
-            if extracted_code and extracted_code >= 1000:
+            if extracted_code and 11 <= extracted_code <= 52:
                 error_code = extracted_code
                 error_info = get_error_description(error_code)
                 error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
@@ -591,7 +633,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                 # Try to extract error code from output even if status is determined by keyword
                 if not error_code:
                     extracted_code = extract_error_code_from_output(result.stdout)
-                    if extracted_code and extracted_code >= 1000:
+                    if extracted_code and 11 <= extracted_code <= 52:
                         error_code = extracted_code
                         error_info = get_error_description(error_code)
                         error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
@@ -616,7 +658,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                 
                 if is_critical_error:
                     # Real script error
-                    error_code = 5000
+                    error_code = 50
                     error_info = get_error_description(error_code)
                     error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
                     check_status = "Ошибка"
@@ -626,7 +668,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                     check_status = 'Не пройдена'
                     # Try to extract error code from output
                     extracted_code = extract_error_code_from_output(result.stdout)
-                    if extracted_code and extracted_code >= 1000:
+                    if extracted_code and 11 <= extracted_code <= 52:
                         error_code = extracted_code
                         error_info = get_error_description(error_code)
                         error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
@@ -636,7 +678,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         if check_status == "Не пройдена" and not error_code:
             # Try one more time to extract from output
             extracted_code = extract_error_code_from_output(result.stdout)
-            if extracted_code and extracted_code >= 1000:
+            if extracted_code and 11 <= extracted_code <= 52:
                 error_code = extracted_code
                 error_info = get_error_description(error_code)
                 error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
@@ -662,15 +704,18 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             result_output += f"\n\n=== Ошибка скрипта-обработчика ===\n{stderr}"
         
         # Extract actual_data if reference_data was provided
+        # Skip extraction if error code indicates line not found (41) or commented (42)
+        # In these cases, there's nothing to compare with reference data
         actual_data = None
-        if reference_data and reference_data.strip():
+        if reference_data and reference_data.strip() and error_code not in [41, 42]:
             # Try to extract from processor script output (if script outputs ACTUAL_DATA:)
             if 'ACTUAL_DATA:' in result.stdout:
                 actual_data = result.stdout.split('ACTUAL_DATA:')[1].split('\n')[0].strip()
             else:
                 # Try to extract from command output by parsing config files
                 # Look for common patterns like "param = value" or "param=value"
-                import re
+                # re is imported at module level - use it directly
+                import re as re_module  # Ensure re is available in this scope
                 
                 # Parse reference_data to understand what we're looking for
                 # Handle formats: "user1,user2", "user1\nuser2", "user1 user2"
@@ -696,12 +741,12 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                     # Look for key=value or key = value patterns
                     if '=' in line_stripped:
                         # Extract value after =
-                        match = re.search(r'=\s*(.+)$', line_stripped)
+                        match = re_module.search(r'=\s*(.+)$', line_stripped)
                         if match:
                             value = match.group(1).strip()
                             
                             # Check if this value contains any of the reference items
-                            value_items = [item.strip() for item in re.split(r'[,\s]+', value) if item.strip()]
+                            value_items = [item.strip() for item in re_module.split(r'[,\s]+', value) if item.strip()]
                             
                             # If value contains at least one reference item, it's likely the right parameter
                             if any(ref_item in value_items for ref_item in ref_items):
@@ -726,10 +771,10 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                         # Remove comment marker and check
                         uncommented_line = line_stripped.lstrip('#').strip()
                         if '=' in uncommented_line:
-                            match = re.search(r'=\s*(.+)$', uncommented_line)
+                            match = re_module.search(r'=\s*(.+)$', uncommented_line)
                             if match:
                                 value = match.group(1).strip()
-                                value_items = [item.strip() for item in re.split(r'[,\s]+', value) if item.strip()]
+                                value_items = [item.strip() for item in re_module.split(r'[,\s]+', value) if item.strip()]
                                 
                                 if any(ref_item in value_items for ref_item in ref_items):
                                     actual_data = value
@@ -749,7 +794,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         
     except subprocess.TimeoutExpired:
         # Processor script timed out
-        error_code = 3004
+        error_code = 34
         error_info = get_error_description(error_code)
         error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
         
@@ -788,7 +833,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             success=False
         )
         
-        error_code = 5000
+        error_code = 50
         error_info = get_error_description(error_code)
         error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
         
