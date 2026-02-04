@@ -331,6 +331,8 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                             check_status=result.check_status,
                             error_code=result.error_code,
                             error_description=result.error_description,
+                            reference_data=reference_data if reference_data and reference_data.strip() else None,
+                            actual_data=result.actual_data,
                             executed_by=user_id
                         )
                         

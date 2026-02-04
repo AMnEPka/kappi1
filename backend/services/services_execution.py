@@ -434,7 +434,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             error_info = get_error_description(cmd_error_code)
             error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
             
-            result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Ошибка ===\n{main_result.error}\n\n=== Статус проверки ===\nОшибка"
+            result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Ошибка ===\n{main_result.error}"
             
             return ExecutionResult(
                 host_id=host.id,
@@ -448,7 +448,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             )
         
         # Generic command failure
-        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Ошибка ===\n{main_result.error}\n\n=== Статус проверки ===\nОшибка"
+        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Ошибка ===\n{main_result.error}"
         
         return ExecutionResult(
             host_id=host.id,
@@ -606,11 +606,85 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         if error_description:
             status_line = f"{check_status}\n{error_description}"
         
-        result_output = f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\n{status_line}"
+        result_output = f"=== Результат команды ===\n{main_result.output}"
         
         # Add stderr info if there was an error (for debugging)
         if stderr and check_status == "Ошибка":
             result_output += f"\n\n=== Ошибка скрипта-обработчика ===\n{stderr}"
+        
+        # Extract actual_data if reference_data was provided
+        actual_data = None
+        if reference_data and reference_data.strip():
+            # Try to extract from processor script output (if script outputs ACTUAL_DATA:)
+            if 'ACTUAL_DATA:' in result.stdout:
+                actual_data = result.stdout.split('ACTUAL_DATA:')[1].split('\n')[0].strip()
+            else:
+                # Try to extract from command output by parsing config files
+                # Look for common patterns like "param = value" or "param=value"
+                import re
+                
+                # Parse reference_data to understand what we're looking for
+                # Handle formats: "user1,user2", "user1\nuser2", "user1 user2"
+                ref_items = []
+                if ',' in reference_data:
+                    ref_items = [item.strip() for item in reference_data.split(',') if item.strip()]
+                elif '\n' in reference_data:
+                    ref_items = [item.strip() for item in reference_data.split('\n') if item.strip()]
+                else:
+                    ref_items = [item.strip() for item in reference_data.split() if item.strip()]
+                
+                # First, try to find uncommented lines
+                uncommented_found = False
+                for line in main_result.output.split('\n'):
+                    line_stripped = line.strip()
+                    if not line_stripped:
+                        continue
+                    
+                    # Skip commented lines for now
+                    if line_stripped.startswith('#'):
+                        continue
+                    
+                    # Look for key=value or key = value patterns
+                    if '=' in line_stripped:
+                        # Extract value after =
+                        match = re.search(r'=\s*(.+)$', line_stripped)
+                        if match:
+                            value = match.group(1).strip()
+                            
+                            # Check if this value contains any of the reference items
+                            value_items = [item.strip() for item in re.split(r'[,\s]+', value) if item.strip()]
+                            
+                            # If value contains at least one reference item, it's likely the right parameter
+                            if any(ref_item in value_items for ref_item in ref_items):
+                                actual_data = value
+                                uncommented_found = True
+                                break
+                            
+                            # Also check if value format matches (comma-separated list)
+                            if ',' in value and len(value_items) > 0:
+                                if ',' in reference_data:
+                                    actual_data = value
+                                    uncommented_found = True
+                                    break
+                
+                # If not found in uncommented lines, check commented lines
+                if not uncommented_found:
+                    for line in main_result.output.split('\n'):
+                        line_stripped = line.strip()
+                        if not line_stripped or not line_stripped.startswith('#'):
+                            continue
+                        
+                        # Remove comment marker and check
+                        uncommented_line = line_stripped.lstrip('#').strip()
+                        if '=' in uncommented_line:
+                            match = re.search(r'=\s*(.+)$', uncommented_line)
+                            if match:
+                                value = match.group(1).strip()
+                                value_items = [item.strip() for item in re.split(r'[,\s]+', value) if item.strip()]
+                                
+                                if any(ref_item in value_items for ref_item in ref_items):
+                                    actual_data = value
+                                    break
         
         return ExecutionResult(
             host_id=host.id,
@@ -620,7 +694,8 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             error=result.stderr if result.stderr else None,
             check_status=check_status,
             error_code=error_code,
-            error_description=error_description
+            error_description=error_description,
+            actual_data=actual_data
         )
         
     except subprocess.TimeoutExpired:
@@ -644,7 +719,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             host_id=host.id,
             host_name=host.name,
             success=False,
-            output=f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\nОшибка\n{error_description}",
+            output=f"=== Результат команды ===\n{main_result.output}",
             error="Таймаут выполнения скрипта-обработчика",
             check_status="Ошибка",
             error_code=error_code,
@@ -672,7 +747,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             host_id=host.id,
             host_name=host.name,
             success=False,
-            output=f"=== Результат команды ===\n{main_result.output}\n\n=== Статус проверки ===\nОшибка\n{error_description}",
+            output=f"=== Результат команды ===\n{main_result.output}",
             error=f"Ошибка обработчика: {str(e)}",
             check_status="Ошибка",
             error_code=error_code,

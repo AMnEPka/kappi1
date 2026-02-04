@@ -18,6 +18,7 @@ class ExecutionResult(BaseModel):
     check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     error_code: Optional[int] = None  # Exit code from script (e.g., 5000)
     error_description: Optional[str] = None  # Human-readable error description
+    actual_data: Optional[str] = None  # Фактические данные из вывода команды (для сравнения с эталоном)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -38,6 +39,8 @@ class Execution(BaseModel):
     check_status: Optional[str] = None  # Пройдена, Не пройдена, Ошибка, Оператор
     error_code: Optional[int] = None  # Exit code from script (e.g., 5000)
     error_description: Optional[str] = None  # Human-readable error description
+    reference_data: Optional[str] = None  # Эталонные данные для сравнения
+    actual_data: Optional[str] = None  # Фактические данные из вывода команды
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     executed_by: Optional[str] = None
 

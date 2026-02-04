@@ -73,6 +73,8 @@ fi`;
         </ul>
         <p className="text-xs mt-2">Скрипт должен вернуть:</p>
         <p className="text-xs mt-1"><strong>'Пройдена', 'Не пройдена', 'Ошибка', 'Оператор'</strong></p>
+        <p className="text-xs mt-2">Для сравнения с эталоном (опционально):</p>
+        <p className="text-xs mt-1">Выведите <code>ACTUAL_DATA: value1,value2</code> перед статусом для автоматического сравнения</p>
       </div>
     );
   }, [categories, formCategoryId]);
