@@ -82,15 +82,14 @@ if (config.enableVisualEdits) {
 
 // Setup dev server configuration
 webpackConfig.devServer = (devServerConfig) => {
-  // Configure WebSocket to use auto-detected port (same as server port)
-  devServerConfig.client = {
-    ...devServerConfig.client,
-    webSocketURL: {
-      hostname: '0.0.0.0',
-      pathname: '/ws',
-      port: 0, // 0 means use the same port as the dev server
-    },
-  };
+  // When DISABLE_HOT_RELOAD is true, completely disable WebSocket connections
+  // This prevents browser from trying to connect to HMR WebSocket through nginx
+  if (config.disableHotReload) {
+    devServerConfig.hot = false;
+    devServerConfig.liveReload = false;
+    devServerConfig.webSocketServer = false; // Disable WebSocket server entirely
+    devServerConfig.client = false; // Disable client script entirely (no WebSocket, no overlay)
+  }
 
   // Apply visual edits dev server setup if enabled
   if (config.enableVisualEdits && setupDevServer) {
