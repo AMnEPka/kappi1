@@ -1,19 +1,19 @@
-[2026-02-04 14:00:20.269] SSH LOG FILE CLEARED - Starting new project execution
+[2026-02-05 08:58:52.038] SSH LOG FILE CLEARED - Starting new project execution
 ================================================================================
 
-2026-02-04 14:00:20 [INFO] SSH log file cleared at 2026-02-04 14:00:20.269
-2026-02-04 14:00:20 [INFO] 
+2026-02-05 08:58:52 [INFO] SSH log file cleared at 2026-02-05 08:58:52.038
+2026-02-05 08:58:52 [INFO] 
 ================================================================================
-[2026-02-04 14:00:20.317] SSH CONNECTION: login - SUCCESS
+[2026-02-05 08:58:52.121] SSH CONNECTION: login - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 Auth Type: password
 Connection Type: ssh
 ================================================================================
 
-2026-02-04 14:00:20 [INFO] 
+2026-02-05 08:58:52 [INFO] 
 ================================================================================
-[2026-02-04 14:00:20.423] SSH CHECK: SUDO - SUCCESS
+[2026-02-05 08:58:52.226] SSH CHECK: SUDO - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
@@ -27,1623 +27,395 @@ uid=0(root) gid=0(root) группы=0(root)
 
 ================================================================================
 
-2026-02-04 14:00:20 [INFO] 
+2026-02-05 08:58:52 [INFO] 
 ================================================================================
-[2026-02-04 14:00:20.524] SSH COMMAND EXECUTION - FAILED
+[2026-02-05 08:58:52.326] SSH COMMAND EXECUTION - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
 >>> COMMAND SENT:
-su user
-
->>> EXIT CODE: 1
-
->>> STDOUT:
-(empty)
-
->>> STDERR:
-su: должен запускаться из терминала
-
-================================================================================
-
-2026-02-04 14:00:20 [INFO] 
-================================================================================
-[2026-02-04 14:00:20.547] PROCESSOR SCRIPT EXECUTION - FAILED
-Host: Linux Server 1 (192.168.56.102:22)
-Script ID: 8aea6212-ce36-4211-8e1c-890e085af7f2
-Script Name: su
-
->>> PROCESSOR SCRIPT (preview):
-#!/usr/bin/env bash
-
-set -eo pipefail
-
-# CHECK_OUTPUT — вывод команды "sudo su user" с хоста
-# Команда на хосте должна быть выполнена как: echo "" | timeout 10 sudo su user
-# Это предотвращает зависание интерактивной сессии и проверяет запрос пароля
-# CHECK_OUTPUT может быть пустым, если команда не выполнилась - это нормально для проверки
-
-# Нормализуем в нижний регистр для упрощения поиска
-lower_output="$(printf '%s\n' "$CHECK_OUTPUT" | tr '[:upper:]' '[:lower:]')"
-
-# Проверяем наличие запроса пароля в выводе
-# Признаки запроса пароля:
-# - "password:" или "password for"
-# - "[sudo] password for"
-# - "пароль" (русский)
-# - "введите пароль"
-# - "enter password"
-
-... (total 45 lines, 1295 chars)
-
->>> INPUT DATA (CHECK_OUTPUT) - 0 chars, 1 lines:
-(empty)
-
->>> REFERENCE DATA (ETALON_INPUT) - 0 chars, 1 lines:
-(empty)
-
->>> EXIT CODE: 44 (Неверное значение)
-
->>> STDOUT (12 chars):
-Не пройдена
-
-
->>> STDERR (278 chars):
-+ set -eo pipefail
-++ printf '%s\n' ''
-++ tr '[:upper:]' '[:lower:]'
-+ lower_output=
-+ echo ''
-+ grep -qE '(password|пароль)'
-+ echo ''
-+ grep -qE '\[sudo\] password for'
-+ echo ''
-+ grep -qi 'введите пароль'
-+ echo ''
-+ grep -qi 'enter password'
-+ echo 'Не пройдена'
-+ exit 44
-
-================================================================================
-
-2026-02-04 14:00:20 [INFO] 
-================================================================================
-[2026-02-04 14:00:20.646] SSH COMMAND EXECUTION - SUCCESS
-Host: Linux Server 1 (192.168.56.102:22)
-Username: user
-
->>> COMMAND SENT:
-sudo -u user cat /etc/passwd
+sudo cat /etc/sudoers
 
 >>> EXIT CODE: 0
 
 >>> STDOUT:
-root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd Time Synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd Network Management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd Bus Proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:PulseAudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-Debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:PostgreSQL administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:NetworkManager OpenVPN,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:HPLIP system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:Avahi mDNS daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash
+#
+# This file MUST be edited with the 'visudo' command as root.
+#
+# Please consider adding local content in /etc/sudoers.d/ instead of
+# directly modifying this file.
+#
+# See the man page for details on how to write a sudoers file.
+#
+Defaults	env_reset
+Defaults	mail_badpass
+Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Host alias specification
+
+# User alias specification
+
+# Cmnd alias specification
+
+# User privilege specification
+root	ALL=(ALL:ALL) ALL
+
+# Allow members of group sudo to execute any command
+%sudo	ALL=(ALL:ALL) ALL
+
+# See sudoers(5) for more information on "#include" directives:
+
+#includedir /etc/sudoers.d
+%astra-admin	ALL=(ALL:ALL) NOPASSWD: ALL
 
 
 >>> STDERR:
 (empty)
 ================================================================================
 
-2026-02-04 14:00:20 [INFO] 
+2026-02-05 08:58:52 [INFO] 
 ================================================================================
-[2026-02-04 14:00:20.659] PROCESSOR SCRIPT EXECUTION - FAILED
+[2026-02-05 08:58:52.419] PROCESSOR SCRIPT EXECUTION - FAILED
 Host: Linux Server 1 (192.168.56.102:22)
-Script ID: dfb1638b-644a-433e-be34-b0bb73162123
-Script Name: sudo -u user
+Script ID: 37e69f41-4d0b-4e42-8cd5-3326b8ffdb62
+Script Name: /etc/sudoers groups
 
 >>> PROCESSOR SCRIPT (preview):
 #!/usr/bin/env bash
 
 set -eo pipefail
 
-# CHECK_OUTPUT — вывод команды "sudo -u user cat /etc/shadow" с хоста
-# Команда на хосте должна быть выполнена как: echo "" | timeout 10 sudo -u user cat /etc/shadow
-# Это предотвращает зависание и проверяет запрос пароля
-# CHECK_OUTPUT может быть пустым, если команда не выполнилась - это нормально для проверки
-
-# Нормализуем в нижний регистр для упрощения поиска
-lower_output="$(printf '%s\n' "$CHECK_OUTPUT" | tr '[:upper:]' '[:lower:]')"
-
-# Проверяем наличие запроса пароля в выводе
-# Признаки запроса пароля:
-# - "password:" или "password for"
-# - "[sudo] password for"
-# - "пароль" (русский)
-# - "введите пароль"
-# - "enter password"
-
-... (total 56 lines, 1863 chars)
-
->>> INPUT DATA (CHECK_OUTPUT) - 2100 chars, 39 lines:
-root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd Time Synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd Network Management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd Bus Proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:PulseAudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-Debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:PostgreSQL administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:NetworkManager OpenVPN,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:HPLIP system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:Avahi mDNS daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash
-
-
->>> REFERENCE DATA (ETALON_INPUT) - 0 chars, 1 lines:
-(empty)
-
->>> EXIT CODE: 44 (Неверное значение)
-
->>> STDOUT (12 chars):
-Не пройдена
-
-
->>> STDERR (15021 chars):
-+ set -eo pipefail
-++ printf '%s\n' 'root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd Time Synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd Network Management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd Bus Proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:PulseAudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-Debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:PostgreSQL administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:NetworkManager OpenVPN,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:HPLIP system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:Avahi mDNS daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash
-'
-++ tr '[:upper:]' '[:lower:]'
-+ lower_output='root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:mailing list manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:gnats bug-reporting system (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd time synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd network management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd bus proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:pulseaudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:postgresql administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:networkmanager openvpn,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:hplip system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:avahi mdns daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash'
-+ echo 'root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:mailing list manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:gnats bug-reporting system (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd time synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd network management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd bus proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:pulseaudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:postgresql administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:networkmanager openvpn,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:hplip system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:avahi mdns daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash'
-+ grep -qE '(password|пароль)'
-+ echo 'root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:mailing list manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:gnats bug-reporting system (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd time synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd network management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd bus proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:pulseaudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:postgresql administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:networkmanager openvpn,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:hplip system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:avahi mdns daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash'
-+ grep -qE '\[sudo\] password for'
-+ echo 'root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd Time Synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd Network Management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd Bus Proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:PulseAudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-Debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:PostgreSQL administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:NetworkManager OpenVPN,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:HPLIP system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:Avahi mDNS daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash
-'
-+ grep -qi 'введите пароль'
-+ echo 'root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd Time Synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd Network Management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd Bus Proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:PulseAudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-Debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:PostgreSQL administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:NetworkManager OpenVPN,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:HPLIP system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:Avahi mDNS daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash
-'
-+ grep -qi 'enter password'
-+ echo 'root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
-bin:x:2:2:bin:/bin:/usr/sbin/nologin
-sys:x:3:3:sys:/dev:/usr/sbin/nologin
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/usr/sbin/nologin
-man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
-lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
-mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
-news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
-uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
-proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
-www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
-backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
-list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
-irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
-gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-systemd-timesync:x:100:102:systemd Time Synchronization,,,:/run/systemd:/bin/false
-systemd-network:x:101:103:systemd Network Management,,,:/run/systemd/netif:/bin/false
-systemd-resolve:x:102:104:systemd Resolver,,,:/run/systemd/resolve:/bin/false
-systemd-bus-proxy:x:103:105:systemd Bus Proxy,,,:/run/systemd:/bin/false
-_apt:x:104:65534::/nonexistent:/bin/false
-messagebus:x:105:109::/nonexistent:/bin/false
-astra-orientation:x:106:110::/var/cache/astra-orientation:/bin/false
-pulse:x:107:113:PulseAudio daemon,,,:/var/run/pulse:/bin/false
-fly-dm:x:108:116::/var/lib/fly-dm:/bin/false
-Debian-exim:x:109:118::/var/spool/exim4:/bin/false
-postgres:x:110:120:PostgreSQL administrator,,,:/var/lib/postgresql:/bin/bash
-dnsmasq:x:111:65534:dnsmasq,,,:/var/lib/misc:/bin/false
-ntp:x:112:122::/nonexistent:/bin/false
-logcheck:x:113:123:logcheck system account,,,:/var/lib/logcheck:/bin/false
-saned:x:114:124::/var/lib/saned:/bin/false
-nm-openvpn:x:115:125:NetworkManager OpenVPN,,,:/var/lib/openvpn/chroot:/bin/false
-hplip:x:116:7:HPLIP system user,,,:/run/hplip:/bin/false
-avahi:x:117:126:Avahi mDNS daemon,,,:/var/run/avahi-daemon:/bin/false
-sshd:x:118:65534::/run/sshd:/usr/sbin/nologin
-user:x:1000:1000:,,,:/home/user:/bin/bash
-'
-+ grep -qE '^[^:]+:[^:]*:[0-9]*:'
-+ echo 'Не пройдена'
-+ exit 44
-
-================================================================================
-
-2026-02-04 14:00:20 [INFO] 
-================================================================================
-[2026-02-04 14:00:20.765] SSH COMMAND EXECUTION - SUCCESS
-Host: Linux Server 1 (192.168.56.102:22)
-Username: user
-
->>> COMMAND SENT:
-sudo grep PASS /etc/login.defs;sudo grep LOGIN /etc/login.defs
-
-
->>> EXIT CODE: 0
-
->>> STDOUT:
-#	PASS_MAX_DAYS	Maximum number of days a password may be used.
-#	PASS_MIN_DAYS	Minimum number of days allowed between password changes.
-#	PASS_WARN_AGE	Number of days warning given before a password expires.
-PASS_MAX_DAYS	99999
-PASS_MIN_DAYS	0
-PASS_WARN_AGE	7
-#PASS_CHANGE_TRIES
-#PASS_ALWAYS_WARN
-#PASS_MIN_LEN
-#PASS_MAX_LEN
-# NO_PASSWORD_CONSOLE
-LOG_OK_LOGINS		no
-HUSHLOGIN_FILE	.hushlogin
-#HUSHLOGIN_FILE	/etc/hushlogins
-LOGIN_RETRIES		5
-LOGIN_TIMEOUT		60
-#NOLOGINS_FILE
-# LOGIN_STRING
-
-
->>> STDERR:
-(empty)
-================================================================================
-
-2026-02-04 14:00:20 [INFO] 
-================================================================================
-[2026-02-04 14:00:20.787] PROCESSOR SCRIPT EXECUTION - FAILED
-Host: Linux Server 1 (192.168.56.102:22)
-Script ID: 67f008f5-987d-45b7-8395-4c75d62ec371
-Script Name: login.defs
-
->>> PROCESSOR SCRIPT (preview):
-#!/usr/bin/env bash
-
-set -eo pipefail
-
-# CHECK_OUTPUT — вывод команд "grep PASS /etc/login.defs; grep LOGIN /etc/login.defs"
-# Ищем значения:
-#   PASS_MIN_DAYS – 1
-#   PASS_WARN_AGE – 14
-#   LOGIN_RETRIES = 10
-#   LOGIN_TIMEOUT = 1800
+# CHECK_OUTPUT — вывод команды "cat /etc/sudoers"
+# ETALON_INPUT — эталонный список групп безопасности
+# Необходимо получить список групп безопасности, имеющих полномочия на применение команды sudo
+# Список групп приводится после строки "#includedir /etc/sudoers.d"
+# Формат: %astra-admin    ALL=(ALL:ALL) NOPASSWD: ALL
+# Сравнить с эталонным списком и вывести ACTUAL_DATA: value1, value2
 
 if [ -z "${CHECK_OUTPUT:-}" ]; then
     exit 51 # Отсутствует переменная
 fi
 
-# Функция для извлечения значения параметра из вывода
-# Формат в файле может быть: PARAM_NAME value или PARAM_NAME=value или PARAM_NAME	value
-# Исключаем закомментированные строки (начинающиеся с #)
-get_param_value() {
-    local param_name="$1"
-... (total 81 lines, 2568 chars)
-
->>> INPUT DATA (CHECK_OUTPUT) - 488 chars, 19 lines:
-#	PASS_MAX_DAYS	Maximum number of days a password may be used.
-#	PASS_MIN_DAYS	Minimum number of days allowed between password changes.
-#	PASS_WARN_AGE	Number of days warning given before a password expires.
-PASS_MAX_DAYS	99999
-PASS_MIN_DAYS	0
-PASS_WARN_AGE	7
-#PASS_CHANGE_TRIES
-#PASS_ALWAYS_WARN
-#PASS_MIN_LEN
-#PASS_MAX_LEN
-# NO_PASSWORD_CONSOLE
-LOG_OK_LOGINS		no
-HUSHLOGIN_FILE	.hushlogin
-#HUSHLOGIN_FILE	/etc/hushlogins
-LOGIN_RETRIES		5
-LOGIN_TIMEOUT		60
-#NOLOGINS_FILE
-# LOGIN_STRING
-
-
->>> REFERENCE DATA (ETALON_INPUT) - 0 chars, 1 lines:
-(empty)
-
->>> EXIT CODE: 44 (Неверное значение)
-
->>> STDOUT (169 chars):
-Неверные значения:
-  PASS_MIN_DAYS=0 (ожидается: 1)
-  PASS_WARN_AGE=7 (ожидается: 14)
-  LOGIN_RETRIES=5 (ожидается: 10)
-  LOGIN_TIMEOUT=60 (ожидается: 1800)
-Не пройдена
-
-
->>> STDERR (4322 chars):
-+ set -eo pipefail
-+ '[' -z '#	PASS_MAX_DAYS	Maximum number of days a password may be used.
-#	PASS_MIN_DAYS	Minimum number of days allowed between password changes.
-#	PASS_WARN_AGE	Number of days warning given before a password expires.
-PASS_MAX_DAYS	99999
-PASS_MIN_DAYS	0
-PASS_WARN_AGE	7
-#PASS_CHANGE_TRIES
-#PASS_ALWAYS_WARN
-#PASS_MIN_LEN
-#PASS_MAX_LEN
-# NO_PASSWORD_CONSOLE
-LOG_OK_LOGINS		no
-HUSHLOGIN_FILE	.hushlogin
-#HUSHLOGIN_FILE	/etc/hushlogins
-LOGIN_RETRIES		5
-LOGIN_TIMEOUT		60
-#NOLOGINS_FILE
-# LOGIN_STRING
-' ']'
-+ errors=()
-+ missing_params=()
-++ get_param_value PASS_MIN_DAYS
-++ local param_name=PASS_MIN_DAYS
-++ echo '#	PASS_MAX_DAYS	Maximum number of days a password may be used.
-#	PASS_MIN_DAYS	Minimum number of days allowed between password changes.
-#	PASS_WARN_AGE	Number of days warning given before a password expires.
-PASS_MAX_DAYS	99999
-PASS_MIN_DAYS	0
-PASS_WARN_AGE	7
-#PASS_CHANGE_TRIES
-#PASS_ALWAYS_WARN
-#PASS_MIN_LEN
-#PASS_MAX_LEN
-# NO_PASSWORD_CONSOLE
-LOG_OK_LOGINS		no
-HUSHLOGIN_FILE	.hushlogin
-#HUSHLOGIN_FILE	/etc/hushlogins
-LOGIN_RETRIES		5
-LOGIN_TIMEOUT		60
-#NOLOGINS_FILE
-# LOGIN_STRING
-'
-++ grep -iE '^[[:space:]]*PASS_MIN_DAYS[[:space:]=]+'
-++ grep -vE '^[[:space:]]*#'
-++ sed -E 's/^[[:space:]]*PASS_MIN_DAYS[[:space:]=]+([0-9]+).*/\1/'
-++ head -1
-+ pass_min_days=0
-+ [[ -z 0 ]]
-+ [[ 0 != \1 ]]
-+ errors+=("PASS_MIN_DAYS=$pass_min_days (ожидается: 1)")
-++ get_param_value PASS_WARN_AGE
-++ local param_name=PASS_WARN_AGE
-++ echo '#	PASS_MAX_DAYS	Maximum number of days a password may be used.
-#	PASS_MIN_DAYS	Minimum number of days allowed between password changes.
-#	PASS_WARN_AGE	Number of days warning given before a password expires.
-PASS_MAX_DAYS	99999
-PASS_MIN_DAYS	0
-PASS_WARN_AGE	7
-#PASS_CHANGE_TRIES
-#PASS_ALWAYS_WARN
-#PASS_MIN_LEN
-#PASS_MAX_LEN
-# NO_PASSWORD_CONSOLE
-LOG_OK_LOGINS		no
-HUSHLOGIN_FILE	.hushlogin
-#HUSHLOGIN_FILE	/etc/hushlogins
-LOGIN_RETRIES		5
-LOGIN_TIMEOUT		60
-#NOLOGINS_FILE
-# LOGIN_STRING
-'
-++ grep -iE '^[[:space:]]*PASS_WARN_AGE[[:space:]=]+'
-++ grep -vE '^[[:space:]]*#'
-++ sed -E 's/^[[:space:]]*PASS_WARN_AGE[[:space:]=]+([0-9]+).*/\1/'
-++ head -1
-+ pass_warn_age=7
-+ [[ -z 7 ]]
-+ [[ 7 != \1\4 ]]
-+ errors+=("PASS_WARN_AGE=$pass_warn_age (ожидается: 14)")
-++ get_param_value LOGIN_RETRIES
-++ local param_name=LOGIN_RETRIES
-++ echo '#	PASS_MAX_DAYS	Maximum number of days a password may be used.
-#	PASS_MIN_DAYS	Minimum number of days allowed between password changes.
-#	PASS_WARN_AGE	Number of days warning given before a password expires.
-PASS_MAX_DAYS	99999
-PASS_MIN_DAYS	0
-PASS_WARN_AGE	7
-#PASS_CHANGE_TRIES
-#PASS_ALWAYS_WARN
-#PASS_MIN_LEN
-#PASS_MAX_LEN
-# NO_PASSWORD_CONSOLE
-LOG_OK_LOGINS		no
-HUSHLOGIN_FILE	.hushlogin
-#HUSHLOGIN_FILE	/etc/hushlogins
-LOGIN_RETRIES		5
-LOGIN_TIMEOUT		60
-#NOLOGINS_FILE
-# LOGIN_STRING
-'
-++ grep -iE '^[[:space:]]*LOGIN_RETRIES[[:space:]=]+'
-++ grep -vE '^[[:space:]]*#'
-++ sed -E 's/^[[:space:]]*LOGIN_RETRIES[[:space:]=]+([0-9]+).*/\1/'
-++ head -1
-+ login_retries=5
-+ [[ -z 5 ]]
-+ [[ 5 != \1\0 ]]
-+ errors+=("LOGIN_RETRIES=$login_retries (ожидается: 10)")
-++ get_param_value LOGIN_TIMEOUT
-++ local param_name=LOGIN_TIMEOUT
-++ echo '#	PASS_MAX_DAYS	Maximum number of days a password may be used.
-#	PASS_MIN_DAYS	Minimum number of days allowed between password changes.
-#	PASS_WARN_AGE	Number of days warning given before a password expires.
-PASS_MAX_DAYS	99999
-PASS_MIN_DAYS	0
-PASS_WARN_AGE	7
-#PASS_CHANGE_TRIES
-#PASS_ALWAYS_WARN
-#PASS_MIN_LEN
-#PASS_MAX_LEN
-# NO_PASSWORD_CONSOLE
-LOG_OK_LOGINS		no
-HUSHLOGIN_FILE	.hushlogin
-#HUSHLOGIN_FILE	/etc/hushlogins
-LOGIN_RETRIES		5
-LOGIN_TIMEOUT		60
-#NOLOGINS_FILE
-# LOGIN_STRING
-'
-++ grep -iE '^[[:space:]]*LOGIN_TIMEOUT[[:space:]=]+'
-++ grep -vE '^[[:space:]]*#'
-++ sed -E 's/^[[:space:]]*LOGIN_TIMEOUT[[:space:]=]+([0-9]+).*/\1/'
-++ head -1
-+ login_timeout=60
-+ [[ -z 60 ]]
-+ [[ 60 != \1\8\0\0 ]]
-+ errors+=("LOGIN_TIMEOUT=$login_timeout (ожидается: 1800)")
-+ [[ 0 -gt 0 ]]
-+ [[ 4 -gt 0 ]]
-+ [[ 0 -gt 0 ]]
-+ [[ 4 -gt 0 ]]
-+ echo 'Неверные значения:'
-+ for error in "${errors[@]}"
-+ echo '  PASS_MIN_DAYS=0 (ожидается: 1)'
-+ for error in "${errors[@]}"
-+ echo '  PASS_WARN_AGE=7 (ожидается: 14)'
-+ for error in "${errors[@]}"
-+ echo '  LOGIN_RETRIES=5 (ожидается: 10)'
-+ for error in "${errors[@]}"
-+ echo '  LOGIN_TIMEOUT=60 (ожидается: 1800)'
-+ echo 'Не пройдена'
-+ exit 44
-
-================================================================================
-
-2026-02-04 14:00:20 [INFO] 
-================================================================================
-[2026-02-04 14:00:20.879] SSH COMMAND EXECUTION - FAILED
-Host: Linux Server 1 (192.168.56.102:22)
-Username: user
-
->>> COMMAND SENT:
-sudo cat /etc/pam.d/system-auth
-
->>> EXIT CODE: 1
-
->>> STDOUT:
-(empty)
-
->>> STDERR:
-cat: /etc/pam.d/system-auth: Нет такого файла или каталога
-
-================================================================================
-
-2026-02-04 14:00:20 [INFO] 
-================================================================================
-[2026-02-04 14:00:20.973] SSH COMMAND EXECUTION - SUCCESS
-Host: Linux Server 1 (192.168.56.102:22)
-Username: user
-
->>> COMMAND SENT:
-sudo cat /etc/shadow
-
->>> EXIT CODE: 0
-
->>> STDOUT:
-root:!:20397:0:99999:7:::
-daemon:*:20397:0:99999:7:::
-bin:*:20397:0:99999:7:::
-sys:*:20397:0:99999:7:::
-sync:*:20397:0:99999:7:::
-games:*:20397:0:99999:7:::
-man:*:20397:0:99999:7:::
-lp:*:20397:0:99999:7:::
-mail:*:20397:0:99999:7:::
-news:*:20397:0:99999:7:::
-uucp:*:20397:0:99999:7:::
-proxy:*:20397:0:99999:7:::
-www-data:*:20397:0:99999:7:::
-backup:*:20397:0:99999:7:::
-list:*:20397:0:99999:7:::
-irc:*:20397:0:99999:7:::
-gnats:*:20397:0:99999:7:::
-nobody:*:20397:0:99999:7:::
-systemd-timesync:*:20397:0:99999:7:::
-systemd-network:*:20397:0:99999:7:::
-systemd-resolve:*:20397:0:99999:7:::
-systemd-bus-proxy:*:20397:0:99999:7:::
-_apt:*:20397:0:99999:7:::
-messagebus:*:20397:0:99999:7:::
-astra-orientation:*:20397:0:99999:7:::
-pulse:*:20397:0:99999:7:::
-fly-dm:*:20397:0:99999:7:::
-Debian-exim:!:20397:0:99999:7:::
-postgres:$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/:20397:0:99999:7:::
-dnsmasq:*:20397:0:99999:7:::
-ntp:*:20397:0:99999:7:::
-logcheck:*:20397:0:99999:7:::
-saned:*:20397:0:99999:7:::
-nm-openvpn:*:20397:0:99999:7:::
-hplip:*:20397:0:99999:7:::
-avahi:*:20397:0:99999:7:::
-sshd:*:20397:0:99999:7:::
-user:$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/:20397:0:99999:7:::
-
-
->>> STDERR:
-(empty)
-================================================================================
-
-2026-02-04 14:00:21 [INFO] 
-================================================================================
-[2026-02-04 14:00:21.096] PROCESSOR SCRIPT EXECUTION - SUCCESS
-Host: Linux Server 1 (192.168.56.102:22)
-Script ID: ef909cf2-f6d0-46f0-836d-d43fb4425ff1
-Script Name: Encrypted_passwords
-
->>> PROCESSOR SCRIPT (preview):
-#!/usr/bin/env bash
-
-set -eo pipefail
-
-# CHECK_OUTPUT — вывод команды "sudo cat /etc/shadow"
-# Проверяем, что все пароли в файле /etc/shadow хранятся в зашифрованном виде
-# Формат /etc/shadow: username:password_hash:last_change:min:max:warn:inactive:expire:reserved
-
-if [ -z "${CHECK_OUTPUT:-}" ]; then
+if [ -z "${ETALON_INPUT:-}" ]; then
     exit 51 # Отсутствует переменная
 fi
 
-# Функция для проверки, является ли пароль зашифрованным
-# Пароль считается зашифрованным, если:
-# - Начинается с $ (современные хеши: $1$, $2a$, $5$, $6$ и т.д.)
-# - Равен * или ! (заблокированный аккаунт)
-# - Имеет формат старых хешей (DES - 13 символов, MD5 - начинается с $1$)
-is_encrypted() {
-    local password_hash="$1"
-    
-... (total 85 lines, 2522 chars)
+# Находим строку "#includedir /etc/sudoers.d" (может быть с пробелами после #)
+... (total 139 lines, 4914 chars)
 
->>> INPUT DATA (CHECK_OUTPUT) - 1308 chars, 39 lines:
-root:!:20397:0:99999:7:::
-daemon:*:20397:0:99999:7:::
-bin:*:20397:0:99999:7:::
-sys:*:20397:0:99999:7:::
-sync:*:20397:0:99999:7:::
-games:*:20397:0:99999:7:::
-man:*:20397:0:99999:7:::
-lp:*:20397:0:99999:7:::
-mail:*:20397:0:99999:7:::
-news:*:20397:0:99999:7:::
-uucp:*:20397:0:99999:7:::
-proxy:*:20397:0:99999:7:::
-www-data:*:20397:0:99999:7:::
-backup:*:20397:0:99999:7:::
-list:*:20397:0:99999:7:::
-irc:*:20397:0:99999:7:::
-gnats:*:20397:0:99999:7:::
-nobody:*:20397:0:99999:7:::
-systemd-timesync:*:20397:0:99999:7:::
-systemd-network:*:20397:0:99999:7:::
-systemd-resolve:*:20397:0:99999:7:::
-systemd-bus-proxy:*:20397:0:99999:7:::
-_apt:*:20397:0:99999:7:::
-messagebus:*:20397:0:99999:7:::
-astra-orientation:*:20397:0:99999:7:::
-pulse:*:20397:0:99999:7:::
-fly-dm:*:20397:0:99999:7:::
-Debian-exim:!:20397:0:99999:7:::
-postgres:$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/:20397:0:99999:7:::
-dnsmasq:*:20397:0:99999:7:::
-ntp:*:20397:0:99999:7:::
-logcheck:*:20397:0:99999:7:::
-saned:*:20397:0:99999:7:::
-nm-openvpn:*:20397:0:99999:7:::
-hplip:*:20397:0:99999:7:::
-avahi:*:20397:0:99999:7:::
-sshd:*:20397:0:99999:7:::
-user:$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/:20397:0:99999:7:::
+>>> INPUT DATA (CHECK_OUTPUT) - 710 chars, 29 lines:
+#
+# This file MUST be edited with the 'visudo' command as root.
+#
+# Please consider adding local content in /etc/sudoers.d/ instead of
+# directly modifying this file.
+#
+# See the man page for details on how to write a sudoers file.
+#
+Defaults	env_reset
+Defaults	mail_badpass
+Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Host alias specification
+
+# User alias specification
+
+# Cmnd alias specification
+
+# User privilege specification
+root	ALL=(ALL:ALL) ALL
+
+# Allow members of group sudo to execute any command
+%sudo	ALL=(ALL:ALL) ALL
+
+# See sudoers(5) for more information on "#include" directives:
+
+#includedir /etc/sudoers.d
+%astra-admin	ALL=(ALL:ALL) NOPASSWD: ALL
 
 
->>> REFERENCE DATA (ETALON_INPUT) - 0 chars, 1 lines:
-(empty)
+>>> REFERENCE DATA (ETALON_INPUT) - 16 chars, 2 lines:
+astra-admin
+root
 
->>> EXIT CODE: 0 (SUCCESS)
+>>> EXIT CODE: 44 (Неверное значение)
 
->>> STDOUT (9 chars):
-Пройдена
+>>> STDOUT (25 chars):
+ACTUAL_DATA: astra-admin
 
 
->>> STDERR (19227 chars):
+>>> STDERR (6504 chars):
 + set -eo pipefail
-+ '[' -z 'root:!:20397:0:99999:7:::
-daemon:*:20397:0:99999:7:::
-bin:*:20397:0:99999:7:::
-sys:*:20397:0:99999:7:::
-sync:*:20397:0:99999:7:::
-games:*:20397:0:99999:7:::
-man:*:20397:0:99999:7:::
-lp:*:20397:0:99999:7:::
-mail:*:20397:0:99999:7:::
-news:*:20397:0:99999:7:::
-uucp:*:20397:0:99999:7:::
-proxy:*:20397:0:99999:7:::
-www-data:*:20397:0:99999:7:::
-backup:*:20397:0:99999:7:::
-list:*:20397:0:99999:7:::
-irc:*:20397:0:99999:7:::
-gnats:*:20397:0:99999:7:::
-nobody:*:20397:0:99999:7:::
-systemd-timesync:*:20397:0:99999:7:::
-systemd-network:*:20397:0:99999:7:::
-systemd-resolve:*:20397:0:99999:7:::
-systemd-bus-proxy:*:20397:0:99999:7:::
-_apt:*:20397:0:99999:7:::
-messagebus:*:20397:0:99999:7:::
-astra-orientation:*:20397:0:99999:7:::
-pulse:*:20397:0:99999:7:::
-fly-dm:*:20397:0:99999:7:::
-Debian-exim:!:20397:0:99999:7:::
-postgres:$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/:20397:0:99999:7:::
-dnsmasq:*:20397:0:99999:7:::
-ntp:*:20397:0:99999:7:::
-logcheck:*:20397:0:99999:7:::
-saned:*:20397:0:99999:7:::
-nm-openvpn:*:20397:0:99999:7:::
-hplip:*:20397:0:99999:7:::
-avahi:*:20397:0:99999:7:::
-sshd:*:20397:0:99999:7:::
-user:$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/:20397:0:99999:7:::
++ '[' -z '#
+# This file MUST be edited with the '\''visudo'\'' command as root.
+#
+# Please consider adding local content in /etc/sudoers.d/ instead of
+# directly modifying this file.
+#
+# See the man page for details on how to write a sudoers file.
+#
+Defaults	env_reset
+Defaults	mail_badpass
+Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Host alias specification
+
+# User alias specification
+
+# Cmnd alias specification
+
+# User privilege specification
+root	ALL=(ALL:ALL) ALL
+
+# Allow members of group sudo to execute any command
+%sudo	ALL=(ALL:ALL) ALL
+
+# See sudoers(5) for more information on "#include" directives:
+
+#includedir /etc/sudoers.d
+%astra-admin	ALL=(ALL:ALL) NOPASSWD: ALL
 ' ']'
-+ errors=()
-+ line_number=0
++ '[' -z 'astra-admin
+root' ']'
++ found_includedir=false
++ groups_after_includedir=
 + IFS=
 + read -r line
-+ line_number=1
-+ [[ -z root:!:20397:0:99999:7::: ]]
-+ [[ root:!:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'root:!:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=root
-++ echo 'root:!:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='!'
-+ [[ -z root ]]
-+ is_encrypted '!'
-+ local 'password_hash=!'
-+ [[ -z ! ]]
-+ [[ ! == \* ]]
-+ [[ ! == \! ]]
-+ return 0
++ echo '#'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=2
-+ [[ -z daemon:*:20397:0:99999:7::: ]]
-+ [[ daemon:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'daemon:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=daemon
-++ echo 'daemon:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z daemon ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# This file MUST be edited with the '\''visudo'\'' command as root.'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=3
-+ [[ -z bin:*:20397:0:99999:7::: ]]
-+ [[ bin:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'bin:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=bin
-++ echo 'bin:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z bin ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '#'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=4
-+ [[ -z sys:*:20397:0:99999:7::: ]]
-+ [[ sys:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'sys:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=sys
-++ echo 'sys:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z sys ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# Please consider adding local content in /etc/sudoers.d/ instead of'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=5
-+ [[ -z sync:*:20397:0:99999:7::: ]]
-+ [[ sync:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'sync:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=sync
-++ echo 'sync:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z sync ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# directly modifying this file.'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=6
-+ [[ -z games:*:20397:0:99999:7::: ]]
-+ [[ games:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'games:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=games
-++ echo 'games:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z games ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '#'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=7
-+ [[ -z man:*:20397:0:99999:7::: ]]
-+ [[ man:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'man:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=man
-++ echo 'man:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z man ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# See the man page for details on how to write a sudoers file.'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=8
-+ [[ -z lp:*:20397:0:99999:7::: ]]
-+ [[ lp:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'lp:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=lp
-++ echo 'lp:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z lp ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '#'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=9
-+ [[ -z mail:*:20397:0:99999:7::: ]]
-+ [[ mail:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'mail:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=mail
-++ echo 'mail:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z mail ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo 'Defaults	env_reset'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=10
-+ [[ -z news:*:20397:0:99999:7::: ]]
-+ [[ news:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'news:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=news
-++ echo 'news:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z news ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo 'Defaults	mail_badpass'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=11
-+ [[ -z uucp:*:20397:0:99999:7::: ]]
-+ [[ uucp:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'uucp:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=uucp
-++ echo 'uucp:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z uucp ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo 'Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=12
-+ [[ -z proxy:*:20397:0:99999:7::: ]]
-+ [[ proxy:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'proxy:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=proxy
-++ echo 'proxy:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z proxy ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo ''
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=13
-+ [[ -z www-data:*:20397:0:99999:7::: ]]
-+ [[ www-data:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'www-data:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=www-data
-++ awk -F: '{print $2}'
-++ echo 'www-data:*:20397:0:99999:7:::'
-+ password_hash='*'
-+ [[ -z www-data ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# Host alias specification'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=14
-+ [[ -z backup:*:20397:0:99999:7::: ]]
-+ [[ backup:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'backup:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=backup
-++ echo 'backup:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z backup ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo ''
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=15
-+ [[ -z list:*:20397:0:99999:7::: ]]
-+ [[ list:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'list:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=list
-++ echo 'list:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z list ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# User alias specification'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=16
-+ [[ -z irc:*:20397:0:99999:7::: ]]
-+ [[ irc:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'irc:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=irc
-++ echo 'irc:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z irc ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo ''
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=17
-+ [[ -z gnats:*:20397:0:99999:7::: ]]
-+ [[ gnats:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'gnats:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=gnats
-++ echo 'gnats:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z gnats ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# Cmnd alias specification'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=18
-+ [[ -z nobody:*:20397:0:99999:7::: ]]
-+ [[ nobody:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'nobody:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=nobody
-++ echo 'nobody:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z nobody ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo ''
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=19
-+ [[ -z systemd-timesync:*:20397:0:99999:7::: ]]
-+ [[ systemd-timesync:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'systemd-timesync:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=systemd-timesync
-++ echo 'systemd-timesync:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z systemd-timesync ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# User privilege specification'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=20
-+ [[ -z systemd-network:*:20397:0:99999:7::: ]]
-+ [[ systemd-network:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'systemd-network:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=systemd-network
-++ echo 'systemd-network:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z systemd-network ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo 'root	ALL=(ALL:ALL) ALL'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=21
-+ [[ -z systemd-resolve:*:20397:0:99999:7::: ]]
-+ [[ systemd-resolve:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'systemd-resolve:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=systemd-resolve
-++ echo 'systemd-resolve:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z systemd-resolve ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo ''
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=22
-+ [[ -z systemd-bus-proxy:*:20397:0:99999:7::: ]]
-+ [[ systemd-bus-proxy:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'systemd-bus-proxy:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=systemd-bus-proxy
-++ echo 'systemd-bus-proxy:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z systemd-bus-proxy ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# Allow members of group sudo to execute any command'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=23
-+ [[ -z _apt:*:20397:0:99999:7::: ]]
-+ [[ _apt:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo '_apt:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=_apt
-++ echo '_apt:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z _apt ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '%sudo	ALL=(ALL:ALL) ALL'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=24
-+ [[ -z messagebus:*:20397:0:99999:7::: ]]
-+ [[ messagebus:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'messagebus:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=messagebus
-++ echo 'messagebus:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z messagebus ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo ''
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=25
-+ [[ -z astra-orientation:*:20397:0:99999:7::: ]]
-+ [[ astra-orientation:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'astra-orientation:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=astra-orientation
-++ echo 'astra-orientation:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z astra-orientation ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo '# See sudoers(5) for more information on "#include" directives:'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=26
-+ [[ -z pulse:*:20397:0:99999:7::: ]]
-+ [[ pulse:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'pulse:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=pulse
-++ echo 'pulse:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z pulse ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
++ echo ''
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ false == true ]]
 + IFS=
 + read -r line
-+ line_number=27
-+ [[ -z fly-dm:*:20397:0:99999:7::: ]]
-+ [[ fly-dm:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'fly-dm:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=fly-dm
-++ echo 'fly-dm:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z fly-dm ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=28
-+ [[ -z Debian-exim:!:20397:0:99999:7::: ]]
-+ [[ Debian-exim:!:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'Debian-exim:!:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=Debian-exim
-++ echo 'Debian-exim:!:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='!'
-+ [[ -z Debian-exim ]]
-+ is_encrypted '!'
-+ local 'password_hash=!'
-+ [[ -z ! ]]
-+ [[ ! == \* ]]
-+ [[ ! == \! ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=29
-+ [[ -z postgres:$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/:20397:0:99999:7::: ]]
-+ [[ postgres:$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'postgres:$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=postgres
-++ echo 'postgres:$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/'
-+ [[ -z postgres ]]
-+ is_encrypted '$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/'
-+ local 'password_hash=$gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/'
-+ [[ -z $gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/ ]]
-+ [[ $gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/ == \* ]]
-+ [[ $gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/ == \! ]]
-+ [[ $gost12512hash$USHPwd7m$Mp/lRV2pKrdFLcizCJUzo34oiTOytSC4Tx.YfAEFQoora6t7GnFABUfPd.EFNrNDogEy1pvbhEc3O75Ar5h4O/ =~ ^\$ ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=30
-+ [[ -z dnsmasq:*:20397:0:99999:7::: ]]
-+ [[ dnsmasq:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'dnsmasq:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=dnsmasq
-++ echo 'dnsmasq:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z dnsmasq ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=31
-+ [[ -z ntp:*:20397:0:99999:7::: ]]
-+ [[ ntp:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'ntp:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=ntp
-++ echo 'ntp:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z ntp ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=32
-+ [[ -z logcheck:*:20397:0:99999:7::: ]]
-+ [[ logcheck:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'logcheck:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=logcheck
-++ awk -F: '{print $2}'
-++ echo 'logcheck:*:20397:0:99999:7:::'
-+ password_hash='*'
-+ [[ -z logcheck ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=33
-+ [[ -z saned:*:20397:0:99999:7::: ]]
-+ [[ saned:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'saned:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=saned
-++ echo 'saned:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z saned ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=34
-+ [[ -z nm-openvpn:*:20397:0:99999:7::: ]]
-+ [[ nm-openvpn:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'nm-openvpn:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=nm-openvpn
-++ echo 'nm-openvpn:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z nm-openvpn ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=35
-+ [[ -z hplip:*:20397:0:99999:7::: ]]
-+ [[ hplip:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'hplip:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=hplip
-++ echo 'hplip:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z hplip ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=36
-+ [[ -z avahi:*:20397:0:99999:7::: ]]
-+ [[ avahi:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'avahi:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=avahi
-++ echo 'avahi:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z avahi ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=37
-+ [[ -z sshd:*:20397:0:99999:7::: ]]
-+ [[ sshd:*:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'sshd:*:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=sshd
-++ echo 'sshd:*:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='*'
-+ [[ -z sshd ]]
-+ is_encrypted '*'
-+ local 'password_hash=*'
-+ [[ -z * ]]
-+ [[ * == \* ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=38
-+ [[ -z user:$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/:20397:0:99999:7::: ]]
-+ [[ user:$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/:20397:0:99999:7::: =~ ^[[:space:]]*# ]]
-++ echo 'user:$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/:20397:0:99999:7:::'
-++ awk -F: '{print $1}'
-+ username=user
-++ echo 'user:$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/:20397:0:99999:7:::'
-++ awk -F: '{print $2}'
-+ password_hash='$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/'
-+ [[ -z user ]]
-+ is_encrypted '$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/'
-+ local 'password_hash=$gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/'
-+ [[ -z $gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/ ]]
-+ [[ $gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/ == \* ]]
-+ [[ $gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/ == \! ]]
-+ [[ $gost12512hash$dTA1m3nF$jkh6ySBAEqJnOQU2GMoQ80tiyKwEJzRkSbAT4pFT6CyXzvR.toIY1P8WlBZzx/D.qeDgfQofFaB713GhceShm/ =~ ^\$ ]]
-+ return 0
-+ IFS=
-+ read -r line
-+ line_number=39
-+ [[ -z '' ]]
++ echo '#includedir /etc/sudoers.d'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ found_includedir=true
 + continue
 + IFS=
 + read -r line
-+ [[ 0 -gt 0 ]]
-+ echo Пройдена
-+ exit 0
++ echo '%astra-admin	ALL=(ALL:ALL) NOPASSWD: ALL'
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ true == true ]]
++ echo '%astra-admin	ALL=(ALL:ALL) NOPASSWD: ALL'
++ grep -qE '^[[:space:]]*%'
+++ echo '%astra-admin	ALL=(ALL:ALL) NOPASSWD: ALL'
+++ sed -E 's/^[[:space:]]*%([a-zA-Z0-9_-]+).*/\1/'
++ group_name=astra-admin
++ [[ -n astra-admin ]]
++ [[ -z '' ]]
++ groups_after_includedir=astra-admin
++ IFS=
++ read -r line
++ echo ''
++ grep -qE '^[[:space:]]*#[[:space:]]*includedir[[:space:]]+/etc/sudoers\.d'
++ [[ true == true ]]
++ echo ''
++ grep -qE '^[[:space:]]*%'
++ IFS=
++ read -r line
++ [[ true == false ]]
++ [[ -z astra-admin ]]
+++ echo astra-admin
+++ sort -u
+++ tr '\n' ,
+++ sed 's/,$//'
++ actual_groups=astra-admin
++ echo 'ACTUAL_DATA: astra-admin'
+++ normalize 'astra-admin
+root'
+++ local 'input=astra-admin
+root'
+++ echo 'astra-admin
+root'
+++ tr '\n\t ' ,
+++ sed 's/,,*/,/g'
+++ sed 's/^,\|,$//g'
+++ awk -F, '{for(i=1;i<=NF;i++) if($i!="") print $i}'
+++ sort -u
+++ tr '\n' ,
+++ sed 's/,$//'
++ expected_normalized=astra-admin,root
+++ normalize astra-admin
+++ local input=astra-admin
+++ echo astra-admin
+++ tr '\n\t ' ,
+++ sed 's/,,*/,/g'
+++ sed 's/^,\|,$//g'
+++ awk -F, '{for(i=1;i<=NF;i++) if($i!="") print $i}'
+++ sort -u
+++ tr '\n' ,
+++ sed 's/,$//'
++ actual_normalized=astra-admin
++ IFS=,
++ read -ra expected_array
++ IFS=,
++ read -ra actual_array
++ expected_count=2
++ actual_count=1
++ [[ 2 -ne 1 ]]
++ exit 44
+
+================================================================================
+
+2026-02-05 08:58:52 [INFO] 
+================================================================================
+[2026-02-05 08:58:52.519] SSH COMMAND EXECUTION - FAILED
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+sudo /opt/kaspersky/klnagent64/bin/klnagchk
+
+>>> EXIT CODE: 1
+
+>>> STDOUT:
+(empty)
+
+>>> STDERR:
+sudo: /opt/kaspersky/klnagent64/bin/klnagchk: command not found
+
+================================================================================
+
+2026-02-05 08:58:52 [INFO] 
+================================================================================
+[2026-02-05 08:58:52.619] SSH COMMAND EXECUTION - FAILED
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+sudo kesl-control --app-info
+
+>>> EXIT CODE: 1
+
+>>> STDOUT:
+(empty)
+
+>>> STDERR:
+sudo: kesl-control: command not found
 
 ================================================================================
 
