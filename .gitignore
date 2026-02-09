@@ -86,3 +86,4 @@ android-sdk/ -e
 models/Trinity-Mini-Q4_K_L.gguf
 frontend2301
 backend2301
+logs/ssh_operations.log
