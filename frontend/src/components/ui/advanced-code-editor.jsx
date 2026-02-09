@@ -3,107 +3,15 @@ import { Maximize2, Minimize2, X, Code2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import './advanced-code-editor.css';
 
-// Syntax highlighting for bash scripts
+// Simple text display without syntax highlighting (disabled due to marker bugs)
 const highlightBash = (code) => {
   if (!code) return '';
   
-  // Escape HTML
-  let highlighted = code
+  // Just escape HTML and return plain text
+  return code
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-  
-  const markers = {
-    COMMENT: '___COMMENT___',
-    STRING_SINGLE: '___STRING_SINGLE___',
-    STRING_DOUBLE: '___STRING_DOUBLE___',
-    VARIABLE: '___VARIABLE___',
-    KEYWORD: '___KEYWORD___',
-    OPERATOR: '___OPERATOR___',
-    NUMBER: '___NUMBER___'
-  };
-  
-  const replacements = [];
-  let markerIndex = 0;
-  
-  // Comments (priority 1)
-  highlighted = highlighted.replace(/(#.*$)/gm, (match) => {
-    const marker = `${markers.COMMENT}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="ace-comment">${match}</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Single-quoted strings
-  highlighted = highlighted.replace(/'([^']*)'/g, (match, content) => {
-    const marker = `${markers.STRING_SINGLE}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="ace-string">'${content}'</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Double-quoted strings
-  highlighted = highlighted.replace(/"([^"]*)"/g, (match, content) => {
-    const marker = `${markers.STRING_DOUBLE}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="ace-string">"${content}"</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Variables $VAR or ${VAR}
-  highlighted = highlighted.replace(/\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?/g, (match) => {
-    if (match.includes('___')) return match;
-    const marker = `${markers.VARIABLE}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="ace-variable">${match}</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Bash keywords
-  const keywords = [
-    'if', 'then', 'else', 'elif', 'fi', 'case', 'esac',
-    'for', 'while', 'until', 'do', 'done',
-    'function', 'select', 'time',
-    'export', 'readonly', 'local', 'declare', 'typeset',
-    'return', 'break', 'continue', 'exit',
-    'test', 'true', 'false', 'null', 'echo', 'grep', 'awk', 'sed'
-  ];
-  
-  keywords.forEach(keyword => {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'g');
-    highlighted = highlighted.replace(regex, (match) => {
-      if (match.includes('___')) return match;
-      const marker = `${markers.KEYWORD}${markerIndex}___`;
-      replacements.push({ marker, html: `<span class="ace-keyword">${match}</span>` });
-      markerIndex++;
-      return marker;
-    });
-  });
-  
-  // Operators
-  highlighted = highlighted.replace(/(&&|\|\||==|!=|<=|>=|[=<>|;])/g, (match) => {
-    if (match.includes('___')) return match;
-    const marker = `${markers.OPERATOR}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="ace-operator">${match}</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Numbers
-  highlighted = highlighted.replace(/\b(\d+)\b/g, (match) => {
-    if (match.includes('___')) return match;
-    const marker = `${markers.NUMBER}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="ace-number">${match}</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Replace markers with HTML
-  replacements.forEach(({ marker, html }) => {
-    highlighted = highlighted.replace(marker, html);
-  });
-  
-  return highlighted;
 };
 
 export const AdvancedCodeEditor = forwardRef(({ 

@@ -3,111 +3,15 @@ import { Button } from '@/components/ui/button';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Подсветка синтаксиса bash с защитой от вложенных тегов
+// Simple text display without syntax highlighting (disabled due to marker bugs)
 const highlightBash = (code) => {
   if (!code) return '';
   
-  // Экранируем HTML
-  let highlighted = code
+  // Just escape HTML and return plain text
+  return code
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-  
-  // Используем маркеры для защиты уже обработанных участков
-  const markers = {
-    COMMENT: '___COMMENT___',
-    STRING_SINGLE: '___STRING_SINGLE___',
-    STRING_DOUBLE: '___STRING_DOUBLE___',
-    VARIABLE: '___VARIABLE___',
-    KEYWORD: '___KEYWORD___',
-    OPERATOR: '___OPERATOR___',
-    NUMBER: '___NUMBER___'
-  };
-  
-  const replacements = [];
-  let markerIndex = 0;
-  
-  // Комментарии (приоритет 1 - обрабатываем первыми)
-  highlighted = highlighted.replace(/(#.*$)/gm, (match) => {
-    const marker = `${markers.COMMENT}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="text-slate-500 italic">${match}</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Строки в одинарных кавычках
-  highlighted = highlighted.replace(/'([^']*)'/g, (match, content) => {
-    const marker = `${markers.STRING_SINGLE}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="text-green-600">'${content}'</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Строки в двойных кавычках
-  highlighted = highlighted.replace(/"([^"]*)"/g, (match, content) => {
-    const marker = `${markers.STRING_DOUBLE}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="text-green-600">"${content}"</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Переменные $VAR или ${VAR} (только вне строк)
-  highlighted = highlighted.replace(/\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?/g, (match) => {
-    // Пропускаем, если это часть маркера
-    if (match.includes('___')) return match;
-    const marker = `${markers.VARIABLE}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="text-blue-600">${match}</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Ключевые слова bash (только целые слова)
-  const keywords = [
-    'if', 'then', 'else', 'elif', 'fi', 'case', 'esac',
-    'for', 'while', 'until', 'do', 'done',
-    'function', 'select', 'time',
-    'export', 'readonly', 'local', 'declare', 'typeset',
-    'return', 'break', 'continue', 'exit',
-    'test', 'true', 'false', 'null'
-  ];
-  
-  keywords.forEach(keyword => {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'g');
-    highlighted = highlighted.replace(regex, (match) => {
-      // Пропускаем, если это часть маркера
-      if (match.includes('___')) return match;
-      const marker = `${markers.KEYWORD}${markerIndex}___`;
-      replacements.push({ marker, html: `<span class="text-purple-600 font-semibold">${match}</span>` });
-      markerIndex++;
-      return marker;
-    });
-  });
-  
-  // Операторы (только вне строк и комментариев)
-  highlighted = highlighted.replace(/(&&|\|\||==|!=|<=|>=|[=<>])/g, (match) => {
-    // Пропускаем, если это часть маркера
-    if (match.includes('___')) return match;
-    const marker = `${markers.OPERATOR}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="text-orange-600">${match}</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Числа (только целые слова)
-  highlighted = highlighted.replace(/\b(\d+)\b/g, (match) => {
-    if (match.includes('___')) return match;
-    const marker = `${markers.NUMBER}${markerIndex}___`;
-    replacements.push({ marker, html: `<span class="text-cyan-600">${match}</span>` });
-    markerIndex++;
-    return marker;
-  });
-  
-  // Заменяем маркеры на HTML
-  replacements.forEach(({ marker, html }) => {
-    highlighted = highlighted.replace(marker, html);
-  });
-  
-  return highlighted;
 };
 
 export function CodeEditor({ 

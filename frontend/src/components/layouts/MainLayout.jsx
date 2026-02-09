@@ -122,16 +122,6 @@ export const MainLayout = ({ children }) => {
             </Link>
           )}
 
-          <Link to="/ai-test" className="md3-sidebar-item-link">
-            <Button
-              variant={isActive('/ai-test') ? "tonal" : "text"}
-              className={`md3-sidebar-button ${isActive('/ai-test') ? 'md3-sidebar-button-active' : ''}`}
-            >
-              <Bot className="md3-icon" />
-              {isSidebarExpanded && "Тест ИИ"}
-            </Button>
-          </Link>
-
           {/* Admin Section Separator */}
           {isAdmin && (
             <>
@@ -237,7 +227,6 @@ const getPageTitle = (pathname) => {
     '/hosts': 'Хосты',
     '/scripts': 'Проверки',
     '/scheduler': 'Планировщик',
-    '/ai-test': 'Тест ИИ',
     '/logs': 'Логи системы',
     '/admin': 'Админ-панель',
     '/users': 'Пользователи',

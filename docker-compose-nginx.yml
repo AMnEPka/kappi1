@@ -34,7 +34,7 @@ services:
       - PYTHONPATH=/app
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
     volumes:
-      - backend_logs:/app/logs
+      - ./logs:/app/logs
     networks:
       - ssh-runner-network
     logging:
@@ -60,9 +60,15 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
-      - REACT_APP_BACKEND_URL=http://localhost:405
-      - REACT_APP_WS_URL=ws://localhost:405/ws
-    command: sh -c "REACT_APP_BACKEND_URL=http://localhost:405 REACT_APP_WS_URL=ws://localhost:405/ws PORT=415 HOST=0.0.0.0 npm start"      
+      # В режиме nginx-reverse-proxy фронт должен ходить в API по относительному пути (/api),
+      # чтобы работало на любом хосте/порту (127.0.0.1:405, домен и т.д.)
+      - REACT_APP_BACKEND_URL=/
+      # Backend websocket проксируется nginx как /ws (если используется в приложении)
+      - REACT_APP_WS_URL=
+      # Dev-server внутри контейнера запускаем без HMR/WS, чтобы не пытаться коннектиться к :415 с хоста
+      - DISABLE_HOT_RELOAD=true
+      - FAST_REFRESH=false
+    command: sh -c "PORT=415 HOST=0.0.0.0 npm start"
 
   # Nginx Reverse Proxy
   nginx:
@@ -89,6 +95,4 @@ volumes:
   mongodb_data:
     driver: local
   mongodb_config:
-    driver: local
-  backend_logs:
     driver: local

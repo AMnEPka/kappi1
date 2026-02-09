@@ -210,11 +210,39 @@ export default function ScriptsPage() {
     try {
       const content = await file.text();
       const payload = JSON.parse(content);
+      
+      // Log request details for debugging
+      console.log('Import request:', {
+        url: '/api/scripts/import/bulk',
+        payloadSize: JSON.stringify(payload).length,
+        scriptsCount: payload.scripts?.length || 0
+      });
+      
       await api.post('/api/scripts/import/bulk', payload);
       toast.success("Импорт завершен");
       await refreshAll();
     } catch (error) {
-      const detail = error.response?.data?.detail || error.message || "Ошибка импорта";
+      // Enhanced error logging
+      console.error('Import error:', {
+        message: error.message,
+        code: error.code,
+        response: error.response?.data,
+        status: error.response?.status,
+        request: error.request,
+        config: error.config
+      });
+      
+      let detail = "Ошибка импорта";
+      if (error.response?.data?.detail) {
+        detail = error.response.data.detail;
+      } else if (error.message) {
+        detail = error.message;
+      } else if (error.code === 'ECONNABORTED') {
+        detail = "Таймаут запроса. Файл слишком большой или сервер не отвечает.";
+      } else if (error.code === 'ERR_NETWORK' || !error.response) {
+        detail = "Ошибка сети. Проверьте подключение к серверу.";
+      }
+      
       toast.error(detail);
     } finally {
       setIsImporting(false);

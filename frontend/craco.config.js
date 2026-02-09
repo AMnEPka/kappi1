@@ -80,33 +80,40 @@ if (config.enableVisualEdits) {
   };
 }
 
-// Setup dev server with visual edits and/or health check
-if (config.enableVisualEdits || config.enableHealthCheck) {
-  webpackConfig.devServer = (devServerConfig) => {
-    // Apply visual edits dev server setup if enabled
-    if (config.enableVisualEdits && setupDevServer) {
-      devServerConfig = setupDevServer(devServerConfig);
-    }
+// Setup dev server configuration
+webpackConfig.devServer = (devServerConfig) => {
+  // When DISABLE_HOT_RELOAD is true, completely disable WebSocket connections
+  // This prevents browser from trying to connect to HMR WebSocket through nginx
+  if (config.disableHotReload) {
+    devServerConfig.hot = false;
+    devServerConfig.liveReload = false;
+    devServerConfig.webSocketServer = false; // Disable WebSocket server entirely
+    devServerConfig.client = false; // Disable client script entirely (no WebSocket, no overlay)
+  }
 
-    // Add health check endpoints if enabled
-    if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
-      const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
+  // Apply visual edits dev server setup if enabled
+  if (config.enableVisualEdits && setupDevServer) {
+    devServerConfig = setupDevServer(devServerConfig);
+  }
 
-      devServerConfig.setupMiddlewares = (middlewares, devServer) => {
-        // Call original setup if exists
-        if (originalSetupMiddlewares) {
-          middlewares = originalSetupMiddlewares(middlewares, devServer);
-        }
+  // Add health check endpoints if enabled
+  if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
+    const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
 
-        // Setup health endpoints
-        setupHealthEndpoints(devServer, healthPluginInstance);
+    devServerConfig.setupMiddlewares = (middlewares, devServer) => {
+      // Call original setup if exists
+      if (originalSetupMiddlewares) {
+        middlewares = originalSetupMiddlewares(middlewares, devServer);
+      }
 
-        return middlewares;
-      };
-    }
+      // Setup health endpoints
+      setupHealthEndpoints(devServer, healthPluginInstance);
 
-    return devServerConfig;
-  };
-}
+      return middlewares;
+    };
+  }
+
+  return devServerConfig;
+};
 
 module.exports = webpackConfig;

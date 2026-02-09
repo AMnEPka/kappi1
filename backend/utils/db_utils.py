@@ -134,6 +134,33 @@ def decode_script_content(encoded_content: Optional[str]) -> Optional[str]:
         return encoded_content
 
 
+def sanitize_script_content(content: str) -> str:
+    """Remove any syntax highlighting markers that might have been accidentally saved.
+    
+    These markers are used only for frontend display and should never be in stored data.
+    """
+    import re
+    if not content:
+        return content
+    
+    # Remove markers like ___COMMENT___0___, ___STRING_SINGLE___11___, etc.
+    marker_patterns = [
+        r'___COMMENT___\d+___',
+        r'___STRING_SINGLE___\d+___',
+        r'___STRING_DOUBLE___\d+___',
+        r'___VARIABLE___\d+___',
+        r'___KEYWORD___\d+___',
+        r'___OPERATOR___\d+___',
+        r'___NUMBER___\d+___',
+    ]
+    
+    sanitized = content
+    for pattern in marker_patterns:
+        sanitized = re.sub(pattern, '', sanitized)
+    
+    return sanitized
+
+
 def encode_script_for_storage(data: dict) -> dict:
     """Encode script content and processor_script fields for MongoDB storage
     
@@ -144,11 +171,15 @@ def encode_script_for_storage(data: dict) -> dict:
         Dictionary with content and processor_script Base64 encoded
     """
     encoded = data.copy()
+    
+    # Sanitize before encoding to remove any accidental markers
     if 'content' in encoded and encoded['content']:
+        encoded['content'] = sanitize_script_content(encoded['content'])
         encoded['content'] = encode_script_content(encoded['content'])
     
     # Обработка processor_script (для обратной совместимости)
     if 'processor_script' in encoded and encoded['processor_script']:
+        encoded['processor_script'] = sanitize_script_content(encoded['processor_script'])
         encoded['processor_script'] = encode_script_content(encoded['processor_script'])
     
     # Обработка версий processor_script
@@ -156,7 +187,8 @@ def encode_script_for_storage(data: dict) -> dict:
         version = encoded['processor_script_version']
         if isinstance(version, dict) and 'content' in version:
             version = version.copy()
-            version['content'] = encode_script_content(version.get('content'))
+            version['content'] = sanitize_script_content(version.get('content'))
+            version['content'] = encode_script_content(version['content'])
             encoded['processor_script_version'] = version
     
     if 'processor_script_versions' in encoded and encoded['processor_script_versions']:
@@ -164,7 +196,8 @@ def encode_script_for_storage(data: dict) -> dict:
         for version in encoded['processor_script_versions']:
             if isinstance(version, dict) and 'content' in version:
                 version_copy = version.copy()
-                version_copy['content'] = encode_script_content(version_copy.get('content'))
+                version_copy['content'] = sanitize_script_content(version_copy.get('content'))
+                version_copy['content'] = encode_script_content(version_copy['content'])
                 versions.append(version_copy)
             else:
                 versions.append(version)

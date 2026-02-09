@@ -8,6 +8,20 @@ import { toast } from "sonner";
 import { api, getAccessToken } from '../config/api';
 import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
 
+const fallbackExtractErrorCode = (output) => {
+  if (!output) return null;
+  const text = String(output);
+  const exitMatch = text.match(/exit code:?\s*(\d+)/i);
+  if (exitMatch?.[1]) return Number(exitMatch[1]);
+  const lines = text.trim().split('\n');
+  const lastLine = (lines[lines.length - 1] || '').trim();
+  if (/^\d+$/.test(lastLine)) return Number(lastLine);
+  return null;
+};
+
+const safeExtractErrorCode =
+  typeof extractErrorCode === 'function' ? extractErrorCode : fallbackExtractErrorCode;
+
 export default function ProjectExecutionPage({ projectId, onNavigate }) {
   const [project, setProject] = useState(null);
   const [executing, setExecuting] = useState(false);
@@ -133,6 +147,10 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   };
 
   const startExecution = async (shouldTrigger = true) => {
+    console.log('=== startExecution called ===');
+    console.log('projectId:', projectId);
+    console.log('shouldTrigger:', shouldTrigger);
+    
     try {
       setExecuting(true);
       setLogs([]);
@@ -143,11 +161,41 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
       // Connect to SSE for real-time updates (EventSource uses GET by default)
       // The backend endpoint will start execution when first connected
-      // Dynamically construct backend URL to work from any host in local network
-      const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      // EventSource doesn't support custom headers, so token must be in URL
       const token = getAccessToken();
-      const eventSource = new EventSource(`${backendUrl}/api/projects/${projectId}/execute?token=${token}`);
+      if (!token) {
+        console.error('No token available!');
+        toast.error("Токен авторизации не найден. Пожалуйста, войдите снова.");
+        setExecuting(false);
+        return;
+      }
+      
+      // Build absolute URL based on current window location to avoid issues with <base> tag
+      // This ensures EventSource uses the correct origin
+      const protocol = window.location.protocol;
+      const host = window.location.host;
+      const executeUrl = `${protocol}//${host}/api/projects/${projectId}/execute?token=${token}`;
+      
+      console.log('=== EventSource Configuration ===');
+      console.log('Creating EventSource with URL:', executeUrl);
+      console.log('Token present:', !!token);
+      console.log('Token length:', token ? token.length : 0);
+      console.log('Current window location:', window.location.href);
+      console.log('Protocol:', protocol, 'Host:', host);
+      
+      const eventSource = new EventSource(executeUrl);
       eventSourceRef.current = eventSource;
+      
+      console.log('EventSource created successfully');
+      console.log('EventSource readyState:', eventSource.readyState);
+      console.log('EventSource URL:', eventSource.url);
+      console.log('EventSource withCredentials:', eventSource.withCredentials);
+
+      // Log when connection opens
+      eventSource.onopen = (event) => {
+        console.log('✅ EventSource connection opened!', event);
+        console.log('EventSource readyState:', eventSource.readyState);
+      };
 
       eventSource.onmessage = (event) => {
         try {
@@ -243,6 +291,17 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       };
 
       eventSource.onerror = (error) => {
+        console.error('EventSource error:', error);
+        console.error('EventSource readyState:', eventSource.readyState);
+        console.error('EventSource URL:', executeUrl);
+        
+        // EventSource.readyState: 0 = CONNECTING, 1 = OPEN, 2 = CLOSED
+        if (eventSource.readyState === EventSource.CLOSED) {
+          console.error('EventSource connection closed');
+        } else if (eventSource.readyState === EventSource.CONNECTING) {
+          console.error('EventSource still connecting - connection may have failed');
+        }
+        
         eventSource.close();
         setExecuting(false);
         // При ошибке соединения ставим галочки
@@ -251,6 +310,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         
         if (logs.length === 0) {
           toast.error("Не удалось подключиться к серверу");
+          console.error('No logs received, connection failed immediately');
                     
           // Используем api вместо fetch
           api.get(`/api/projects/${projectId}/execution-failed`)
@@ -300,6 +360,12 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   };
 
   const getLogMessage = (log) => {
+    // Helper to format error info from backend
+    const formatErrorInfo = (errorInfo) => {
+      if (!errorInfo) return '';
+      return `\n  → [${errorInfo.category}] ${errorInfo.error}: ${errorInfo.description}`;
+    };
+    
     switch (log.type) {
       case 'status':
         return log.message;
@@ -307,26 +373,40 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         return log.message;
       case 'error':
         // Попробуем извлечь информацию об ошибке
-        const errorCode = extractErrorCode(log.message);
+        const errorCode = safeExtractErrorCode(log.message);
         if (errorCode && ERROR_CODES[errorCode]) {
           const errorInfo = getErrorDescription(errorCode);
-          return `${log.message}\n  → ${errorInfo.category}: ${errorInfo.error} (${errorInfo.description})`;
+          return `${log.message}\n  → [${errorInfo.category}] ${errorInfo.error}: ${errorInfo.description}`;
         }
         return log.message;
       case 'task_error':
-        const taskErrorCode = extractErrorCode(log.error);
+        // Используем error_info от бэкенда если есть
+        if (log.error_info) {
+          return `Ошибка на хосте ${log.host_name}: ${log.error}${formatErrorInfo(log.error_info)}`;
+        }
+        // Fallback на извлечение кода из текста ошибки
+        const taskErrorCode = safeExtractErrorCode(log.error);
         if (taskErrorCode && ERROR_CODES[taskErrorCode]) {
           const taskErrorInfo = getErrorDescription(taskErrorCode);
-          return `Ошибка на хосте ${log.host_name}: ${log.error}\n  → ${taskErrorInfo.category}: ${taskErrorInfo.error}`;
+          return `Ошибка на хосте ${log.host_name}: ${log.error}\n  → [${taskErrorInfo.category}] ${taskErrorInfo.error}: ${taskErrorInfo.description}`;
         }
         return `Ошибка на хосте ${log.host_name}: ${log.error}`;      
       case 'task_start':
         return `\nХост ${log.host_name}`;
       case 'check_network':
+        if (!log.success && log.error_info) {
+          return `${log.message}${formatErrorInfo(log.error_info)}`;
+        }
         return log.message;
       case 'check_login':
+        if (!log.success && log.error_info) {
+          return `${log.message}${formatErrorInfo(log.error_info)}`;
+        }
         return log.message;
       case 'check_sudo':
+        if (!log.success && log.error_info) {
+          return `${log.message}${formatErrorInfo(log.error_info)}`;
+        }
         return log.message;
       case 'script_progress':
         return `Проверки проведены ${log.completed}/${log.total}`;
