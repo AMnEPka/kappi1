@@ -1,4 +1,76 @@
-[2026-02-10 11:35:00.262] SSH LOG FILE CLEARED - Starting new project execution
+[2026-02-10 12:31:24.025] SSH LOG FILE CLEARED - Starting new project execution
 ================================================================================
 
-2026-02-10 11:35:00 [INFO] SSH log file cleared at 2026-02-10 11:35:00.262
+2026-02-10 12:31:24 [INFO] SSH log file cleared at 2026-02-10 12:31:24.025
+2026-02-10 12:31:24 [INFO] 
+================================================================================
+[2026-02-10 12:31:24.094] SSH CONNECTION: login - SUCCESS
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+Auth Type: password
+Connection Type: ssh
+================================================================================
+
+2026-02-10 12:31:24 [INFO] 
+================================================================================
+[2026-02-10 12:31:24.228] SSH CHECK: SUDO - SUCCESS
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+sudo -n id
+
+>>> EXIT CODE: 0
+
+>>> STDOUT:
+uid=0(root) gid=0(root) группы=0(root)
+
+================================================================================
+
+2026-02-10 12:31:24 [INFO] 
+================================================================================
+[2026-02-10 12:31:24.340] SSH COMMAND EXECUTION - FAILED
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+sudo kesl-control --app-info
+
+>>> EXIT CODE: 1
+
+>>> STDOUT:
+(empty)
+
+>>> STDERR:
+sudo: kesl-control: command not found
+
+================================================================================
+
+2026-02-10 12:31:24 [INFO] 
+================================================================================
+[2026-02-10 12:31:24.730] PROCESSOR SCRIPT EXECUTION - SUCCESS
+Host: Windows Server 1 (192.168.56.103:5985)
+Script ID: 98d75646-ac4d-4b42-8fa3-310390dbd09c
+Script Name: test1
+
+>>> PROCESSOR SCRIPT (preview):
+echo 'Оператор'
+
+>>> INPUT DATA (CHECK_OUTPUT) - 10 chars, 2 lines:
+test\user
+
+
+>>> REFERENCE DATA (ETALON_INPUT) - 0 chars, 1 lines:
+(empty)
+
+>>> EXIT CODE: 0 (SUCCESS)
+
+>>> STDOUT (9 chars):
+Оператор
+
+
+>>> STDERR (16 chars):
++ echo Оператор
+
+================================================================================
+

@@ -121,13 +121,20 @@ async def update_host(host_id: str, host_update: HostUpdate, current_user: User 
     
     update_data = host_update.model_dump(exclude_unset=True)
     
-    # Encrypt password if provided
-    if 'password' in update_data and update_data['password']:
-        update_data['password'] = encrypt_password(update_data['password'])
+    # Encrypt password if provided, remove from update if empty
+    # (empty password means "don't change" — frontend sends "" as placeholder)
+    if 'password' in update_data:
+        if update_data['password']:
+            update_data['password'] = encrypt_password(update_data['password'])
+        else:
+            del update_data['password']
     
-    # Encrypt SSH key if provided
-    if 'ssh_key' in update_data and update_data['ssh_key']:
-        update_data['ssh_key'] = encrypt_password(update_data['ssh_key'])
+    # Encrypt SSH key if provided, remove from update if empty
+    if 'ssh_key' in update_data:
+        if update_data['ssh_key']:
+            update_data['ssh_key'] = encrypt_password(update_data['ssh_key'])
+        else:
+            del update_data['ssh_key']
     
     if not update_data:
         raise HTTPException(status_code=400, detail="Нет данных для обновления")
