@@ -158,6 +158,8 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
         });
       } catch (err) {
         console.error('Error loading scripts for system:', err);
+        toast.error("Не удалось загрузить скрипты для выбранной системы");
+        return;
       }
     }
     
