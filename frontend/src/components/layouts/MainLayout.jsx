@@ -14,6 +14,7 @@ import {
   Home,
   ChevronLeft,
   Bot,
+  Library,
 } from "lucide-react";
 import { Button, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui/md3';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,9 +26,11 @@ export const MainLayout = ({ children }) => {
   const navigate = useNavigate();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const showScheduler = isAdmin || hasPermission('projects_execute');
+  const showCatalog = hasPermission('is_catalog_view');
   
   const isActive = (path) => {
     if (path === '/hosts') return location.pathname === '/hosts';
+    if (path === '/is-catalog') return location.pathname === '/is-catalog';
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
@@ -118,6 +121,18 @@ export const MainLayout = ({ children }) => {
               >
                 <Calendar className="md3-icon" />
                 {isSidebarExpanded && "Планировщик"}
+              </Button>
+            </Link>
+          )}
+
+          {showCatalog && (
+            <Link to="/is-catalog" className="md3-sidebar-item-link">
+              <Button
+                variant={isActive('/is-catalog') ? "tonal" : "text"}
+                className={`md3-sidebar-button ${isActive('/is-catalog') ? 'md3-sidebar-button-active' : ''}`}
+              >
+                <Library className="md3-icon" />
+                {isSidebarExpanded && "Каталог ИС"}
               </Button>
             </Link>
           )}
@@ -224,6 +239,7 @@ export const MainLayout = ({ children }) => {
 const getPageTitle = (pathname) => {
   const titles = {
     '/': 'Проекты',
+    '/is-catalog': 'Каталог ИС',
     '/hosts': 'Хосты',
     '/scripts': 'Проверки',
     '/scheduler': 'Планировщик',

@@ -72,7 +72,10 @@ PERMISSIONS = {
     'projects_create': 'Создание проектов',
     'projects_execute': 'Выполнение проектов',
     'scheduler_access': 'Доступ к планировщику заданий',
-    'logs_access': 'Доступ к логам'
+    'logs_access': 'Доступ к логам',
+    'is_catalog_view': 'Просмотр каталога ИС',
+    'is_catalog_edit': 'Редактирование каталога ИС',
+    'is_catalog_manage_schema': 'Управление полями каталога ИС (схема)'
 }
 
 # ============================================================================
@@ -99,6 +102,11 @@ PERMISSION_GROUPS = {
     'Проекты': [
         'projects_create',
         'projects_execute'
+    ],
+    'Каталог ИС': [
+        'is_catalog_view',
+        'is_catalog_edit',
+        'is_catalog_manage_schema'
     ],
     'Результаты': [
         'results_view_all',

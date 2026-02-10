@@ -6,6 +6,7 @@
  */
 
 import React, { Suspense, lazy } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useProjectNavigation } from '@/hooks/useProjectNavigation';
 
 // Lazy loaded pages
@@ -34,10 +35,18 @@ export const ProjectsPageWrapper = () => {
 };
 
 export const ProjectWizardWrapper = () => {
+  const location = useLocation();
   const { handleNavigate } = useProjectNavigation();
+  const initialPreset = location.state && location.state.fromIsCatalog
+    ? {
+        fromIsCatalog: true,
+        hostIds: location.state.hostIds || [],
+        projectName: location.state.projectName || '',
+      }
+    : null;
   return (
     <Suspense fallback={<PageLoader />}>
-      <ProjectWizard onNavigate={handleNavigate} />
+      <ProjectWizard onNavigate={handleNavigate} initialPreset={initialPreset} />
     </Suspense>
   );
 };

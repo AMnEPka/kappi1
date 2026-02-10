@@ -105,9 +105,9 @@ const WizardContent = () => {
 };
 
 // Main exported component with provider
-export default function ProjectWizard({ onNavigate }) {
+export default function ProjectWizard({ onNavigate, initialPreset }) {
   return (
-    <WizardProvider onNavigate={onNavigate}>
+    <WizardProvider onNavigate={onNavigate} initialPreset={initialPreset}>
       <WizardContent />
     </WizardProvider>
   );

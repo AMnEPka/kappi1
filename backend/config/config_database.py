@@ -88,7 +88,11 @@ async def ensure_indexes():
         await db.categories.create_index("name")
         await db.systems.create_index("category_id")
         await db.scripts.create_index("system_id")
-        
+
+        # IS catalog
+        await db.is_catalog.create_index("created_at")
+        await db.is_catalog.create_index("id", unique=True)
+
         logger.info("✅ MongoDB indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create MongoDB indexes: {e}")

@@ -83,7 +83,11 @@ async def startup_db_init():
     try:
         # Ensure MongoDB indexes are created
         await ensure_indexes()
-        
+
+        # Ensure IS catalog default schema exists
+        from api.api_is_catalog import ensure_default_schema
+        await ensure_default_schema()
+
         # Check if admin user exists
         existing_admin = await db.users.find_one({"username": "admin"})
         
