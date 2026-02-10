@@ -125,7 +125,7 @@ async def update_project(project_id: str, project_update: ProjectUpdate, current
 
 @router.delete("/projects/{project_id}")
 async def delete_project(project_id: str, current_user: User = Depends(get_current_user)):
-    """Delete project (only creator or admin)"""
+    """Delete project (only creator or admin). Cascade: executions, scheduler jobs/runs, tasks, access."""
     project = await db.projects.find_one({"id": project_id})
     if not project:
         raise HTTPException(status_code=404, detail="Проект не найден")
@@ -133,15 +133,15 @@ async def delete_project(project_id: str, current_user: User = Depends(get_curre
     if project.get('created_by') != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Только пользователь с доступом к этому проекту может удалить его")
     
-    # Check if project has executions
-    executions_count = await db.executions.count_documents({"project_id": project_id})
-    if executions_count > 0:
-        raise HTTPException(
-            status_code=400, 
-            detail="Невозможно удалить проект: существуют запуски проекта"
-        )
+    # Cascade delete: remove all data linked to this project
+    await db.executions.delete_many({"project_id": project_id})
+    job_ids = [doc["id"] for doc in await db.scheduler_jobs.find({"project_id": project_id}, {"id": 1}).to_list(1000)]
+    if job_ids:
+        await db.scheduler_runs.delete_many({"job_id": {"$in": job_ids}})
+        await db.scheduler_jobs.delete_many({"project_id": project_id})
+    await db.project_tasks.delete_many({"project_id": project_id})
+    await db.project_access.delete_many({"project_id": project_id})
    
-    # Delete project
     result = await db.projects.delete_one({"id": project_id})
     
     log_audit(

@@ -3,6 +3,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, getAccessToken } from '../config/api';
@@ -62,12 +63,11 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
   const fetchProject = async () => {
     try {
-      const [projectRes, tasksRes, hostsRes, systemsRes, scriptsRes, usersRes] = await Promise.all([
+      const [projectRes, tasksRes, hostsRes, systemsRes, usersRes] = await Promise.all([
         api.get(`/api/projects/${projectId}`),          
         api.get(`/api/projects/${projectId}/tasks`),      
         api.get('/api/hosts'),                          
         api.get('/api/systems'),                        
-        api.get('/api/scripts'),                         
         api.get(`/api/projects/${projectId}/users`)
       ]);
       
@@ -75,22 +75,32 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       setTasks(tasksRes.data);
       setHosts(hostsRes.data);
       setSystems(systemsRes.data);
-      setScripts(scriptsRes.data);
-      // Ensure projectUsers is always an array
       setProjectUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+
+      // Load scripts per system type from project tasks so each system (e.g. Linux and Windows) gets its full list of checks (avoids 1000 limit showing only first system's scripts)
+      const systemIds = [...new Set((tasksRes.data || []).map(t => t.system_id).filter(Boolean))];
+      let scriptsData = [];
+      if (systemIds.length > 0) {
+        const scriptResponses = await Promise.all(
+          systemIds.map(sid => api.get('/api/scripts', { params: { system_id: sid } }))
+        );
+        scriptsData = scriptResponses.flatMap(r => r.data || []);
+      } else {
+        const scriptsRes = await api.get('/api/scripts');
+        scriptsData = scriptsRes.data || [];
+      }
+      setScripts(scriptsData);
       
-      // Initialize edited tasks
       const tasksMap = {};
-      tasksRes.data.forEach(task => {
+      (tasksRes.data || []).forEach(task => {
         tasksMap[task.id] = {
           ...task,
-          script_ids: [...task.script_ids],
+          script_ids: [...(task.script_ids || [])],
           reference_data: { ...(task.reference_data || {}) }
         };
       });
       setEditedTasks(tasksMap);
       
-      // If project is running, connect to SSE
       if (projectRes.data.status === 'running') {
         startExecution(false);
       }
@@ -102,19 +112,24 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
   const saveTaskChanges = async () => {
     try {
-      // Update each modified task
-      const updates = Object.values(editedTasks).map(task => 
-        api.put(`/api/projects/${projectId}/tasks/${task.id}`, {
+      // Update each modified task (include system_id if changed)
+      const updates = Object.values(editedTasks).map(task => {
+        const payload = {
           script_ids: task.script_ids,
           reference_data: task.reference_data
-        })
-      );
+        };
+        // Find original task to check if system_id changed
+        const originalTask = tasks.find(t => t.id === task.id);
+        if (originalTask && task.system_id !== originalTask.system_id) {
+          payload.system_id = task.system_id;
+        }
+        return api.put(`/api/projects/${projectId}/tasks/${task.id}`, payload);
+      });
       
       await Promise.all(updates);
       
-      // Refresh tasks
-      const tasksRes = await api.get(`/api/projects/${projectId}/tasks`);
-      setTasks(tasksRes.data);
+      // Full reload to pick up new system's scripts
+      await fetchProject();
       
       setEditMode(false);
       toast.success("Изменения сохранены");
@@ -122,6 +137,40 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       console.error('Error saving changes:', error);
       toast.error("Не удалось сохранить изменения");
     }
+  };
+
+  const changeTaskSystem = async (taskId, newSystemId) => {
+    // Check if we already have scripts for this system loaded
+    const existingScripts = scripts.filter(s => s.system_id === newSystemId);
+    
+    let newSystemScripts = existingScripts;
+    if (existingScripts.length === 0) {
+      // Load scripts for the new system
+      try {
+        const res = await api.get('/api/scripts', { params: { system_id: newSystemId } });
+        const loadedScripts = res.data || [];
+        newSystemScripts = loadedScripts;
+        // Merge into scripts state (avoid duplicates)
+        setScripts(prev => {
+          const existingIds = new Set(prev.map(s => s.id));
+          const newOnes = loadedScripts.filter(s => !existingIds.has(s.id));
+          return [...prev, ...newOnes];
+        });
+      } catch (err) {
+        console.error('Error loading scripts for system:', err);
+      }
+    }
+    
+    // Reset script_ids to all scripts of the new system, clear reference_data
+    setEditedTasks(prev => ({
+      ...prev,
+      [taskId]: {
+        ...prev[taskId],
+        system_id: newSystemId,
+        script_ids: newSystemScripts.map(s => s.id),
+        reference_data: {}
+      }
+    }));
   };
 
   const toggleScript = (taskId, scriptId) => {
@@ -570,18 +619,52 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
             <div className="space-y-4">
               {tasks.map(task => {
                 const host = hosts.find(h => h.id === task.host_id);
-                const system = systems.find(s => s.id === task.system_id);
-                const systemScripts = scripts.filter(s => s.system_id === task.system_id);
                 const editedTask = editedTasks[task.id] || task;
+                const activeSystemId = editedTask.system_id || task.system_id;
+                const system = systems.find(s => s.id === activeSystemId);
+                const systemScripts = scripts.filter(s => s.system_id === activeSystemId);
+
+                // Filter available systems by host connection type
+                const availableSystems = systems.filter(s => {
+                  if (host?.connection_type === 'winrm') return s.os_type === 'windows';
+                  if (host?.connection_type === 'ssh') return s.os_type === 'linux';
+                  return true;
+                });
                 
                 return (
                   <div key={task.id} className="border rounded-lg p-4">
-                    <div className="font-semibold text-lg mb-2">
-                      {host?.name || 'Неизвестный хост'} - {system?.name || 'Неизвестная система'}
-                    </div>
-                    <div className="text-sm text-gray-600 mb-3">
-                      {host?.hostname}
-                    </div>
+                    {editMode ? (
+                      <div className="mb-3">
+                        <div className="font-semibold text-lg mb-1">
+                          {host?.name || 'Неизвестный хост'}
+                        </div>
+                        <div className="text-sm text-gray-600 mb-2">{host?.hostname}</div>
+                        <Select
+                          value={activeSystemId}
+                          onValueChange={(value) => changeTaskSystem(task.id, value)}
+                        >
+                          <SelectTrigger className="w-full max-w-xs">
+                            <SelectValue placeholder="Выберите систему" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableSystems.map(s => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.name} ({s.os_type === 'windows' ? 'Windows' : 'Linux'})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="font-semibold text-lg mb-2">
+                          {host?.name || 'Неизвестный хост'} - {system?.name || 'Неизвестная система'}
+                        </div>
+                        <div className="text-sm text-gray-600 mb-3">
+                          {host?.hostname}
+                        </div>
+                      </>
+                    )}
                     <div className="space-y-2">
                       {systemScripts.map(script => {
                         const isSelected = editedTask.script_ids.includes(script.id);

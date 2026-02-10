@@ -184,7 +184,13 @@ async def execute_project(project_id: str, token: Optional[str] = None, skip_aud
                 # 2. Check login and sudo (combined for SSH to avoid multiple connections)
                 if host.connection_type == "winrm":
                     # For WinRM, check login first
-                    login_ok, login_msg = await loop.run_in_executor(None, _check_winrm_login, host)
+                    logger.info(f"Starting WinRM login check for host: {host.name} ({host.hostname}:{host.port})")
+                    try:
+                        login_ok, login_msg = await loop.run_in_executor(None, _check_winrm_login, host)
+                    except Exception as e:
+                        logger.exception(f"WinRM login check failed with exception for {host.name}: {e}")
+                        login_ok, login_msg = False, f"Ошибка проверки входа: {getattr(e, 'message', str(e))}"
+                    logger.info(f"WinRM login check result for {host.name}: ok={login_ok}, msg={str(login_msg)[:80] if login_msg else ''}")
                     
                     # Get error code for login check
                     login_error_code = None

@@ -25,6 +25,8 @@ SSH_CONNECT_TIMEOUT = int(os.environ.get('SSH_CONNECT_TIMEOUT', '10'))
 SSH_COMMAND_TIMEOUT = int(os.environ.get('SSH_COMMAND_TIMEOUT', '60'))
 SSH_RETRY_ATTEMPTS = int(os.environ.get('SSH_RETRY_ATTEMPTS', '3'))
 WINRM_TIMEOUT = int(os.environ.get('WINRM_TIMEOUT', '30'))
+# pywinrm requires read_timeout_sec > operation_timeout_sec (both non-zero)
+WINRM_READ_TIMEOUT = int(os.environ.get('WINRM_READ_TIMEOUT', str(WINRM_TIMEOUT + 15)))
 
 
 def _load_private_key(key_data: str):
@@ -219,13 +221,25 @@ def _check_sudo_access_linux(host: Host) -> Tuple[bool, str]:
 
 
 def _create_winrm_session(host: Host) -> winrm.Session:
-    """Create WinRM session with configured timeout"""
+    """Create WinRM session with configured timeout.
+    Username for domain auth must be DOMAIN\\user (e.g. test\\user). Same as PowerShell Get-Credential 'test\\user'.
+    """
+    endpoint = f"http://{host.hostname}:{host.port}"
+    if not endpoint.rstrip("/").endswith("/wsman"):
+        endpoint = endpoint.rstrip("/") + "/wsman"
+    logger.info(f"WinRM session: endpoint={endpoint}, user={((host.username or '').strip())[:20]}...")
+    password = decrypt_password(host.password) if host.password else ""
+    # Ensure username is passed as-is (DOMAIN\user); avoid stripping backslash
+    username = (host.username or "").strip()
+    # read_timeout_sec must exceed operation_timeout_sec (pywinrm requirement)
+    read_timeout = max(WINRM_READ_TIMEOUT, WINRM_TIMEOUT + 1)
     return winrm.Session(
-        f"http://{host.hostname}:{host.port}",
-        auth=(host.username, decrypt_password(host.password) if host.password else ""),
-        transport='ntlm',
-        read_timeout_sec=WINRM_TIMEOUT,
-        operation_timeout_sec=WINRM_TIMEOUT
+        endpoint,
+        auth=(username, password),
+        transport="ntlm",
+        read_timeout_sec=read_timeout,
+        operation_timeout_sec=WINRM_TIMEOUT,
+        server_cert_validation="ignore",
     )
 
 
@@ -256,14 +270,19 @@ def _check_admin_access(host: Host) -> Tuple[bool, str]:
 def _check_winrm_login(host: Host) -> Tuple[bool, str]:
     """Check WinRM login credentials with retry logic"""
     try:
+        logger.info(f"WinRM login: creating session for {host.hostname}")
         session = _create_winrm_session(host)
+        logger.info(f"WinRM login: running echo test on {host.hostname}")
         r = session.run_cmd("echo test")
+        logger.info(f"WinRM login: run_cmd status_code={r.status_code} for {host.hostname}")
         if r.status_code == 0:
             return True, "WinRM login OK"
         else:
-            return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
+            err = (r.std_err or b"").decode("utf-8", errors="ignore") or str(r.status_code)
+            return False, f"Неверные учётные данные: {err}"
     except Exception as e:
-        return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
+        logger.warning(f"WinRM login exception for {host.hostname}: {e}")
+        return False, f"Неверные учётные данные: {getattr(e, 'message', str(e))}"
 
 
 @retry(

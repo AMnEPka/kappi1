@@ -306,21 +306,37 @@ const fetchProjectUsers = async (projectId) => {
       const tasksResponse = await api.get(`/api/projects/${selectedProjectForHosts.id}/tasks`);
       const existingTasks = tasksResponse.data;
       
-      // Get system configurations from existing tasks
-      const systemConfigs = {};
+      // Group task configs by connection type so we can clone the right set for each imported host
+      // (не копируем linux-задачи на Windows-хосты и наоборот)
+      const allHostsForImport = await api.get('/api/hosts');
+      const allHostsList = allHostsForImport.data;
+      
+      // Build map: connection_type -> { system_id: config }
+      const configsByConnectionType = {};
       if (existingTasks.length > 0) {
-        const firstHostId = existingTasks[0].host_id;
-        existingTasks
-          .filter(task => task.host_id === firstHostId)
-          .forEach(task => {
-            if (!systemConfigs[task.system_id]) {
-              systemConfigs[task.system_id] = {
-                system_id: task.system_id,
-                script_ids: task.script_ids,
-                reference_data: task.reference_data || {}
-              };
-            }
-          });
+        const hostTasksMap = {};
+        existingTasks.forEach(task => {
+          if (!hostTasksMap[task.host_id]) hostTasksMap[task.host_id] = [];
+          hostTasksMap[task.host_id].push(task);
+        });
+        
+        for (const [hostId, hostTasks] of Object.entries(hostTasksMap)) {
+          const existingHost = allHostsList.find(h => h.id === hostId);
+          const connType = existingHost?.connection_type;
+          if (connType && !configsByConnectionType[connType]) {
+            const configs = {};
+            hostTasks.forEach(task => {
+              if (!configs[task.system_id]) {
+                configs[task.system_id] = {
+                  system_id: task.system_id,
+                  script_ids: task.script_ids,
+                  reference_data: task.reference_data || {}
+                };
+              }
+            });
+            configsByConnectionType[connType] = configs;
+          }
+        }
       }
       
       for (let i = 0; i < hostsData.length; i++) {
@@ -342,9 +358,10 @@ const fetchProjectUsers = async (projectId) => {
           // Add to project hosts
           setProjectHosts(prev => [...prev, newHost]);
           
-          // Create tasks for this host
-          if (Object.keys(systemConfigs).length > 0) {
-            for (const [systemId, config] of Object.entries(systemConfigs)) {
+          // Clone tasks only from a host with the SAME connection type
+          const matchingConfigs = configsByConnectionType[hostData.connection_type];
+          if (matchingConfigs && Object.keys(matchingConfigs).length > 0) {
+            for (const [systemId, config] of Object.entries(matchingConfigs)) {
               await api.post(`/api/projects/${selectedProjectForHosts.id}/tasks`, {
                 host_id: newHost.id,
                 system_id: systemId,
@@ -429,7 +446,8 @@ const fetchProjectUsers = async (projectId) => {
         // Add to project hosts
         setProjectHosts(prev => [...prev, newHost]);
         
-        // Create tasks for this host (need to get systems from existing tasks)
+        // Create tasks for this host based on an existing host with the SAME connection type
+        // (не копируем linux-задачи на Windows-хосты и наоборот)
         try {
           const tasksResponse = await api.get(`/api/projects/${selectedProjectForHosts.id}/tasks`);
           const existingTasks = tasksResponse.data;
@@ -444,19 +462,25 @@ const fetchProjectUsers = async (projectId) => {
               hostTasksMap[task.host_id].push(task);
             });
             
-            // Get system configurations from first existing host's tasks
-            const firstHostId = Object.keys(hostTasksMap)[0];
-            const firstHostTasks = hostTasksMap[firstHostId];
+            // Find an existing host with the SAME connection type as the new host
+            const matchingHostId = Object.keys(hostTasksMap).find(hostId => {
+              const existingHost = allHostsResponse.data.find(h => h.id === hostId);
+              return existingHost && existingHost.connection_type === newHost.connection_type;
+            });
             
-            // Create tasks for new host with same system configurations
-            for (const task of firstHostTasks) {
-              await api.post(`/api/projects/${selectedProjectForHosts.id}/tasks`, {
-                host_id: newHost.id,
-                system_id: task.system_id,
-                script_ids: task.script_ids,
-                reference_data: task.reference_data || {}
-              });
+            // Clone tasks only from a host with matching connection type
+            if (matchingHostId) {
+              const matchingHostTasks = hostTasksMap[matchingHostId];
+              for (const task of matchingHostTasks) {
+                await api.post(`/api/projects/${selectedProjectForHosts.id}/tasks`, {
+                  host_id: newHost.id,
+                  system_id: task.system_id,
+                  script_ids: task.script_ids,
+                  reference_data: task.reference_data || {}
+                });
+              }
             }
+            // If no matching host found — no tasks created, user configures manually
           }
         } catch (error) {
           console.error('Error creating tasks for new host:', error);

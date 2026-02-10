@@ -56,6 +56,7 @@ class ProjectTaskCreate(BaseModel):
 
 
 class ProjectTaskUpdate(BaseModel):
+    system_id: Optional[str] = None
     script_ids: Optional[List[str]] = None
     reference_data: Optional[dict] = None
     status: Optional[str] = None
