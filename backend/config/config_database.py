@@ -93,6 +93,16 @@ async def ensure_indexes():
         await db.is_catalog.create_index("created_at")
         await db.is_catalog.create_index("id", unique=True)
 
+        # IB profiles
+        await db.ib_profiles.create_index("id", unique=True)
+        await db.ib_profiles.create_index("category_id")
+        await db.ib_profiles.create_index("system_id")
+        await db.ib_profiles.create_index("updated_at")
+        await db.ib_profile_applications.create_index("applied_at")
+        await db.ib_profile_applications.create_index("applied_by")
+        await db.ib_profile_applications.create_index("session_id")
+        await db.ib_profile_apply_sessions.create_index("session_id", unique=True)
+
         logger.info("✅ MongoDB indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create MongoDB indexes: {e}")

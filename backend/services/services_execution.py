@@ -371,6 +371,53 @@ def _winrm_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str
         return False, "", str(e)
 
 
+def _execute_profile_linux(host: Host, script_content: str) -> Tuple[bool, str, str, int]:
+    """
+    Execute IB profile script on Linux: write content to temp file and run via sudo bash.
+    Returns: (success, stdout, stderr, exit_code)
+    """
+    import base64
+    import uuid as _uuid
+    if not script_content:
+        return True, "", "", 0
+    try:
+        content_b64 = base64.b64encode(script_content.encode("utf-8")).decode("ascii").replace("\n", "")
+        tmp_name = f"/tmp/ib_profile_{_uuid.uuid4().hex[:12]}.sh"
+        # Write via base64 decode, chmod, sudo bash, then rm; capture exit code
+        cmd = (
+            f"echo '{content_b64}' | base64 -d > {tmp_name} && "
+            f"chmod +x {tmp_name} && "
+            f"sudo -n bash {tmp_name}; rc=$?; rm -f {tmp_name}; exit $rc"
+        )
+        success, output, error = _ssh_connect_and_execute(host, cmd)
+        exit_code = 0 if success else 1
+        if not success and not error and output:
+            error = output
+        return success, output or "", error or "", exit_code
+    except Exception as e:
+        return False, "", str(e), 1
+
+
+def _execute_profile_windows(host: Host, script_content: str) -> Tuple[bool, str, str, int]:
+    """
+    Execute IB profile script on Windows via WinRM PowerShell.
+    Returns: (success, stdout, stderr, exit_code)
+    """
+    try:
+        session = _create_winrm_session(host)
+        r = session.run_ps(script_content or "")
+        success = r.status_code == 0
+        out = r.std_out
+        err = r.std_err or b""
+        if isinstance(out, bytes):
+            out = out.decode("utf-8", errors="ignore")
+        if isinstance(err, bytes):
+            err = err.decode("utf-8", errors="ignore")
+        return success, out or "", err or "", r.status_code
+    except Exception as e:
+        return False, "", str(e), 1
+
+
 async def execute_command(host: Host, command: str) -> ExecutionResult:
     """
     Execute command on host (SSH for Linux, WinRM for Windows)

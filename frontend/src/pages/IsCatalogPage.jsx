@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Upload,
   PlayCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,6 +68,7 @@ export default function IsCatalogPage() {
   const canEdit = hasPermission("is_catalog_edit");
   const canManageSchema = isAdmin || hasPermission("is_catalog_manage_schema");
   const canCreateProject = hasPermission("projects_create");
+  const canApplyIbProfile = hasPermission("ib_profiles_apply");
 
   const [schema, setSchema] = useState(null);
   const [items, setItems] = useState([]);
@@ -660,12 +662,31 @@ export default function IsCatalogPage() {
           {selectedItem && (
             <ScrollArea className="flex-1 -mx-6 px-6">
               <div className="space-y-6 py-4">
-                {canCreateProject && (editForm.host_ids ?? selectedItem.host_ids ?? []).length > 0 && (
-                  <div className="flex justify-end">
-                    <Button onClick={conductOsib} className="gap-2">
-                      <PlayCircle className="h-4 w-4" />
-                      Провести ОСИБ
-                    </Button>
+                {(canCreateProject || canApplyIbProfile) && (editForm.host_ids ?? selectedItem.host_ids ?? []).length > 0 && (
+                  <div className="flex justify-end gap-2">
+                    {canCreateProject && (
+                      <Button onClick={conductOsib} className="gap-2">
+                        <PlayCircle className="h-4 w-4" />
+                        Провести ОСИБ
+                      </Button>
+                    )}
+                    {canApplyIbProfile && (
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => {
+                          const hostIds = editForm.host_ids ?? selectedItem?.host_ids ?? [];
+                          if (hostIds.length === 0) {
+                            toast.error("В ИС нет хостов.");
+                            return;
+                          }
+                          navigate("/ib-profiles/apply", { state: { fromIsCatalogHostIds: hostIds } });
+                        }}
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        Применить профиль ИБ
+                      </Button>
+                    )}
                   </div>
                 )}
                 {canEdit ? (

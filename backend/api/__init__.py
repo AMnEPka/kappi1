@@ -19,6 +19,7 @@ from .api_audit import router as audit_router
 from .api_export import router as export_router
 from .api_ai import router as ai_router
 from .api_is_catalog import router as is_catalog_router
+from .api_ib_profiles import router as ib_profiles_router
 
 # Create main API router with /api prefix
 api_router = APIRouter(prefix="/api")
@@ -37,5 +38,6 @@ api_router.include_router(audit_router, tags=["audit"])
 api_router.include_router(export_router, tags=["export"])
 api_router.include_router(ai_router, tags=["ai"])
 api_router.include_router(is_catalog_router)
+api_router.include_router(ib_profiles_router)
 
 __all__ = ['api_router']

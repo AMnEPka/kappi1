@@ -75,7 +75,10 @@ PERMISSIONS = {
     'logs_access': 'Доступ к логам',
     'is_catalog_view': 'Просмотр каталога ИС',
     'is_catalog_edit': 'Редактирование каталога ИС',
-    'is_catalog_manage_schema': 'Управление полями каталога ИС (схема)'
+    'is_catalog_manage_schema': 'Управление полями каталога ИС (схема)',
+    'ib_profiles_view': 'Просмотр профилей ИБ',
+    'ib_profiles_manage': 'Управление профилями ИБ (создание, редактирование, удаление, экспорт)',
+    'ib_profiles_apply': 'Применение профилей ИБ на хосты',
 }
 
 # ============================================================================
@@ -107,6 +110,11 @@ PERMISSION_GROUPS = {
         'is_catalog_view',
         'is_catalog_edit',
         'is_catalog_manage_schema'
+    ],
+    'Профили ИБ': [
+        'ib_profiles_view',
+        'ib_profiles_manage',
+        'ib_profiles_apply'
     ],
     'Результаты': [
         'results_view_all',

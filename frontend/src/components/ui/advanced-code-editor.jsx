@@ -52,7 +52,9 @@ export const AdvancedCodeEditor = forwardRef(({
   const horizontalTrackRef = useRef(null);
   const dragStartRef = useRef({ y: 0, x: 0, scrollTop: 0, scrollLeft: 0 });
   
-  const lines = value ? value.split('\n') : [''];
+  // Defensive: this editor expects `value` to be a string
+  const safeValue = typeof value === 'string' ? value : '';
+  const lines = safeValue ? safeValue.split('\n') : [''];
   const lineCount = lines.length;
   
   // Calculate line number width (minimum 3 characters)
@@ -239,13 +241,13 @@ export const AdvancedCodeEditor = forwardRef(({
       
       if (e.shiftKey) {
         // Shift+Tab - remove indentation
-        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-        const lineText = value.substring(lineStart, start);
+        const lineStart = safeValue.lastIndexOf('\n', start - 1) + 1;
+        const lineText = safeValue.substring(lineStart, start);
         const leadingSpaces = lineText.match(/^[ ]{0,4}/)?.[0] || '';
         
         if (leadingSpaces.length > 0) {
-          const newValue = value.substring(0, lineStart) + 
-            value.substring(lineStart + leadingSpaces.length);
+          const newValue = safeValue.substring(0, lineStart) + 
+            safeValue.substring(lineStart + leadingSpaces.length);
           onChange?.({ target: { value: newValue } });
           
           // Restore cursor position
@@ -256,7 +258,7 @@ export const AdvancedCodeEditor = forwardRef(({
         }
       } else {
         // Tab - add indentation
-        const newValue = value.substring(0, start) + spaces + value.substring(end);
+        const newValue = safeValue.substring(0, start) + spaces + safeValue.substring(end);
         onChange?.({ target: { value: newValue } });
         
         // Restore cursor position
@@ -266,7 +268,7 @@ export const AdvancedCodeEditor = forwardRef(({
         });
       }
     }
-  }, [value, onChange, tabSize, isFullscreen, onFullscreenExit]);
+  }, [safeValue, onChange, tabSize, isFullscreen, onFullscreenExit]);
 
   // Toggle fullscreen
   const toggleFullscreen = useCallback(() => {
@@ -305,11 +307,11 @@ export const AdvancedCodeEditor = forwardRef(({
     }
     
     return () => resizeObserver.disconnect();
-  }, [value, updateScrollbars, isFullscreen]);
+  }, [safeValue, updateScrollbars, isFullscreen]);
 
   // Expose API methods via ref
   useImperativeHandle(ref, () => ({
-    getText: () => value,
+    getText: () => safeValue,
     setText: (text) => onChange?.({ target: { value: text } }),
     getScrollTop: () => textareaRef.current?.scrollTop || 0,
     setScrollTop: (val) => {
@@ -339,7 +341,7 @@ export const AdvancedCodeEditor = forwardRef(({
       if (!textarea) return { line: 1, column: 1 };
       
       const pos = textarea.selectionStart;
-      const textBefore = value.substring(0, pos);
+      const textBefore = safeValue.substring(0, pos);
       const lines = textBefore.split('\n');
       
       return {
@@ -349,7 +351,7 @@ export const AdvancedCodeEditor = forwardRef(({
     },
     getLineCount: () => lineCount,
     focus: () => textareaRef.current?.focus()
-  }), [value, onChange, lineCount, handleScroll, onFullscreenEnter, onFullscreenExit]);
+  }), [safeValue, onChange, lineCount, handleScroll, onFullscreenEnter, onFullscreenExit]);
 
   const editorContent = (
     <div 
@@ -408,10 +410,10 @@ export const AdvancedCodeEditor = forwardRef(({
             className="ace-highlight-layer"
             aria-hidden="true"
           >
-            {value ? (
+            {safeValue ? (
               <div 
                 className="ace-highlight-content"
-                dangerouslySetInnerHTML={{ __html: highlightBash(value) }}
+                dangerouslySetInnerHTML={{ __html: highlightBash(safeValue) }}
               />
             ) : (
               <div className="ace-placeholder">{placeholder}</div>
@@ -421,7 +423,7 @@ export const AdvancedCodeEditor = forwardRef(({
           {/* Textarea */}
           <textarea
             ref={textareaRef}
-            value={value}
+            value={safeValue}
             onChange={onChange}
             onScroll={handleScroll}
             onKeyDown={handleKeyDown}
