@@ -1,0 +1,104 @@
+version: '3.8'
+
+networks:
+  ssh-runner-network:
+    name: ssh-runner-network
+
+services:
+  mongodb:
+    image: mongo:4.4
+    container_name: ssh-runner-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    environment:
+      - MONGO_INITDB_DATABASE=ssh_runner_db
+    networks:
+      - ssh-runner-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend.buildkit
+      # Ключевые настройки для кэширования:
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    container_name: ssh-runner-backend
+    restart: unless-stopped
+    ports:
+      - "435:435"
+    depends_on:
+      - mongodb
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=ssh_runner_db
+      - CORS_ORIGINS=*
+      - PYTHONPATH=/app
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./logs:/app/logs
+      - pip-cache:/root/.cache/pip  # Кэш pip сохраняется между сборками
+    networks:
+      - ssh-runner-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend.buildkit
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    container_name: ssh-runner-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - ssh-runner-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - REACT_APP_BACKEND_URL=/
+      - REACT_APP_WS_URL=
+      - DISABLE_HOT_RELOAD=true
+      - FAST_REFRESH=false
+      - NODE_ENV=development
+    volumes:
+      - node-modules:/app/frontend/node_modules  # node_modules не переустанавливаются
+      - npm-cache:/root/.npm  # Кэш npm сохраняется
+    command: sh -c "PORT=415 HOST=0.0.0.0 npm start"
+
+  nginx:
+    image: nginx:alpine
+    container_name: ssh-runner-nginx
+    restart: unless-stopped
+    ports:
+      - "405:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ssh-runner-network
+    logging:
+      driver: "json-file"
+      options:  
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mongodb_data:
+  mongodb_config:
+  pip-cache:    # Для кэша Python пакетов
+  node-modules: # Для node_modules (чтобы не переустанавливать)
+  npm-cache:    # Для кэша npm

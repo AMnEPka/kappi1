@@ -1,0 +1,87 @@
+# Backend Dockerfile for SSH Script Runner
+# Используем многостадийную сборку для лучшего кэширования
+
+# Этап 1: Зависимости
+FROM python:3.11-slim AS deps
+
+WORKDIR /app/backend
+
+# Устанавливаем системные зависимости
+RUN apt-get update && apt-get install -y \
+    openssh-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копируем и устанавливаем Python зависимости с кэшированием
+COPY requirements.txt .
+
+# Используем кэш pip через mount (BuildKit feature)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install --user -r requirements.txt
+
+# Этап 2: Сборка (если нужно)
+FROM python:3.11-slim AS builder
+
+WORKDIR /app/backend
+
+# Копируем установленные зависимости
+COPY --from=deps /root/.local /root/.local
+
+# Копируем код приложения
+COPY . .
+
+# Добавляем зависимости в PATH
+ENV PATH=/root/.local/bin:$PATH
+
+# Этап 3: Продакшен
+FROM python:3.11-slim AS production
+
+WORKDIR /app/backend
+
+# Копируем только необходимое из builder
+COPY --from=builder /root/.local /root/.local
+COPY --from=builder /app/backend .
+
+# Устанавливаем системные зависимости (только runtime)
+RUN apt-get update && apt-get install -y \
+    openssh-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Добавляем зависимости в PATH
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Создаем непривилегированного пользователя
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 435
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:435/api/health || exit 1
+
+# Run the application
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "435"]
+
+# Этап 4: Для разработки (наследуем от deps)
+FROM deps AS development
+
+# Копируем код
+COPY . .
+
+# Устанавливаем дополнительные dev зависимости если нужно
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --user watchdog
+
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 435
+
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "435", "--reload"]
