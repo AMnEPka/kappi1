@@ -54,9 +54,9 @@ const shouldRefreshToken = (token) => {
   if (!expTime) return false;
   const now = Date.now();
   const timeUntilExpiry = expTime - now;
-  // Refresh if token expires in less than 5 minutes OR is already expired
+  // Refresh if token expires in 5 minutes or less OR is already expired
   // (expired tokens can still be refreshed via the refresh_token)
-  return timeUntilExpiry < 300000; // 5 minutes = 300000 ms
+  return timeUntilExpiry <= 300000; // 5 minutes = 300000 ms
 };
 
 // Attempt to refresh the token proactively (shared logic for interval & visibility handler)

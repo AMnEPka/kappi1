@@ -73,6 +73,7 @@ async def run_apply_session_events(
         host_doc = await db.hosts.find_one({"id": host_id}, {"_id": 0})
         if not host_doc:
             yield {"type": "task_error", "host_name": host_id, "error": "Хост не найден"}
+            yield {"type": "script_progress", "host_name": host_id, "completed": idx + 1, "total": total}
             failed += 1
             continue
 
@@ -81,12 +82,14 @@ async def run_apply_session_events(
         profile_id = profile_by_os.get(os_key)
         if not profile_id:
             yield {"type": "task_error", "host_name": host.name, "error": f"Профиль для ОС {os_key} не выбран"}
+            yield {"type": "script_progress", "host_name": host.name, "completed": idx + 1, "total": total}
             failed += 1
             continue
 
         profile_doc = await db.ib_profiles.find_one({"id": profile_id}, {"_id": 0, "content": 1, "version": 1})
         if not profile_doc:
             yield {"type": "task_error", "host_name": host.name, "error": "Профиль не найден"}
+            yield {"type": "script_progress", "host_name": host.name, "completed": idx + 1, "total": total}
             failed += 1
             continue
 
