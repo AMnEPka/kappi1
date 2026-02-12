@@ -62,18 +62,48 @@ async def get_projects(
         # Admin or curator sees all projects
         projects = await db.projects.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     else:
-        # Get projects created by user + shared projects (pagination applied after merge)
-        my_projects = await db.projects.find({"created_by": current_user.id}, {"_id": 0}).to_list(5000)
-        
-        # Get projects with explicit access
-        access_records = await db.project_access.find({"user_id": current_user.id}).to_list(5000)
-        project_ids = [rec['project_id'] for rec in access_records]
-        accessible_projects = await db.projects.find({"id": {"$in": project_ids}}, {"_id": 0}).to_list(5000) if project_ids else []
-        
-        # Combine, deduplicate, sort, and apply pagination
-        all_projects = {p['id']: p for p in my_projects + accessible_projects}
-        projects = sorted(all_projects.values(), key=lambda x: x.get('created_at', ''), reverse=True)
-        projects = projects[skip:skip + limit]
+        # Non-admin: merge "created by me" + "shared with me", then paginate at DB level.
+        # Fetch only id + created_at to build ordered list, then load full docs for the current page only.
+        my_cursor = db.projects.find(
+            {"created_by": current_user.id},
+            {"_id": 0, "id": 1, "created_at": 1},
+        ).sort("created_at", -1)
+        my_projects_light = await my_cursor.to_list(None)  # no limit — only id/created_at
+
+        access_cursor = db.project_access.find(
+            {"user_id": current_user.id},
+            {"_id": 0, "project_id": 1},
+        )
+        access_records = await access_cursor.to_list(None)  # no limit
+        shared_ids = list({rec["project_id"] for rec in access_records if rec.get("project_id")})
+
+        if shared_ids:
+            shared_cursor = db.projects.find(
+                {"id": {"$in": shared_ids}},
+                {"_id": 0, "id": 1, "created_at": 1},
+            ).sort("created_at", -1)
+            accessible_light = await shared_cursor.to_list(None)
+        else:
+            accessible_light = []
+
+        # Deduplicate (created_by wins), sort by created_at desc, apply pagination
+        by_id = {p["id"]: p for p in my_projects_light}
+        for p in accessible_light:
+            if p["id"] not in by_id:
+                by_id[p["id"]] = p
+        ordered = sorted(by_id.values(), key=lambda x: x.get("created_at") or "", reverse=True)
+        page_ids = [p["id"] for p in ordered[skip : skip + limit]]
+
+        if not page_ids:
+            projects = []
+        else:
+            # Fetch full project docs for this page only (preserve order)
+            full_docs = await db.projects.find(
+                {"id": {"$in": page_ids}},
+                {"_id": 0},
+            ).to_list(len(page_ids))
+            by_id_full = {p["id"]: p for p in full_docs}
+            projects = [by_id_full[pid] for pid in page_ids]
     
     # Batch-fetch имён создателей (вместо N+1 запросов по одному на проект)
     creator_ids = list({p['created_by'] for p in projects if p.get('created_by')})

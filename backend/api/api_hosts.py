@@ -90,11 +90,16 @@ async def get_host(host_id: str, current_user: User = Depends(get_current_user))
 async def test_host_connection(host_id: str, current_user: User = Depends(get_current_user)):
     """Test SSH connection to host (requires hosts_edit_own or hosts_edit_all permission)"""
     await require_permission(current_user, 'hosts_edit_own', 'hosts_edit_all')
-    
+
     host_doc = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     if not host_doc:
         raise HTTPException(status_code=404, detail="Хост не найден 2")
-    
+
+    # Users with only hosts_edit_own may test only their own hosts
+    is_owner = host_doc.get("created_by") == current_user.id
+    if not is_owner:
+        await require_permission(current_user, "hosts_edit_all")
+
     host = Host(**parse_from_mongo(host_doc))
     
     # Try simple command
