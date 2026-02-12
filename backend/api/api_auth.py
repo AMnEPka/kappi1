@@ -19,6 +19,7 @@ from models.auth_models import (
     RefreshToken, RefreshTokenRequest, TokenRefreshResponse
 )
 from services.services_auth import get_current_user, get_user_permissions
+from services.services_sse_tickets import create_sse_ticket
 from utils.audit_utils import log_audit
 from utils.db_utils import prepare_for_mongo
 
@@ -290,9 +291,22 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     }
 
 
+@router.post("/auth/sse-ticket")
+async def create_sse_ticket_endpoint(current_user: User = Depends(get_current_user)):
+    """
+    Create a short-lived, single-use ticket for SSE connections.
+
+    The client should call this endpoint before opening an EventSource and pass
+    the returned ``ticket`` as a query parameter instead of the raw JWT token.
+    The ticket expires in 60 seconds and can only be used once.
+    """
+    ticket = await create_sse_ticket(current_user.id)
+    return {"ticket": ticket}
+
+
 @router.get("/permissions", response_model=Dict[str, Any])
-async def get_permissions_list():
-    """Get all available permissions with descriptions and groups"""
+async def get_permissions_list(current_user: User = Depends(get_current_user)):
+    """Get all available permissions with descriptions and groups (requires authentication)"""
     return {
         "permissions": PERMISSIONS,
         "groups": PERMISSION_GROUPS

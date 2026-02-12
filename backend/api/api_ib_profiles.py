@@ -24,6 +24,7 @@ from models.ib_profile_models import (
 from models.auth_models import User
 from services.services_auth import get_current_user, require_permission, get_current_user_from_token, has_permission
 from services.services_ib_profiles_apply import run_apply_session_events
+from services.services_sse_tickets import validate_sse_ticket
 from utils.db_utils import prepare_for_mongo, parse_from_mongo
 from utils.audit_utils import log_audit
 
@@ -320,16 +321,22 @@ async def apply_profiles_start(
 @router.get("/apply/{session_id}/stream")
 async def apply_profiles_stream(
     session_id: str,
+    ticket: Optional[str] = None,
     token: Optional[str] = None,
 ):
-    """SSE-поток выполнения применения профилей (аутентификация через query token)."""
-    if not token:
-        raise HTTPException(status_code=401, detail="Требуется token для SSE")
-    try:
-        current_user = await get_current_user_from_token(token)
-    except Exception as e:
-        logger.error(f"Apply stream auth failed: {e}")
-        raise HTTPException(status_code=401, detail="Ошибка авторизации")
+    """SSE-поток выполнения применения профилей (аутентификация через SSE ticket или legacy token)."""
+    # Authenticate via SSE ticket (preferred) or legacy JWT token (fallback)
+    if ticket:
+        current_user = await validate_sse_ticket(ticket)
+    elif token:
+        logger.warning("Apply stream using legacy token query param (deprecated)")
+        try:
+            current_user = await get_current_user_from_token(token)
+        except Exception as e:
+            logger.error(f"Apply stream auth failed: {e}")
+            raise HTTPException(status_code=401, detail="Ошибка авторизации")
+    else:
+        raise HTTPException(status_code=401, detail="Требуется ticket для SSE-подключения")
     if not await has_permission(current_user, "ib_profiles_apply"):
         raise HTTPException(status_code=403, detail="Нет прав на применение профилей ИБ")
 

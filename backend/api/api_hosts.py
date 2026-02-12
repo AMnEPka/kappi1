@@ -83,8 +83,10 @@ async def get_host(host_id: str, current_user: User = Depends(get_current_user))
 
 
 @router.post("/hosts/{host_id}/test")
-async def test_host_connection(host_id: str):
-    """Test SSH connection to host"""
+async def test_host_connection(host_id: str, current_user: User = Depends(get_current_user)):
+    """Test SSH connection to host (requires hosts_edit_own or hosts_edit_all permission)"""
+    await require_permission(current_user, 'hosts_edit_own', 'hosts_edit_all')
+    
     host_doc = await db.hosts.find_one({"id": host_id}, {"_id": 0})
     if not host_doc:
         raise HTTPException(status_code=404, detail="Хост не найден 2")

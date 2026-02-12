@@ -324,6 +324,18 @@ export const getActiveSessionsApi = async () => {
   return response.data;
 };
 
+/**
+ * Get a short-lived, single-use SSE ticket.
+ * Use this instead of passing the raw JWT token in SSE query parameters.
+ * The ticket expires in 60 seconds and can only be used once.
+ *
+ * @returns {Promise<string>} The opaque ticket string
+ */
+export const getSSETicket = async () => {
+  const response = await api.post('/api/auth/sse-ticket');
+  return response.data.ticket;
+};
+
 // Initialize token refresh & visibility handler on module load if token exists
 if (typeof window !== 'undefined') {
   const token = getAccessToken();

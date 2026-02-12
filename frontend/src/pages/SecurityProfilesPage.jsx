@@ -161,15 +161,6 @@ export default function SecurityProfilesPage() {
       .catch(() => toast.error("Ошибка загрузки профиля"));
   };
 
-  const handleExport = (profile) => {
-    const token = getAccessToken();
-    const url = `${process.env.REACT_APP_BACKEND_URL || ""}/api/ib-profiles/${profile.id}/export`;
-    window.open(
-      `${url}?token=${token}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
-  };
   const handleExportDownload = (profile) => {
     api
       .get(`/api/ib-profiles/${profile.id}/export`, { responseType: "text" })

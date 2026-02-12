@@ -22,7 +22,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, getAccessToken } from "@/config/api";
+import { api, getAccessToken, getSSETicket } from "@/config/api";
 import { toast } from "sonner";
 import {
   Server,
@@ -270,10 +270,18 @@ export default function ApplyProfilePage() {
         setApplying(false);
         return;
       }
-      const token = getAccessToken();
+      let ticket;
+      try {
+        ticket = await getSSETicket();
+      } catch (err) {
+        console.error('Failed to obtain SSE ticket:', err);
+        toast.error("Не удалось получить SSE-тикет для стриминга");
+        setApplying(false);
+        return;
+      }
       const protocol = window.location.protocol;
       const host = window.location.host;
-      const streamUrl = `${protocol}//${host}/api/ib-profiles/apply/${sessionId}/stream?token=${token}`;
+      const streamUrl = `${protocol}//${host}/api/ib-profiles/apply/${sessionId}/stream?ticket=${ticket}`;
       const eventSource = new EventSource(streamUrl);
       eventSourceRef.current = eventSource;
 

@@ -22,6 +22,7 @@ from services.services_init import (
     _check_winrm_login, _check_admin_access,
     save_failed_executions
 )
+from services.services_sse_tickets import validate_sse_ticket
 from utils.db_utils import prepare_for_mongo, parse_from_mongo, decode_script_from_storage
 from utils.audit_utils import log_audit
 from utils.ssh_logger import clear_ssh_logs
@@ -31,21 +32,30 @@ router = APIRouter()
 
 
 @router.get("/projects/{project_id}/execute")
-async def execute_project(project_id: str, token: Optional[str] = None, skip_audit_log: bool = False):
+async def execute_project(
+    project_id: str,
+    ticket: Optional[str] = None,
+    token: Optional[str] = None,
+    skip_audit_log: bool = False,
+):
     """Execute project with real-time updates via Server-Sent Events (requires projects_execute permission and access to project)"""
-    logger.info(f"Execute endpoint called for project_id: {project_id}, token present: {bool(token)}")
+    logger.info(f"Execute endpoint called for project_id: {project_id}, ticket present: {bool(ticket)}, token present: {bool(token)}")
     
-    # Get current user from token parameter (for SSE which doesn't support headers)
-    if not token:
-        logger.warning(f"Execute endpoint called without token for project_id: {project_id}")
-        raise HTTPException(status_code=401, detail="Token required for SSE connection")
-    
-    try:
-        current_user = await get_current_user_from_token(token)
-        logger.info(f"User authenticated: {current_user.username} (id: {current_user.id})")
-    except Exception as e:
-        logger.error(f"Failed to authenticate user from token: {e}")
-        raise
+    # Authenticate via SSE ticket (preferred) or legacy JWT token (fallback)
+    if ticket:
+        current_user = await validate_sse_ticket(ticket)
+        logger.info(f"User authenticated via SSE ticket: {current_user.username} (id: {current_user.id})")
+    elif token:
+        logger.warning("SSE connection using legacy token query param (deprecated)")
+        try:
+            current_user = await get_current_user_from_token(token)
+            logger.info(f"User authenticated via legacy token: {current_user.username} (id: {current_user.id})")
+        except Exception as e:
+            logger.error(f"Failed to authenticate user from token: {e}")
+            raise
+    else:
+        logger.warning(f"Execute endpoint called without ticket/token for project_id: {project_id}")
+        raise HTTPException(status_code=401, detail="Ticket or token required for SSE connection")
     
     # Check permission
     if not await has_permission(current_user, 'projects_execute'):

@@ -103,6 +103,10 @@ async def ensure_indexes():
         await db.ib_profile_applications.create_index("session_id")
         await db.ib_profile_apply_sessions.create_index("session_id", unique=True)
 
+        # SSE tickets (short-lived, auto-cleanup via TTL)
+        await db.sse_tickets.create_index("ticket", unique=True)
+        await db.sse_tickets.create_index("expires_at", expireAfterSeconds=0)  # TTL index
+
         logger.info("✅ MongoDB indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create MongoDB indexes: {e}")

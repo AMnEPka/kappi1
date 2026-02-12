@@ -6,7 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
-import { api, getAccessToken } from '../config/api';
+import { api, getSSETicket } from '../config/api';
 import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
 
 const fallbackExtractErrorCode = (output) => {
@@ -212,11 +212,13 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
       // Connect to SSE for real-time updates (EventSource uses GET by default)
       // The backend endpoint will start execution when first connected
-      // EventSource doesn't support custom headers, so token must be in URL
-      const token = getAccessToken();
-      if (!token) {
-        console.error('No token available!');
-        toast.error("Токен авторизации не найден. Пожалуйста, войдите снова.");
+      // EventSource doesn't support custom headers, so we use a short-lived SSE ticket
+      let ticket;
+      try {
+        ticket = await getSSETicket();
+      } catch (err) {
+        console.error('Failed to obtain SSE ticket:', err);
+        toast.error("Не удалось получить SSE-тикет. Пожалуйста, войдите снова.");
         setExecuting(false);
         return;
       }
@@ -225,12 +227,10 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       // This ensures EventSource uses the correct origin
       const protocol = window.location.protocol;
       const host = window.location.host;
-      const executeUrl = `${protocol}//${host}/api/projects/${projectId}/execute?token=${token}`;
+      const executeUrl = `${protocol}//${host}/api/projects/${projectId}/execute?ticket=${ticket}`;
       
       console.log('=== EventSource Configuration ===');
       console.log('Creating EventSource with URL:', executeUrl);
-      console.log('Token present:', !!token);
-      console.log('Token length:', token ? token.length : 0);
       console.log('Current window location:', window.location.href);
       console.log('Protocol:', protocol, 'Host:', host);
       
