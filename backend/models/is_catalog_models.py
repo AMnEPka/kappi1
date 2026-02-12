@@ -13,11 +13,17 @@ import uuid
 # Schema (field definitions, admin-managed)
 # ---------------------------------------------------------------------------
 
+# Allowed file field types: word (.doc, .docx), excel (.xls, .xlsx), pdf
+FIELD_TYPE_TEXT = "text"
+FIELD_TYPE_FILE = "file"
+FIELD_TYPES = [FIELD_TYPE_TEXT, FIELD_TYPE_FILE]
+
 class ISCatalogSchemaField(BaseModel):
     """Single field definition in the IS catalog schema."""
     key: str
     label: str
     order: int = 0
+    field_type: str = FIELD_TYPE_TEXT  # "text" | "file"
 
 
 class ISCatalogSchema(BaseModel):

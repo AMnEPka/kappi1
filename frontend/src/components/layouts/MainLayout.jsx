@@ -134,7 +134,7 @@ export const MainLayout = ({ children }) => {
                 className={`md3-sidebar-button ${isActive('/is-catalog') ? 'md3-sidebar-button-active' : ''}`}
               >
                 <Library className="md3-icon" />
-                {isSidebarExpanded && "Каталог ИС"}
+                {isSidebarExpanded && "Каталог ИС/ИР"}
               </Button>
             </Link>
           )}
@@ -264,7 +264,7 @@ export const MainLayout = ({ children }) => {
 const getPageTitle = (pathname) => {
   const titles = {
     '/': 'Проекты',
-    '/is-catalog': 'Каталог ИС',
+    '/is-catalog': 'Каталог ИС/ИР',
     '/ib-profiles': 'Перечень профилей ИБ',
     '/ib-profiles/apply': 'Применение профилей ИБ',
     '/hosts': 'Хосты',

@@ -92,6 +92,7 @@ async def ensure_indexes():
         # IS catalog
         await db.is_catalog.create_index("created_at")
         await db.is_catalog.create_index("id", unique=True)
+        await db.is_catalog_files.create_index("id", unique=True)
 
         # IB profiles
         await db.ib_profiles.create_index("id", unique=True)
