@@ -425,8 +425,16 @@ async def log_failed_execution(project_id: str, current_user: User = Depends(get
 
 
 @router.get("/projects/{project_id}/executions", response_model=List[Execution])
-async def get_project_executions(project_id: str, current_user: User = Depends(get_current_user)):
-    """Get all execution results for a project"""
+async def get_project_executions(
+    project_id: str,
+    skip: int = 0,
+    limit: int = 1000,
+    current_user: User = Depends(get_current_user),
+):
+    """Get all execution results for a project (with pagination)"""
+    limit = max(1, min(limit, 1000))
+    skip = max(0, skip)
+
     if not await has_permission(current_user, 'results_view_all'):
         if not await can_access_project(current_user, project_id):
             raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
@@ -434,7 +442,7 @@ async def get_project_executions(project_id: str, current_user: User = Depends(g
     executions = await db.executions.find(
         {"project_id": project_id},
         {"_id": 0}
-    ).sort("executed_at", -1).to_list(1000)
+    ).sort("executed_at", -1).skip(skip).limit(limit).to_list(limit)
     
     log_audit(
         "25",  # просмотр результатов проекта
@@ -509,8 +517,17 @@ async def get_project_sessions(project_id: str, current_user: User = Depends(get
 
 
 @router.get("/projects/{project_id}/sessions/{session_id}/executions", response_model=List[Execution])
-async def get_session_executions(project_id: str, session_id: str, current_user: User = Depends(get_current_user)):
-    """Get all executions for a specific session (requires results_view_all or project access)"""
+async def get_session_executions(
+    project_id: str,
+    session_id: str,
+    skip: int = 0,
+    limit: int = 1000,
+    current_user: User = Depends(get_current_user),
+):
+    """Get all executions for a specific session (with pagination)"""
+    limit = max(1, min(limit, 1000))
+    skip = max(0, skip)
+
     # Check if user can view all results or has access to project
     if not await has_permission(current_user, 'results_view_all'):
         if not await can_access_project(current_user, project_id):
@@ -519,7 +536,7 @@ async def get_session_executions(project_id: str, session_id: str, current_user:
     executions = await db.executions.find(
         {"project_id": project_id, "execution_session_id": session_id},
         {"_id": 0}
-    ).sort("executed_at", 1).to_list(1000)
+    ).sort("executed_at", 1).skip(skip).limit(limit).to_list(limit)
 
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 
@@ -580,12 +597,19 @@ async def execute_script(execute_req: ExecuteRequest, current_user: User = Depen
 
 
 @router.get("/executions", response_model=List[Execution])
-async def get_executions(current_user: User = Depends(get_current_user)):
-    """Get all executions (requires results_view_all or shows own executions)"""
+async def get_executions(
+    skip: int = 0,
+    limit: int = 1000,
+    current_user: User = Depends(get_current_user),
+):
+    """Get all executions (with pagination; requires results_view_all or shows own executions)"""
+    limit = max(1, min(limit, 1000))
+    skip = max(0, skip)
+
     if await has_permission(current_user, 'results_view_all'):
-        executions = await db.executions.find({}, {"_id": 0}).sort("executed_at", -1).to_list(1000)
+        executions = await db.executions.find({}, {"_id": 0}).sort("executed_at", -1).skip(skip).limit(limit).to_list(limit)
     else:
-        executions = await db.executions.find({"executed_by": current_user.id}, {"_id": 0}).sort("executed_at", -1).to_list(1000)
+        executions = await db.executions.find({"executed_by": current_user.id}, {"_id": 0}).sort("executed_at", -1).skip(skip).limit(limit).to_list(limit)
     
     return [Execution(**parse_from_mongo(execution)) for execution in executions]
 

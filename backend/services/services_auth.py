@@ -126,6 +126,18 @@ async def has_permission(user: User, permission: str) -> bool:
     return permission in permissions
 
 
+async def has_any_permission(user: User, *permissions: str) -> bool:
+    """
+    Проверить, есть ли у пользователя хотя бы одно из перечисленных прав.
+    В отличие от нескольких последовательных вызовов has_permission(),
+    загружает права из БД только один раз (2 запроса вместо 2*N).
+    """
+    if user.is_admin:
+        return True
+    user_permissions = await get_user_permissions(user)
+    return any(perm in user_permissions for perm in permissions)
+
+
 async def require_permission(user: User, *permissions: str) -> None:
     """
     Require one or more permissions, raise 403 if not authorized

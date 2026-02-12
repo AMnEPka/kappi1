@@ -7,7 +7,7 @@ from config.config_init import db
 from config.config_security import encrypt_password
 from models.content_models import Host, HostCreate, HostUpdate
 from models.auth_models import User
-from services.services_auth import get_current_user, has_permission, require_permission
+from services.services_auth import get_current_user, has_permission, has_any_permission, require_permission
 from services.services_execution import execute_command
 from utils.db_utils import prepare_for_mongo, parse_from_mongo
 from utils.audit_utils import log_audit
@@ -52,17 +52,21 @@ async def create_host(host_input: HostCreate, current_user: User = Depends(get_c
 
 
 @router.get("/hosts", response_model=List[Host])
-async def get_hosts(current_user: User = Depends(get_current_user)):
-    """Get all hosts (filtered by permissions)"""
+async def get_hosts(
+    skip: int = 0,
+    limit: int = 1000,
+    current_user: User = Depends(get_current_user),
+):
+    """Get all hosts (filtered by permissions, with pagination)"""
+    limit = max(1, min(limit, 1000))
+    skip = max(0, skip)
+
     # If user can edit all hosts OR can work with projects, show all hosts
-    if (await has_permission(current_user, 'hosts_edit_all') or 
-        await has_permission(current_user, 'projects_create') or 
-        await has_permission(current_user, 'projects_execute') or
-        await has_permission(current_user, 'results_view_all')):
-        hosts = await db.hosts.find({}, {"_id": 0}).to_list(1000)
+    if await has_any_permission(current_user, 'hosts_edit_all', 'projects_create', 'projects_execute', 'results_view_all'):
+        hosts = await db.hosts.find({}, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
     else:
         # Show only own hosts
-        hosts = await db.hosts.find({"created_by": current_user.id}, {"_id": 0}).to_list(1000)
+        hosts = await db.hosts.find({"created_by": current_user.id}, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
     
     return [Host(**parse_from_mongo(host)) for host in hosts]
 

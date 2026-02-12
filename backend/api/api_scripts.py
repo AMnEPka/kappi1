@@ -9,7 +9,7 @@ import hashlib
 from config.config_init import db
 from models.content_models import Script, ScriptCreate, ScriptUpdate, Category, System, CheckGroup
 from models.auth_models import User
-from services.services_auth import get_current_user, has_permission, require_permission
+from services.services_auth import get_current_user, has_permission, has_any_permission, require_permission
 from utils.db_utils import (
     prepare_for_mongo, 
     parse_from_mongo, 
@@ -113,8 +113,17 @@ async def create_script(system_id: str, script_input: ScriptCreate, current_user
 
 
 @router.get("/scripts")
-async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
-    """Get all scripts with filtering options (filtered by permissions)"""
+async def get_scripts(
+    system_id: Optional[str] = None,
+    category_id: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 1000,
+    current_user: User = Depends(get_current_user),
+):
+    """Get all scripts with filtering options (filtered by permissions, with pagination)"""
+    limit = max(1, min(limit, 1000))
+    skip = max(0, skip)
+
     query = {}
     
     if system_id:
@@ -127,14 +136,11 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
     
     # Filter by permissions
     # If user can edit all scripts OR can work with projects, show all scripts
-    if not (await has_permission(current_user, 'checks_edit_all') or 
-            await has_permission(current_user, 'projects_create') or 
-            await has_permission(current_user, 'projects_execute') or
-            await has_permission(current_user, 'results_view_all')):
+    if not await has_any_permission(current_user, 'checks_edit_all', 'projects_create', 'projects_execute', 'results_view_all'):
         # Show only own scripts
         query["created_by"] = current_user.id
     
-    scripts = await db.scripts.find(query, {"_id": 0}).sort("order", 1).to_list(1000)
+    scripts = await db.scripts.find(query, {"_id": 0}).sort("order", 1).skip(skip).limit(limit).to_list(limit)
     
     # Enrich with system and category info
     enriched_scripts = []
@@ -524,7 +530,7 @@ async def rollback_processor_script_version(
 @router.get("/scripts/export/all")
 async def export_all_scripts(current_user: User = Depends(get_current_user)):
     """Export all checks with categories, systems and groups (bulk export)"""
-    if not (await has_permission(current_user, 'checks_edit_all') or await has_permission(current_user, 'checks_create')):
+    if not await has_any_permission(current_user, 'checks_edit_all', 'checks_create'):
         raise HTTPException(status_code=403, detail="Недостаточно прав для экспорта проверок")
     
     categories_docs = await db.categories.find({}, {"_id": 0}).to_list(2000)
@@ -612,7 +618,7 @@ async def import_scripts(
     current_user: User = Depends(get_current_user)
 ):
     """Import checks with their categories, systems and groups"""
-    if not (await has_permission(current_user, 'checks_edit_all') or await has_permission(current_user, 'checks_create')):
+    if not await has_any_permission(current_user, 'checks_edit_all', 'checks_create'):
         raise HTTPException(status_code=403, detail="Недостаточно прав для импорта проверок")
     
     if not payload.scripts:

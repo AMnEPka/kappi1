@@ -20,13 +20,17 @@ async def get_audit_logs(
     end_date: Optional[str] = None,
     event_types: Optional[str] = None,
     excluded_event_types: Optional[str] = None,
+    skip: int = 0,
     limit: int = 200,
     current_user: User = Depends(get_current_user)
 ):
-    """Fetch audit logs with optional filters (admin only)"""
+    """Fetch audit logs with optional filters and pagination (admin only)"""
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
     
+    limit = max(1, min(limit, 500))
+    skip = max(0, skip)
+
     query: Dict[str, Any] = {}
     created_filter: Dict[str, Any] = {}
     
@@ -51,8 +55,6 @@ async def get_audit_logs(
         if excluded_events:
             query["event"] = {"$nin": excluded_events}
     
-    limit = max(1, min(limit, 500))
-    
-    logs = await db.audit_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     return [AuditLog(**parse_from_mongo(log)) for log in logs]
 

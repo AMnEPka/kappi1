@@ -38,16 +38,6 @@ def _os_from_connection_type(connection_type: Optional[str]) -> str:
     return "linux"  # ssh, k8s, default
 
 
-async def _get_category_name(category_id: str) -> str:
-    cat = await db.categories.find_one({"id": category_id}, {"name": 1})
-    return cat.get("name", category_id) if cat else category_id
-
-
-async def _get_system_name(system_id: str) -> str:
-    sys = await db.systems.find_one({"id": system_id}, {"name": 1})
-    return sys.get("name", system_id) if sys else system_id
-
-
 # ============================================================================
 # List / Get
 # ============================================================================
@@ -57,9 +47,13 @@ async def list_profiles(
     category_id: Optional[str] = None,
     system_id: Optional[str] = None,
     search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 1000,
     current_user: User = Depends(get_current_user),
 ):
-    """Список профилей ИБ с фильтрами по категории, системе и поиском по версии."""
+    """Список профилей ИБ с фильтрами по категории, системе и поиском по версии (с пагинацией)."""
+    limit = max(1, min(limit, 1000))
+    skip = max(0, skip)
     await require_permission(current_user, "ib_profiles_view")
 
     query = {}
@@ -72,8 +66,20 @@ async def list_profiles(
             {"version": {"$regex": search.strip(), "$options": "i"}},
         ]
 
-    cursor = db.ib_profiles.find(query, {"_id": 0}).sort("updated_at", -1)
-    docs = await cursor.to_list(1000)
+    cursor = db.ib_profiles.find(query, {"_id": 0}).sort("updated_at", -1).skip(skip).limit(limit)
+    docs = await cursor.to_list(limit)
+
+    # Batch-fetch имён категорий и систем (вместо N+1 запросов)
+    cat_ids = list({d.get("category_id") for d in docs if d.get("category_id")})
+    sys_ids = list({d.get("system_id") for d in docs if d.get("system_id")})
+    cat_map: dict[str, str] = {}
+    sys_map: dict[str, str] = {}
+    if cat_ids:
+        cat_docs = await db.categories.find({"id": {"$in": cat_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(cat_ids))
+        cat_map = {c["id"]: c.get("name", c["id"]) for c in cat_docs}
+    if sys_ids:
+        sys_docs = await db.systems.find({"id": {"$in": sys_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(sys_ids))
+        sys_map = {s["id"]: s.get("name", s["id"]) for s in sys_docs}
 
     result = []
     for doc in docs:
@@ -82,9 +88,9 @@ async def list_profiles(
             IBProfileListEntry(
                 id=d["id"],
                 category_id=d["category_id"],
-                category_name=await _get_category_name(d["category_id"]),
+                category_name=cat_map.get(d["category_id"], d["category_id"]),
                 system_id=d["system_id"],
-                system_name=await _get_system_name(d["system_id"]),
+                system_name=sys_map.get(d["system_id"], d["system_id"]),
                 version=d["version"],
                 status=d.get("status", "draft"),
                 created_at=d.get("created_at"),

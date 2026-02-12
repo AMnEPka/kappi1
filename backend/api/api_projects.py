@@ -49,32 +49,47 @@ async def create_project(project_input: ProjectCreate, current_user: User = Depe
 
 
 @router.get("/projects", response_model=List[Project])
-async def get_projects(current_user: User = Depends(get_current_user)):
-    """Get all accessible projects"""
+async def get_projects(
+    skip: int = 0,
+    limit: int = 1000,
+    current_user: User = Depends(get_current_user),
+):
+    """Get all accessible projects (with pagination)"""
+    limit = max(1, min(limit, 1000))
+    skip = max(0, skip)
+
     if current_user.is_admin or await has_permission(current_user, 'results_view_all'):
         # Admin or curator sees all projects
-        projects = await db.projects.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+        projects = await db.projects.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     else:
-        # Get projects created by user
-        my_projects = await db.projects.find({"created_by": current_user.id}, {"_id": 0}).to_list(1000)
+        # Get projects created by user + shared projects (pagination applied after merge)
+        my_projects = await db.projects.find({"created_by": current_user.id}, {"_id": 0}).to_list(5000)
         
         # Get projects with explicit access
-        access_records = await db.project_access.find({"user_id": current_user.id}).to_list(1000)
+        access_records = await db.project_access.find({"user_id": current_user.id}).to_list(5000)
         project_ids = [rec['project_id'] for rec in access_records]
-        accessible_projects = await db.projects.find({"id": {"$in": project_ids}}, {"_id": 0}).to_list(1000) if project_ids else []
+        accessible_projects = await db.projects.find({"id": {"$in": project_ids}}, {"_id": 0}).to_list(5000) if project_ids else []
         
-        # Combine and deduplicate
+        # Combine, deduplicate, sort, and apply pagination
         all_projects = {p['id']: p for p in my_projects + accessible_projects}
-        projects = list(all_projects.values())
-        projects.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        projects = sorted(all_projects.values(), key=lambda x: x.get('created_at', ''), reverse=True)
+        projects = projects[skip:skip + limit]
     
-    # Enrich projects with creator username & fullname
+    # Batch-fetch имён создателей (вместо N+1 запросов по одному на проект)
+    creator_ids = list({p['created_by'] for p in projects if p.get('created_by')})
+    creator_map: dict[str, dict] = {}
+    if creator_ids:
+        creator_docs = await db.users.find(
+            {"id": {"$in": creator_ids}},
+            {"_id": 0, "id": 1, "username": 1, "full_name": 1},
+        ).to_list(len(creator_ids))
+        creator_map = {c["id"]: c for c in creator_docs}
+
     for project in projects:
-        if project.get('created_by'):
-            creator = await db.users.find_one({"id": project['created_by']}, {"_id": 0, "username": 1, "full_name": 1})
-            if creator:
-                project['creator_username'] = creator.get('username', 'Unknown')
-                project['creator_full_name'] = creator.get('full_name', 'Unknown')          
+        creator = creator_map.get(project.get('created_by', ''))
+        if creator:
+            project['creator_username'] = creator.get('username', 'Unknown')
+            project['creator_full_name'] = creator.get('full_name', 'Unknown')
     
     return [Project(**parse_from_mongo(proj)) for proj in projects]
 

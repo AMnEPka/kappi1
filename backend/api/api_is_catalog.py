@@ -80,7 +80,6 @@ def _filter_data_to_schema(data: dict, schema_doc: dict) -> dict:
 async def get_schema(current_user: User = Depends(get_current_user)):
     """Get current IS catalog field schema (any authenticated user with catalog view)."""
     await require_permission(current_user, "is_catalog_view")
-    await ensure_default_schema()
     doc = await db.is_catalog_schema.find_one({"id": SCHEMA_ID}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Схема не найдена")
@@ -95,7 +94,6 @@ async def update_schema(
     """Update schema (admin or is_catalog_manage_schema). Add/remove/reorder fields."""
     if not current_user.is_admin and not await has_permission(current_user, "is_catalog_manage_schema"):
         raise HTTPException(status_code=403, detail="Недостаточно прав для изменения схемы")
-    await ensure_default_schema()
 
     old_doc = await db.is_catalog_schema.find_one({"id": SCHEMA_ID})
     old_keys = set(_get_schema_field_keys(old_doc or {}))
@@ -129,16 +127,22 @@ async def update_schema(
 # ============================================================================
 
 @router.get("", response_model=List[Dict[str, Any]])
-async def list_is_catalog(current_user: User = Depends(get_current_user)):
-    """List all information systems (fields according to current schema)."""
+async def list_is_catalog(
+    skip: int = 0,
+    limit: int = 1000,
+    current_user: User = Depends(get_current_user),
+):
+    """List all information systems (with pagination)."""
+    limit = max(1, min(limit, 1000))
+    skip = max(0, skip)
+
     await require_permission(current_user, "is_catalog_view")
-    await ensure_default_schema()
     schema_doc = await db.is_catalog_schema.find_one({"id": SCHEMA_ID}, {"_id": 0})
     if not schema_doc:
         raise HTTPException(status_code=404, detail="Схема не найдена")
 
-    cursor = db.is_catalog.find({}, {"_id": 0}).sort("created_at", -1)
-    items = await cursor.to_list(1000)
+    cursor = db.is_catalog.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit)
+    items = await cursor.to_list(limit)
     return [_item_response(doc, schema_doc) for doc in items]
 
 
@@ -148,7 +152,6 @@ async def create_is_catalog_item(
 ):
     """Create new IS. Body: optional host_ids + any schema field keys."""
     await require_permission(current_user, "is_catalog_edit")
-    await ensure_default_schema()
     schema_doc = await db.is_catalog_schema.find_one({"id": SCHEMA_ID}, {"_id": 0})
     if not schema_doc:
         raise HTTPException(status_code=404, detail="Схема не найдена")
@@ -186,7 +189,6 @@ async def get_is_catalog_item(
 ):
     """Get one IS by id."""
     await require_permission(current_user, "is_catalog_view")
-    await ensure_default_schema()
     schema_doc = await db.is_catalog_schema.find_one({"id": SCHEMA_ID}, {"_id": 0})
     if not schema_doc:
         raise HTTPException(status_code=404, detail="Схема не найдена")
@@ -203,7 +205,6 @@ async def update_is_catalog_item(
 ):
     """Update IS. Body: optional host_ids + any schema field keys."""
     await require_permission(current_user, "is_catalog_edit")
-    await ensure_default_schema()
     schema_doc = await db.is_catalog_schema.find_one({"id": SCHEMA_ID}, {"_id": 0})
     if not schema_doc:
         raise HTTPException(status_code=404, detail="Схема не найдена")
