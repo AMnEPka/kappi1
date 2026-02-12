@@ -27,10 +27,11 @@ ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', '')
 # JWT Configuration
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production-please-use-strong-random-key')
 JWT_ALGORITHM = "HS256"
-# Access token expiration time in minutes (default: 30 minutes)
+# Access token expiration time in minutes (default: 120 minutes / 2 hours)
 # Set via JWT_ACCESS_TOKEN_EXPIRE_MINUTES environment variable
-# Note: Frontend automatically refreshes token 1 minute before expiration
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRE_MINUTES', '30'))
+# Note: Frontend automatically refreshes token 5 minutes before expiration
+#       and also refreshes on tab visibility change (return from background)
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRE_MINUTES', '120'))
 JWT_REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get('JWT_REFRESH_TOKEN_EXPIRE_DAYS', '30'))
 # Legacy support
 JWT_ACCESS_TOKEN_EXPIRE_HOURS = 24

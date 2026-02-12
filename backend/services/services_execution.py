@@ -291,21 +291,22 @@ def _check_winrm_login(host: Host) -> Tuple[bool, str]:
     retry=retry_if_exception_type((socket.error, socket.timeout)),
     reraise=True
 )
-def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
+def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str, int]:
     """
     Connect to host via SSH and execute command with retry logic.
     Uses ssh_connection context manager for automatic cleanup.
-    
-    Returns: (success, output, error)
+
+    Returns: (success, output, error, exit_code)
+    On connection/execution exception, exit_code is 1 (generic failure).
     """
     try:
         with ssh_connection(host) as ssh:
             stdin, stdout, stderr = ssh.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
             exit_code = stdout.channel.recv_exit_status()
-            
+
             output = stdout.read().decode('utf-8', errors='ignore')
             error = stderr.read().decode('utf-8', errors='ignore') if exit_code != 0 else ""
-            
+
             # Логируем команду и результат
             log_ssh_command(
                 host=host,
@@ -315,8 +316,8 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
                 exit_code=exit_code,
                 success=(exit_code == 0)
             )
-            
-            return exit_code == 0, output, error
+
+            return exit_code == 0, output, error, exit_code
     except paramiko.AuthenticationException as e:
         error_msg = f"Authentication failed: {str(e)}"
         log_ssh_command(
@@ -325,7 +326,7 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
             stderr=error_msg,
             success=False
         )
-        return False, "", error_msg
+        return False, "", error_msg, 1
     except paramiko.SSHException as e:
         error_msg = f"SSH error: {str(e)}"
         log_ssh_command(
@@ -334,7 +335,7 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
             stderr=error_msg,
             success=False
         )
-        return False, "", error_msg
+        return False, "", error_msg, 1
     except Exception as e:
         error_msg = str(e)
         log_ssh_command(
@@ -343,7 +344,7 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
             stderr=error_msg,
             success=False
         )
-        return False, "", error_msg
+        return False, "", error_msg, 1
 
 
 @retry(
@@ -389,8 +390,7 @@ def _execute_profile_linux(host: Host, script_content: str) -> Tuple[bool, str, 
             f"chmod +x {tmp_name} && "
             f"sudo -n bash {tmp_name}; rc=$?; rm -f {tmp_name}; exit $rc"
         )
-        success, output, error = _ssh_connect_and_execute(host, cmd)
-        exit_code = 0 if success else 1
+        success, output, error, exit_code = _ssh_connect_and_execute(host, cmd)
         if not success and not error and output:
             error = output
         return success, output or "", error or "", exit_code
@@ -426,7 +426,7 @@ async def execute_command(host: Host, command: str) -> ExecutionResult:
     
     try:
         if host.connection_type == "ssh":
-            success, output, error = await loop.run_in_executor(
+            success, output, error, _ = await loop.run_in_executor(
                 None, _ssh_connect_and_execute, host, command
             )
         elif host.connection_type == "winrm":

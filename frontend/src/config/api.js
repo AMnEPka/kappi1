@@ -47,15 +47,36 @@ const getTokenExpirationTime = (token) => {
   return decoded.exp * 1000;
 };
 
-// Check if token needs refresh (refresh 1 minute before expiration)
+// Check if token needs refresh (refresh 5 minutes before expiration or already expired)
 const shouldRefreshToken = (token) => {
   if (!token) return false;
   const expTime = getTokenExpirationTime(token);
   if (!expTime) return false;
   const now = Date.now();
   const timeUntilExpiry = expTime - now;
-  // Refresh if token expires in less than 1 minute (60000 ms)
-  return timeUntilExpiry < 60000 && timeUntilExpiry > 0;
+  // Refresh if token expires in less than 5 minutes OR is already expired
+  // (expired tokens can still be refreshed via the refresh_token)
+  return timeUntilExpiry < 300000; // 5 minutes = 300000 ms
+};
+
+// Attempt to refresh the token proactively (shared logic for interval & visibility handler)
+const tryProactiveRefresh = async () => {
+  const token = getAccessToken();
+  if (!token) return;
+
+  if (shouldRefreshToken(token) && !isRefreshing) {
+    console.log('🔄 Auto-refreshing token...');
+    isRefreshing = true;
+    try {
+      await refreshAccessToken();
+      console.log('✅ Token auto-refreshed successfully');
+    } catch (error) {
+      console.error('❌ Auto token refresh failed:', error);
+      // Don't logout on proactive refresh failure — let the 401 handler deal with it
+    } finally {
+      isRefreshing = false;
+    }
+  }
 };
 
 // Setup automatic token refresh
@@ -66,7 +87,7 @@ const setupTokenRefresh = () => {
     tokenRefreshInterval = null;
   }
 
-  // Check token every 30 seconds
+  // Check token every 20 seconds
   tokenRefreshInterval = setInterval(async () => {
     const token = getAccessToken();
     if (!token) {
@@ -77,19 +98,21 @@ const setupTokenRefresh = () => {
       }
       return;
     }
+    await tryProactiveRefresh();
+  }, 20000); // Check every 20 seconds
+};
 
-    // Check if token needs refresh
-    if (shouldRefreshToken(token) && !isRefreshing) {
-      console.log('🔄 Auto-refreshing token before expiration...');
-      try {
-        await refreshAccessToken();
-        console.log('✅ Token auto-refreshed successfully');
-      } catch (error) {
-        console.error('❌ Auto token refresh failed:', error);
-        // Don't logout on auto-refresh failure, let the 401 handler deal with it
-      }
+// Handle tab visibility change — immediately check & refresh token when user returns
+let visibilityHandlerInstalled = false;
+const setupVisibilityHandler = () => {
+  if (typeof document === 'undefined' || visibilityHandlerInstalled) return;
+  visibilityHandlerInstalled = true;
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+      // User switched back to the tab — refresh token if needed
+      await tryProactiveRefresh();
     }
-  }, 30000); // Check every 30 seconds
+  });
 };
 
 // Process queued requests after token refresh
@@ -116,6 +139,7 @@ export const setTokens = (accessToken, refreshToken) => {
   // Setup automatic token refresh when tokens are set
   if (accessToken) {
     setupTokenRefresh();
+    setupVisibilityHandler();
   }
 };
 
@@ -155,20 +179,36 @@ const forceLogout = (reason = 'session_expired') => {
   window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=${reason}`;
 };
 
-// Request interceptor - add token to all requests and check if refresh needed
+// Request interceptor - add token to all requests and refresh if needed
 api.interceptors.request.use(
   async (config) => {
-    const token = getAccessToken();
+    let token = getAccessToken();
     if (token) {
-      // Check if token needs refresh before making request
+      // If token is expired or about to expire, try to refresh before sending request
       if (shouldRefreshToken(token) && !isRefreshing) {
+        isRefreshing = true;
         try {
-          const newToken = await refreshAccessToken();
-          config.headers.Authorization = `Bearer ${newToken}`;
-          return config;
+          token = await refreshAccessToken();
+          console.log('✅ Token refreshed in request interceptor');
         } catch (error) {
           console.warn('Token refresh in request interceptor failed, using existing token:', error);
+          // Re-read token in case another concurrent refresh succeeded
+          token = getAccessToken();
+        } finally {
+          isRefreshing = false;
         }
+      } else if (isRefreshing) {
+        // Another refresh is in progress — wait for it to complete
+        token = await new Promise((resolve) => {
+          const checkInterval = setInterval(() => {
+            if (!isRefreshing) {
+              clearInterval(checkInterval);
+              resolve(getAccessToken());
+            }
+          }, 100);
+          // Safety timeout: don't wait forever
+          setTimeout(() => { clearInterval(checkInterval); resolve(getAccessToken()); }, 5000);
+        });
       }
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -180,7 +220,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - handle 401 errors with token refresh
+// Response interceptor - handle 401 errors with token refresh + retry
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -209,24 +249,44 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      try {
-        const newToken = await refreshAccessToken();
-        
-        processQueue(null, newToken);
-        
-        // Retry original request with new token
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return api(originalRequest);
-      } catch (refreshError) {
-        console.error('❌ Token refresh failed:', refreshError);
-        processQueue(refreshError, null);
-        
-        // Refresh failed - logout user
-        forceLogout('session_expired');
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+      // Retry refresh up to 2 times with a small delay between attempts
+      const MAX_REFRESH_RETRIES = 2;
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= MAX_REFRESH_RETRIES; attempt++) {
+        try {
+          const newToken = await refreshAccessToken();
+          
+          processQueue(null, newToken);
+          isRefreshing = false;
+          
+          // Retry original request with new token
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          lastError = refreshError;
+          console.warn(`⚠️ Token refresh attempt ${attempt}/${MAX_REFRESH_RETRIES} failed:`, refreshError?.message || refreshError);
+          
+          // If this is a definitive auth error (401/403 from refresh endpoint), don't retry
+          if (refreshError?.response?.status === 401 || refreshError?.response?.status === 403) {
+            break;
+          }
+          
+          // Wait before retrying (only if not the last attempt)
+          if (attempt < MAX_REFRESH_RETRIES) {
+            await new Promise(r => setTimeout(r, 1000 * attempt));
+          }
+        }
       }
+
+      // All refresh attempts failed
+      console.error('❌ All token refresh attempts failed');
+      processQueue(lastError, null);
+      isRefreshing = false;
+      
+      // Refresh failed - logout user
+      forceLogout('session_expired');
+      return Promise.reject(lastError);
     }
 
     return Promise.reject(error);
@@ -264,11 +324,12 @@ export const getActiveSessionsApi = async () => {
   return response.data;
 };
 
-// Initialize token refresh on module load if token exists
+// Initialize token refresh & visibility handler on module load if token exists
 if (typeof window !== 'undefined') {
   const token = getAccessToken();
   if (token) {
     setupTokenRefresh();
+    setupVisibilityHandler();
   }
 }
 
