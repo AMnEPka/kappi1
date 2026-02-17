@@ -79,6 +79,7 @@ export default function ApplyProfilePage() {
   const fileInputRef = useRef(null);
   const eventSourceRef = useRef(null);
   const logsEndRef = useRef(null);
+  const hasReceivedLogsRef = useRef(false);
 
   const loadHosts = useCallback(async () => {
     try {
@@ -259,6 +260,7 @@ export default function ApplyProfilePage() {
     setApplying(true);
     setLogs([]);
     setStats({ total: 0, completed: 0, failed: 0 });
+    hasReceivedLogsRef.current = false;
     try {
       const startRes = await api.post("/api/ib-profiles/apply/start", {
         host_ids: selectedHostIds,
@@ -279,6 +281,7 @@ export default function ApplyProfilePage() {
 
       eventSource.onmessage = (event) => {
         try {
+          hasReceivedLogsRef.current = true;
           const data = JSON.parse(event.data);
           setLogs((prev) => {
             if (data.type === "script_progress") {
@@ -326,7 +329,7 @@ export default function ApplyProfilePage() {
         eventSource.close();
         eventSourceRef.current = null;
         setApplying(false);
-        if (logs.length === 0) toast.error("Не удалось подключиться к потоку выполнения");
+        if (!hasReceivedLogsRef.current) toast.error("Не удалось подключиться к потоку выполнения");
       };
     } catch (err) {
       toast.error(err.response?.data?.detail || "Ошибка запуска применения");

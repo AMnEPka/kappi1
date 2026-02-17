@@ -40,7 +40,8 @@ FROM python:3.11-slim AS production
 WORKDIR /app/backend
 
 # Копируем только необходимое из builder
-COPY --from=builder /root/.local /root/.local
+# Dependencies under /app so appuser can read them (chown applies to /app only)
+COPY --from=builder /root/.local /app/.local
 COPY --from=builder /app/backend .
 
 # Устанавливаем системные зависимости (только runtime)
@@ -49,12 +50,12 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Добавляем зависимости в PATH
-ENV PATH=/root/.local/bin:$PATH
+# Добавляем зависимости в PATH (under /app for appuser access)
+ENV PATH=/app/.local/bin:$PATH
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Создаем непривилегированного пользователя
+# Создаем непривилегированного пользователя; /app (code + .local) owned by appuser
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
