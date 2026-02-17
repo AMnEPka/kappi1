@@ -25,6 +25,8 @@ SSH_CONNECT_TIMEOUT = int(os.environ.get('SSH_CONNECT_TIMEOUT', '10'))
 SSH_COMMAND_TIMEOUT = int(os.environ.get('SSH_COMMAND_TIMEOUT', '60'))
 SSH_RETRY_ATTEMPTS = int(os.environ.get('SSH_RETRY_ATTEMPTS', '3'))
 WINRM_TIMEOUT = int(os.environ.get('WINRM_TIMEOUT', '30'))
+# pywinrm requires read_timeout_sec > operation_timeout_sec (both non-zero)
+WINRM_READ_TIMEOUT = int(os.environ.get('WINRM_READ_TIMEOUT', str(WINRM_TIMEOUT + 15)))
 
 
 def _load_private_key(key_data: str):
@@ -219,13 +221,25 @@ def _check_sudo_access_linux(host: Host) -> Tuple[bool, str]:
 
 
 def _create_winrm_session(host: Host) -> winrm.Session:
-    """Create WinRM session with configured timeout"""
+    """Create WinRM session with configured timeout.
+    Username for domain auth must be DOMAIN\\user (e.g. test\\user). Same as PowerShell Get-Credential 'test\\user'.
+    """
+    endpoint = f"http://{host.hostname}:{host.port}"
+    if not endpoint.rstrip("/").endswith("/wsman"):
+        endpoint = endpoint.rstrip("/") + "/wsman"
+    logger.info(f"WinRM session: endpoint={endpoint}, user={((host.username or '').strip())[:20]}...")
+    password = decrypt_password(host.password) if host.password else ""
+    # Ensure username is passed as-is (DOMAIN\user); avoid stripping backslash
+    username = (host.username or "").strip()
+    # read_timeout_sec must exceed operation_timeout_sec (pywinrm requirement)
+    read_timeout = max(WINRM_READ_TIMEOUT, WINRM_TIMEOUT + 1)
     return winrm.Session(
-        f"http://{host.hostname}:{host.port}",
-        auth=(host.username, decrypt_password(host.password) if host.password else ""),
-        transport='ntlm',
-        read_timeout_sec=WINRM_TIMEOUT,
-        operation_timeout_sec=WINRM_TIMEOUT
+        endpoint,
+        auth=(username, password),
+        transport="ntlm",
+        read_timeout_sec=read_timeout,
+        operation_timeout_sec=WINRM_TIMEOUT,
+        server_cert_validation="ignore",
     )
 
 
@@ -256,14 +270,19 @@ def _check_admin_access(host: Host) -> Tuple[bool, str]:
 def _check_winrm_login(host: Host) -> Tuple[bool, str]:
     """Check WinRM login credentials with retry logic"""
     try:
+        logger.info(f"WinRM login: creating session for {host.hostname}")
         session = _create_winrm_session(host)
+        logger.info(f"WinRM login: running echo test on {host.hostname}")
         r = session.run_cmd("echo test")
+        logger.info(f"WinRM login: run_cmd status_code={r.status_code} for {host.hostname}")
         if r.status_code == 0:
             return True, "WinRM login OK"
         else:
-            return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
+            err = (r.std_err or b"").decode("utf-8", errors="ignore") or str(r.status_code)
+            return False, f"Неверные учётные данные: {err}"
     except Exception as e:
-        return False, "Неверные учётные данные: Ошибка при входе (логин/пароль/SSH-ключ)"
+        logger.warning(f"WinRM login exception for {host.hostname}: {e}")
+        return False, f"Неверные учётные данные: {getattr(e, 'message', str(e))}"
 
 
 @retry(
@@ -272,21 +291,22 @@ def _check_winrm_login(host: Host) -> Tuple[bool, str]:
     retry=retry_if_exception_type((socket.error, socket.timeout)),
     reraise=True
 )
-def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
+def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str, int]:
     """
     Connect to host via SSH and execute command with retry logic.
     Uses ssh_connection context manager for automatic cleanup.
-    
-    Returns: (success, output, error)
+
+    Returns: (success, output, error, exit_code)
+    On connection/execution exception, exit_code is 1 (generic failure).
     """
     try:
         with ssh_connection(host) as ssh:
             stdin, stdout, stderr = ssh.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
             exit_code = stdout.channel.recv_exit_status()
-            
+
             output = stdout.read().decode('utf-8', errors='ignore')
             error = stderr.read().decode('utf-8', errors='ignore') if exit_code != 0 else ""
-            
+
             # Логируем команду и результат
             log_ssh_command(
                 host=host,
@@ -296,8 +316,8 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
                 exit_code=exit_code,
                 success=(exit_code == 0)
             )
-            
-            return exit_code == 0, output, error
+
+            return exit_code == 0, output, error, exit_code
     except paramiko.AuthenticationException as e:
         error_msg = f"Authentication failed: {str(e)}"
         log_ssh_command(
@@ -306,7 +326,7 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
             stderr=error_msg,
             success=False
         )
-        return False, "", error_msg
+        return False, "", error_msg, 1
     except paramiko.SSHException as e:
         error_msg = f"SSH error: {str(e)}"
         log_ssh_command(
@@ -315,7 +335,7 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
             stderr=error_msg,
             success=False
         )
-        return False, "", error_msg
+        return False, "", error_msg, 1
     except Exception as e:
         error_msg = str(e)
         log_ssh_command(
@@ -324,7 +344,7 @@ def _ssh_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str]:
             stderr=error_msg,
             success=False
         )
-        return False, "", error_msg
+        return False, "", error_msg, 1
 
 
 @retry(
@@ -352,6 +372,52 @@ def _winrm_connect_and_execute(host: Host, command: str) -> Tuple[bool, str, str
         return False, "", str(e)
 
 
+def _execute_profile_linux(host: Host, script_content: str) -> Tuple[bool, str, str, int]:
+    """
+    Execute IB profile script on Linux: write content to temp file and run via sudo bash.
+    Returns: (success, stdout, stderr, exit_code)
+    """
+    import base64
+    import uuid as _uuid
+    if not script_content:
+        return True, "", "", 0
+    try:
+        content_b64 = base64.b64encode(script_content.encode("utf-8")).decode("ascii").replace("\n", "")
+        tmp_name = f"/tmp/ib_profile_{_uuid.uuid4().hex[:12]}.sh"
+        # Write via base64 decode, chmod, sudo bash, then rm; capture exit code
+        cmd = (
+            f"echo '{content_b64}' | base64 -d > {tmp_name} && "
+            f"chmod +x {tmp_name} && "
+            f"sudo -n bash {tmp_name}; rc=$?; rm -f {tmp_name}; exit $rc"
+        )
+        success, output, error, exit_code = _ssh_connect_and_execute(host, cmd)
+        if not success and not error and output:
+            error = output
+        return success, output or "", error or "", exit_code
+    except Exception as e:
+        return False, "", str(e), 1
+
+
+def _execute_profile_windows(host: Host, script_content: str) -> Tuple[bool, str, str, int]:
+    """
+    Execute IB profile script on Windows via WinRM PowerShell.
+    Returns: (success, stdout, stderr, exit_code)
+    """
+    try:
+        session = _create_winrm_session(host)
+        r = session.run_ps(script_content or "")
+        success = r.status_code == 0
+        out = r.std_out
+        err = r.std_err or b""
+        if isinstance(out, bytes):
+            out = out.decode("utf-8", errors="ignore")
+        if isinstance(err, bytes):
+            err = err.decode("utf-8", errors="ignore")
+        return success, out or "", err or "", r.status_code
+    except Exception as e:
+        return False, "", str(e), 1
+
+
 async def execute_command(host: Host, command: str) -> ExecutionResult:
     """
     Execute command on host (SSH for Linux, WinRM for Windows)
@@ -360,7 +426,7 @@ async def execute_command(host: Host, command: str) -> ExecutionResult:
     
     try:
         if host.connection_type == "ssh":
-            success, output, error = await loop.run_in_executor(
+            success, output, error, _ = await loop.run_in_executor(
                 None, _ssh_connect_and_execute, host, command
             )
         elif host.connection_type == "winrm":

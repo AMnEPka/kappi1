@@ -1,0 +1,23 @@
+# Frontend Dockerfile for SSH Script Runner
+FROM node:20-alpine
+
+WORKDIR /app/frontend
+
+# Устанавливаем зависимости для сборки
+RUN apk add --no-cache python3 make g++
+
+# Копируем package файлы отдельно для кэширования
+COPY package*.json ./
+
+# Устанавливаем зависимости с кэшированием
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --legacy-peer-deps
+
+# Копируем остальной код
+COPY . .
+
+EXPOSE 415
+
+ENV NODE_ENV=development
+
+CMD ["sh", "-c", "PORT=415 HOST=0.0.0.0 npm start"]

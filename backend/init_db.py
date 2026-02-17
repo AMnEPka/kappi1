@@ -66,7 +66,9 @@ async def init_database():
                     'hosts_create', 'hosts_edit_all', 'hosts_delete_all',
                     'users_manage', 'roles_manage',
                     'results_view_all', 'results_export_all',
-                    'projects_create', 'projects_execute'
+                    'projects_create', 'projects_execute',
+                    'is_catalog_view', 'is_catalog_edit', 'is_catalog_manage_schema',
+                    'ib_profiles_view', 'ib_profiles_manage', 'ib_profiles_apply'
                 ]),
                 "description": "Полный доступ ко всем функциям системы",
                 "created_at": datetime.now(timezone.utc).isoformat(),

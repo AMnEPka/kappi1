@@ -14,6 +14,8 @@ import {
   Home,
   ChevronLeft,
   Bot,
+  Library,
+  ShieldCheck,
 } from "lucide-react";
 import { Button, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui/md3';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,9 +27,12 @@ export const MainLayout = ({ children }) => {
   const navigate = useNavigate();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const showScheduler = isAdmin || hasPermission('projects_execute');
-  
+  const showCatalog = hasPermission('is_catalog_view');
+  const showIbProfiles = hasPermission('ib_profiles_view') || hasPermission('ib_profiles_apply');
   const isActive = (path) => {
     if (path === '/hosts') return location.pathname === '/hosts';
+    if (path === '/is-catalog') return location.pathname === '/is-catalog';
+    if (path === '/ib-profiles') return location.pathname.startsWith('/ib-profiles');
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
@@ -120,6 +125,41 @@ export const MainLayout = ({ children }) => {
                 {isSidebarExpanded && "Планировщик"}
               </Button>
             </Link>
+          )}
+
+          {showCatalog && (
+            <Link to="/is-catalog" className="md3-sidebar-item-link">
+              <Button
+                variant={isActive('/is-catalog') ? "tonal" : "text"}
+                className={`md3-sidebar-button ${isActive('/is-catalog') ? 'md3-sidebar-button-active' : ''}`}
+              >
+                <Library className="md3-icon" />
+                {isSidebarExpanded && "Каталог ИС/ИР"}
+              </Button>
+            </Link>
+          )}
+
+          {showIbProfiles && (
+            <>
+              <Link to="/ib-profiles" className="md3-sidebar-item-link">
+                <Button
+                  variant={isActive('/ib-profiles') && location.pathname === '/ib-profiles' ? "tonal" : "text"}
+                  className={`md3-sidebar-button ${isActive('/ib-profiles') && location.pathname === '/ib-profiles' ? 'md3-sidebar-button-active' : ''}`}
+                >
+                  <ShieldCheck className="md3-icon" />
+                  {isSidebarExpanded && "Профили ИБ"}
+                </Button>
+              </Link>
+              <Link to="/ib-profiles/apply" className="md3-sidebar-item-link">
+                <Button
+                  variant={location.pathname === '/ib-profiles/apply' ? "tonal" : "text"}
+                  className={`md3-sidebar-button ${location.pathname === '/ib-profiles/apply' ? 'md3-sidebar-button-active' : ''}`}
+                >
+                  <ShieldCheck className="md3-icon" />
+                  {isSidebarExpanded && "Применение профилей ИБ"}
+                </Button>
+              </Link>
+            </>
           )}
 
           {/* Admin Section Separator */}
@@ -224,6 +264,9 @@ export const MainLayout = ({ children }) => {
 const getPageTitle = (pathname) => {
   const titles = {
     '/': 'Проекты',
+    '/is-catalog': 'Каталог ИС/ИР',
+    '/ib-profiles': 'Перечень профилей ИБ',
+    '/ib-profiles/apply': 'Применение профилей ИБ',
     '/hosts': 'Хосты',
     '/scripts': 'Проверки',
     '/scheduler': 'Планировщик',

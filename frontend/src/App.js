@@ -15,6 +15,9 @@ const ScriptsPage = lazy(() => import("@/pages/ScriptsPage"));
 const ExecutePage = lazy(() => import("@/pages/ExecutePage"));
 const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
 const AITestPage = lazy(() => import("@/pages/AITestPage"));
+const IsCatalogPage = lazy(() => import("@/pages/IsCatalogPage"));
+const SecurityProfilesPage = lazy(() => import("@/pages/SecurityProfilesPage"));
+const ApplyProfilePage = lazy(() => import("@/pages/ApplyProfilePage"));
 
 // Page wrappers (pages that need router props)
 import {
@@ -60,6 +63,9 @@ function App() {
                             <Route path="/:projectId/results" element={<ProjectResultsPageWrapper />} />
                             
                             {/* Simple pages */}
+                            <Route path="/is-catalog" element={<IsCatalogPage />} />
+                            <Route path="/ib-profiles" element={<SecurityProfilesPage />} />
+                            <Route path="/ib-profiles/apply" element={<ApplyProfilePage />} />
                             <Route path="/hosts" element={<HostsPage />} />
                             <Route path="/scripts" element={<ScriptsPage />} />
                             <Route path="/execute" element={<ExecutePage />} />

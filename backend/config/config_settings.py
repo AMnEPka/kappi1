@@ -27,10 +27,11 @@ ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', '')
 # JWT Configuration
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production-please-use-strong-random-key')
 JWT_ALGORITHM = "HS256"
-# Access token expiration time in minutes (default: 30 minutes)
+# Access token expiration time in minutes (default: 120 minutes / 2 hours)
 # Set via JWT_ACCESS_TOKEN_EXPIRE_MINUTES environment variable
-# Note: Frontend automatically refreshes token 1 minute before expiration
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRE_MINUTES', '30'))
+# Note: Frontend automatically refreshes token 5 minutes before expiration
+#       and also refreshes on tab visibility change (return from background)
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRE_MINUTES', '120'))
 JWT_REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get('JWT_REFRESH_TOKEN_EXPIRE_DAYS', '30'))
 # Legacy support
 JWT_ACCESS_TOKEN_EXPIRE_HOURS = 24
@@ -72,7 +73,13 @@ PERMISSIONS = {
     'projects_create': 'Создание проектов',
     'projects_execute': 'Выполнение проектов',
     'scheduler_access': 'Доступ к планировщику заданий',
-    'logs_access': 'Доступ к логам'
+    'logs_access': 'Доступ к логам',
+    'is_catalog_view': 'Просмотр каталога ИС',
+    'is_catalog_edit': 'Редактирование каталога ИС',
+    'is_catalog_manage_schema': 'Управление полями каталога ИС (схема)',
+    'ib_profiles_view': 'Просмотр профилей ИБ',
+    'ib_profiles_manage': 'Управление профилями ИБ (создание, редактирование, удаление, экспорт)',
+    'ib_profiles_apply': 'Применение профилей ИБ на хосты',
 }
 
 # ============================================================================
@@ -99,6 +106,16 @@ PERMISSION_GROUPS = {
     'Проекты': [
         'projects_create',
         'projects_execute'
+    ],
+    'Каталог ИС': [
+        'is_catalog_view',
+        'is_catalog_edit',
+        'is_catalog_manage_schema'
+    ],
+    'Профили ИБ': [
+        'ib_profiles_view',
+        'ib_profiles_manage',
+        'ib_profiles_apply'
     ],
     'Результаты': [
         'results_view_all',

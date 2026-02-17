@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { api, getAccessToken } from '@/config/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,11 +22,12 @@ const INITIAL_PROJECT_DATA = {
   hostsList: []
 };
 
-export const WizardProvider = ({ children, onNavigate }) => {
+export const WizardProvider = ({ children, onNavigate, initialPreset }) => {
   const [step, setStep] = useState(1);
   const [projectData, setProjectData] = useState(INITIAL_PROJECT_DATA);
   const [loading, setLoading] = useState(false);
-  
+  const appliedPresetRef = useRef(false);
+
   // Reference data
   const [hosts, setHosts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -35,20 +36,40 @@ export const WizardProvider = ({ children, onNavigate }) => {
   const [users, setUsers] = useState([]);
   const [checkGroups, setCheckGroups] = useState([]);
   const [systemCheckTemplates, setSystemCheckTemplates] = useState({});
-  
+
   const { user: currentUser } = useAuth();
 
   // Load initial data
   useEffect(() => {
     const loadData = async () => {
       if (!currentUser) return;
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
       await fetchData();
     };
-    
+
     loadData();
   }, [currentUser]);
+
+  // Применить пресет из каталога ИС (хосты на шаге 2): один раз после загрузки hosts
+  useEffect(() => {
+    if (
+      !initialPreset?.fromIsCatalog ||
+      !initialPreset.hostIds?.length ||
+      !hosts.length ||
+      appliedPresetRef.current
+    ) {
+      return;
+    }
+    appliedPresetRef.current = true;
+    const hostIdsSet = new Set(initialPreset.hostIds);
+    const preselectedHosts = hosts.filter((h) => hostIdsSet.has(h.id));
+    setProjectData((prev) => ({
+      ...prev,
+      name: initialPreset.projectName || prev.name,
+      hostsList: preselectedHosts
+    }));
+  }, [hosts, initialPreset]);
 
   const fetchData = useCallback(async () => {
     try {
