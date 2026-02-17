@@ -459,111 +459,44 @@ async def execute_command(host: Host, command: str) -> ExecutionResult:
         )
 
 
-async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, 
-                                        reference_data: Optional[str] = None, script_id: Optional[str] = None, 
-                                        script_name: Optional[str] = None) -> ExecutionResult:
+async def run_processor_on_output(
+    host_id: str,
+    host_name: str,
+    raw_output: str,
+    processor_script: Optional[str],
+    reference_data: Optional[str],
+    script_id: str,
+    script_name: str,
+) -> ExecutionResult:
     """
-    Execute check command and process results with optional reference data.
-    
-    Two-stage process:
-    1. Execute command on remote host - detect technical errors (file not found, permission denied, etc.)
-    2. Run processor script locally - analyze output for check pass/fail
-    
-    Status mapping:
-    - "Ошибка" - Technical errors (1x, 2x, 3x, 5x codes)
-    - "Не пройдена" - Check failures (4x codes) - config issues found
-    - "Пройдена" - Check passed
-    - "Оператор" - Manual review required
+    Run processor script locally on pre-captured command output.
+    Used by online execution (after SSH/WinRM) and by offline result import.
     """
     import subprocess
-    # re is imported at module level, use it directly
-    
-    # Step 1: Execute the main command on remote host
-    main_result = await execute_command(host, command)
-    
     if not processor_script:
-        # No processor - return as is
-        return main_result
-    
-    # Step 1.5: Check for critical technical errors in command execution
-    # Only block processor script execution for critical errors (command not found, permission denied, etc.)
-    # For expected failures (like "group not found"), let the processor script handle it
-    if not main_result.success:
-        # Try to detect specific error from command output
-        # Get exit code from the error message if available
-        exit_code = 1  # Default
-        
-        # Detect error type from stderr/output
-        cmd_error_code = detect_command_error(
-            exit_code=exit_code,
-            stdout=main_result.output or "",
-            stderr=main_result.error or ""
+        return ExecutionResult(
+            host_id=host_id,
+            host_name=host_name,
+            success=True,
+            output=raw_output or "",
+            error=None,
         )
-        
-        # Only block processor execution for critical errors (not for expected failures)
-        # Critical errors: command not found (31), permission denied (13, 22), file not found for critical files (21)
-        # Expected failures: group not found, user not found, etc. - let processor script handle these
-        if cmd_error_code and cmd_error_code in [11, 12, 13, 21, 22, 31, 32, 33, 34]:
-            # Critical technical error - don't run processor script
-            error_info = get_error_description(cmd_error_code)
-            error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
-            
-            result_output = main_result.output
-            
-            return ExecutionResult(
-                host_id=host.id,
-                host_name=host.name,
-                success=False,
-                output=result_output,
-                error=main_result.error,
-                check_status="Ошибка",
-                error_code=cmd_error_code,
-                error_description=error_description
-            )
-        
-        # For other errors (including expected failures like "group not found"),
-        # continue to processor script - it will handle the output appropriately
-        # This allows scripts to check for "group not found" and treat it as success
-    
-    # Step 2: Run processor script LOCALLY with main command output as input
     try:
         # Normalize line endings: CRLF -> LF (fixes Windows/Linux compatibility issues)
-        # This is critical when scripts are created on Windows but run on Linux
         normalized_script = processor_script.replace('\r\n', '\n').replace('\r', '\n')
-        normalized_output = (main_result.output or '').replace('\r\n', '\n').replace('\r', '\n')
+        normalized_output = (raw_output or '').replace('\r\n', '\n').replace('\r', '\n')
         normalized_reference = (reference_data or '').replace('\r\n', '\n').replace('\r', '\n')
         
-        # Detailed logging for debugging
-        script_preview = normalized_script[:500] + ('...' if len(normalized_script) > 500 else '')
         script_lines = normalized_script.split('\n')
-        logger.info(f"Processor script preview (first 500 chars): {repr(script_preview)}")
         logger.info(f"Processor script total length: {len(normalized_script)} chars, {len(script_lines)} lines")
-        logger.info(f"CHECK_OUTPUT size: {len(normalized_output)} chars, {len(normalized_output.split(chr(10)))} lines")
-        logger.info(f"ETALON_INPUT size: {len(normalized_reference)} chars, {len(normalized_reference.split(chr(10)))} lines")
-        logger.info(f"First 3 lines of script: {script_lines[:3]}")
+        logger.info(f"Executing processor script locally for {host_name}, output size: {len(normalized_output)} bytes")
         
-        # Set environment variables for the local process
         env = os.environ.copy()
         env['CHECK_OUTPUT'] = normalized_output
         env['ETALON_INPUT'] = normalized_reference
         
-        # Log environment variable sizes (for debugging)
-        logger.info(f"Environment CHECK_OUTPUT size: {len(env.get('CHECK_OUTPUT', ''))} chars")
-        logger.info(f"Environment ETALON_INPUT size: {len(env.get('ETALON_INPUT', ''))} chars")
-        
-        logger.info(f"Executing processor script locally for {host.name}, output size: {len(normalized_output)} bytes")
-        
-        # Check if bash is available
-        try:
-            bash_check = subprocess.run(['bash', '--version'], capture_output=True, text=True, timeout=5)
-            logger.info(f"Bash version check: {bash_check.returncode}, stdout: {bash_check.stdout[:100] if bash_check.stdout else 'N/A'}")
-        except Exception as e:
-            logger.error(f"Failed to check bash availability: {e}")
-        
-        # Execute processor script locally using bash with verbose error reporting
-        # Try to validate script syntax first
         syntax_check = subprocess.run(
-            ['bash', '-n'],  # -n = check syntax without executing
+            ['bash', '-n'],
             input=normalized_script,
             capture_output=True,
             text=True,
@@ -571,14 +504,6 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         )
         if syntax_check.returncode != 0:
             logger.error(f"Bash syntax error in script: {syntax_check.stderr}")
-            logger.error(f"Script content (first 1000 chars): {repr(normalized_script[:1000])}")
-            # Log full script for debugging
-            logger.error(f"Full script:\n{normalized_script}")
-        
-        # Execute processor script locally using bash
-        # TEMPORARY: Use bash -x for debugging to see what's being executed
-        # This will show all commands being executed
-        logger.info("Executing script with bash -x for debugging")
         result = subprocess.run(
             ['bash', '-x', '-c', normalized_script],
             env=env,
@@ -587,7 +512,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
             timeout=30
         )
         
-        logger.info(f"Local processor execution completed for {host.name}, return code: {result.returncode}")
+        logger.info(f"Local processor execution completed for {host_name}, return code: {result.returncode}")
         logger.info(f"STDOUT length: {len(result.stdout)} chars, STDERR length: {len(result.stderr)} chars")
         
         # Extract actual exit code from stderr if bash -x was used
@@ -638,9 +563,12 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                 signal_num = result.returncode - 128
                 logger.error(f"Script terminated by signal {signal_num} (exit code {result.returncode})")
         
-        # Log processor script execution (use normalized data for logging)
+        class _LogHost:
+            name = host_name
+            hostname = "(offline)"
+            port = 0
         log_processor_script(
-            host=host,
+            host=_LogHost(),
             script_id=script_id or "",
             script_name=script_name or "",
             processor_script=normalized_script,
@@ -706,7 +634,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                     else:
                         # If no code found but status is "Не пройдена", try to infer from context
                         # This is a fallback - ideally scripts should return error codes
-                        logger.info(f"Processor script returned 'Не пройдена' without error code for {host.name}")
+                        logger.info(f"Processor script returned 'Не пройдена' without error code for {host_name}")
             elif 'оператор' in output_lower:
                 check_status = 'Оператор'
             elif result.returncode == 0:
@@ -728,7 +656,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                     error_info = get_error_description(error_code)
                     error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
                     check_status = "Ошибка"
-                    logger.warning(f"Processor script error for {host.name}, exit code: {result.returncode}, stderr: {stderr[:200]}")
+                    logger.warning(f"Processor script error for {host_name}, exit code: {result.returncode}, stderr: {stderr[:200]}")
                 else:
                     # Non-zero exit without critical error = check failed (e.g., grep returned 1)
                     check_status = 'Не пройдена'
@@ -738,7 +666,7 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                         error_code = extracted_code
                         error_info = get_error_description(error_code)
                         error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
-                    logger.info(f"Processor script returned exit code {result.returncode} for {host.name}, treating as check failure")
+                    logger.info(f"Processor script returned exit code {result.returncode} for {host_name}, treating as check failure")
         
         # If status is "Не пройдена" but no error code was found, add a generic message
         if check_status == "Не пройдена" and not error_code:
@@ -756,35 +684,26 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                 else:
                     # No reference data - generic failure
                     error_description = "Конфигурация: Проверка не пройдена - Результат проверки не соответствует требованиям"
-                logger.info(f"Processor script returned 'Не пройдена' without error code for {host.name}, reference_data used: {bool(reference_data and reference_data.strip())}")
+                logger.info(f"Processor script returned 'Не пройдена' without error code for {host_name}, reference_data used: {bool(reference_data and reference_data.strip())}")
         
         # Build result message
         status_line = check_status or 'Не определён'
         if error_description:
             status_line = f"{check_status}\n{error_description}"
         
-        result_output = main_result.output
+        result_output = raw_output
         
         # Add stderr info if there was an error (for debugging)
         if stderr and check_status == "Ошибка":
             result_output += f"\n\n=== Ошибка скрипта-обработчика ===\n{stderr}"
         
         # Extract actual_data if reference_data was provided
-        # Skip extraction if error code indicates line not found (41) or commented (42)
-        # In these cases, there's nothing to compare with reference data
         actual_data = None
         if reference_data and reference_data.strip() and error_code not in [41, 42]:
-            # Try to extract from processor script output (if script outputs ACTUAL_DATA:)
             if 'ACTUAL_DATA:' in result.stdout:
                 actual_data = result.stdout.split('ACTUAL_DATA:')[1].split('\n')[0].strip()
             else:
-                # Try to extract from command output by parsing config files
-                # Look for common patterns like "param = value" or "param=value"
-                # re is imported at module level - use it directly
-                import re as re_module  # Ensure re is available in this scope
-                
-                # Parse reference_data to understand what we're looking for
-                # Handle formats: "user1,user2", "user1\nuser2", "user1 user2"
+                import re as re_module
                 ref_items = []
                 if ',' in reference_data:
                     ref_items = [item.strip() for item in reference_data.split(',') if item.strip()]
@@ -792,10 +711,8 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                     ref_items = [item.strip() for item in reference_data.split('\n') if item.strip()]
                 else:
                     ref_items = [item.strip() for item in reference_data.split() if item.strip()]
-                
-                # First, try to find uncommented lines
                 uncommented_found = False
-                for line in main_result.output.split('\n'):
+                for line in raw_output.split('\n'):
                     line_stripped = line.strip()
                     if not line_stripped:
                         continue
@@ -827,9 +744,8 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                                     uncommented_found = True
                                     break
                 
-                # If not found in uncommented lines, check commented lines
                 if not uncommented_found:
-                    for line in main_result.output.split('\n'):
+                    for line in raw_output.split('\n'):
                         line_stripped = line.strip()
                         if not line_stripped or not line_stripped.startswith('#'):
                             continue
@@ -847,8 +763,8 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
                                     break
         
         return ExecutionResult(
-            host_id=host.id,
-            host_name=host.name,
+            host_id=host_id,
+            host_name=host_name,
             success=(check_status == 'Пройдена'),
             output=result_output,
             error=result.stderr if result.stderr else None,
@@ -859,27 +775,28 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         )
         
     except subprocess.TimeoutExpired:
-        # Processor script timed out
         error_code = 34
         error_info = get_error_description(error_code)
         error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
-        
+        class _LogHostT:
+            name = host_name
+            hostname = "(offline)"
+            port = 0
         log_processor_script(
-            host=host,
+            host=_LogHostT(),
             script_id=script_id or "",
             script_name=script_name or "",
             processor_script=processor_script,
-            input_data=main_result.output,
+            input_data=raw_output,
             reference_data=reference_data or "",
             stderr="Таймаут выполнения скрипта-обработчика",
             success=False
         )
-        
         return ExecutionResult(
-            host_id=host.id,
-            host_name=host.name,
+            host_id=host_id,
+            host_name=host_name,
             success=False,
-            output=main_result.output,
+            output=raw_output,
             error="Таймаут выполнения скрипта-обработчика",
             check_status="Ошибка",
             error_code=error_code,
@@ -887,32 +804,75 @@ async def execute_check_with_processor(host: Host, command: str, processor_scrip
         )
         
     except Exception as e:
-        # Log processor script error
+        class _LogHostE:
+            name = host_name
+            hostname = "(offline)"
+            port = 0
         log_processor_script(
-            host=host,
+            host=_LogHostE(),
             script_id=script_id or "",
             script_name=script_name or "",
             processor_script=processor_script,
-            input_data=main_result.output,
+            input_data=raw_output,
             reference_data=reference_data or "",
             stderr=f"Ошибка обработчика: {str(e)}",
             success=False
         )
-        
         error_code = 50
         error_info = get_error_description(error_code)
         error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
-        
         return ExecutionResult(
-            host_id=host.id,
-            host_name=host.name,
+            host_id=host_id,
+            host_name=host_name,
             success=False,
-            output=main_result.output,
+            output=raw_output,
             error=f"Ошибка обработчика: {str(e)}",
             check_status="Ошибка",
             error_code=error_code,
             error_description=error_description
         )
+
+
+async def execute_check_with_processor(host: Host, command: str, processor_script: Optional[str] = None, 
+                                        reference_data: Optional[str] = None, script_id: Optional[str] = None, 
+                                        script_name: Optional[str] = None) -> ExecutionResult:
+    """
+    Execute check command and process results with optional reference data.
+    Two-stage: (1) execute command on remote host, (2) run processor script locally.
+    """
+    main_result = await execute_command(host, command)
+    if not processor_script:
+        return main_result
+    if not main_result.success:
+        exit_code = 1
+        cmd_error_code = detect_command_error(
+            exit_code=exit_code,
+            stdout=main_result.output or "",
+            stderr=main_result.error or ""
+        )
+        if cmd_error_code and cmd_error_code in [11, 12, 13, 21, 22, 31, 32, 33, 34]:
+            error_info = get_error_description(cmd_error_code)
+            error_description = f"{error_info['category']}: {error_info['error']} - {error_info['description']}"
+            return ExecutionResult(
+                host_id=host.id,
+                host_name=host.name,
+                success=False,
+                output=main_result.output or "",
+                error=main_result.error,
+                check_status="Ошибка",
+                error_code=cmd_error_code,
+                error_description=error_description
+            )
+    return await run_processor_on_output(
+        host.id,
+        host.name,
+        main_result.output or "",
+        processor_script,
+        reference_data,
+        script_id or "",
+        script_name or "",
+    )
+
 
 # Keep for backward compatibility
 def _check_ssh_login_original(host: Host) -> tuple[bool, str]:

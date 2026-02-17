@@ -54,7 +54,8 @@ from models.execution_models import (
     SchedulerJobUpdate,
     SchedulerRun,
     ExecuteProjectRequest,
-    ExecuteRequest
+    ExecuteRequest,
+    OfflineSession,
 )
 
 # Audit models
@@ -107,6 +108,7 @@ __all__ = [
     "SchedulerRun",
     "ExecuteProjectRequest",
     "ExecuteRequest",
+    "OfflineSession",
     
     # Audit models
     "AuditLog"

@@ -128,6 +128,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                     {sessions.map((session, index) => (
                       <SelectItem key={session.session_id} value={session.session_id}>
                         {index === 0 ? '🆕 ' : ''}
+                        {session.is_offline ? '(офлайн) ' : ''}
                         {formatDate(session.executed_at)} 
                         {' - '}
                         Пройдено: {session.passed_count}/{session.total_checks}. 

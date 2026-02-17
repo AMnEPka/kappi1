@@ -104,6 +104,12 @@ async def ensure_indexes():
         await db.ib_profile_applications.create_index("session_id")
         await db.ib_profile_apply_sessions.create_index("session_id", unique=True)
 
+        # Offline check sessions
+        await db.offline_sessions.create_index("project_id")
+        await db.offline_sessions.create_index("execution_session_id", unique=True)
+        await db.offline_sessions.create_index("created_by")
+        await db.offline_sessions.create_index([("created_at", -1)])
+
         logger.info("✅ MongoDB indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create MongoDB indexes: {e}")
