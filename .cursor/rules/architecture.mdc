@@ -1,0 +1,129 @@
+---
+description: System architecture — module relationships, data flow, design patterns
+alwaysApply: true
+---
+
+# Architecture
+
+## High-Level Structure
+
+```
+┌─────────────────────────────────────────────────────┐
+│                     nginx (reverse proxy)            │
+│              frontend :415 ─── backend :435          │
+└─────────────────────────────────────────────────────┘
+
+┌── Frontend (React 19) ──────────────────────────────┐
+│  App.js (Router + AuthProvider + ThemeProvider)       │
+│  ├─ pages/            17+ lazy-loaded pages          │
+│  ├─ components/ui/    shadcn/ui + Radix + MD3        │
+│  ├─ hooks/            useApiLoader, usePermissions    │
+│  ├─ contexts/         AuthContext, WizardContext      │
+│  └─ config/api.js     Axios + JWT auto-refresh       │
+└──────────────────────────────────────────────────────┘
+        │  REST + SSE (Bearer JWT)
+        ▼
+┌── Backend (FastAPI) ─────────────────────────────────┐
+│  server.py (app, CORS, rate-limit, startup)          │
+│  ├─ api/              15 router modules → /api       │
+│  ├─ services/         Business logic layer           │
+│  ├─ models/           Pydantic domain models         │
+│  ├─ config/           Settings, DB, security         │
+│  ├─ utils/            DB helpers, audit, error codes │
+│  └─ scheduler/        Background job worker          │
+└──────────────────────────────────────────────────────┘
+        │  Motor (async)
+        ▼
+┌── MongoDB 6.0 ───────────────────────────────────────┐
+│  Collections: users, hosts, projects, project_tasks,  │
+│  executions, scripts, categories, systems, roles,     │
+│  scheduler_jobs, audit_logs, is_catalog, ib_profiles  │
+└──────────────────────────────────────────────────────┘
+        ▲
+        │  Paramiko (SSH) / pywinrm (WinRM)
+┌── Remote Hosts ──────────────────────────────────────┐
+│  Linux (SSH :22)  │  Windows (WinRM :5985/5986)      │
+└──────────────────────────────────────────────────────┘
+```
+
+## Backend Layering
+
+```
+Request → api/ (routes, validation, auth) → services/ (logic) → db (Motor) / SSH / WinRM
+                                                 ↑
+                                          models/ (Pydantic)
+                                          config/ (settings, security)
+                                          utils/  (helpers)
+```
+
+- **api/** — HTTP handlers. Each file = one domain (auth, hosts, projects…). Handles request parsing, permission checks via `require_permission()`, delegates to services.
+- **services/** — Core logic: execution engine, scheduler, offline script generation, IB profile application. No direct HTTP concerns.
+- **models/** — Pydantic BaseModel classes. Used for request/response validation and DB document shaping.
+- **config/** — Centralized settings (`config_settings.py`), DB connection (`config_database.py`), JWT/encryption (`config_security.py`), rate limiting (`config_rate_limit.py`). All re-exported from `config_init.py`.
+- **utils/** — Stateless helpers: `db_utils` (prepare/parse Mongo docs), `audit_utils` (async audit logging), `error_codes` (execution error classification).
+- **scheduler/** — Background worker polling `scheduler_jobs` collection, calculating next run times, triggering project executions.
+
+## Frontend Layering
+
+```
+App.js (Router)
+  └─ MainLayout (sidebar + appbar)
+       └─ Page component (lazy-loaded)
+            ├─ uses hooks (useApiLoader, usePermissions, useDialog)
+            ├─ calls api.get/post/put/delete (Axios)
+            ├─ renders UI components (shadcn/ui)
+            └─ may use Context (AuthContext, WizardContext)
+```
+
+- No separate service/repository layer — API calls are made directly in pages/hooks via the shared Axios instance.
+- State: React Context (auth, theme, wizard) + local `useState`. No Redux/Zustand.
+- Real-time: SSE via `EventSource` for execution logs and profile application.
+
+## Key Design Patterns
+
+| Pattern | Where | Notes |
+|---------|-------|-------|
+| Router aggregation | `api/__init__.py` | All routers → single `api_router` with `/api` prefix |
+| Permission guard | `require_permission()` / `has_permission()` | Called in every endpoint; 20+ granular permissions |
+| Fernet encryption | Host passwords, SSH keys | Encrypted at rest, decrypted only during execution |
+| SSE streaming | Execution, IB apply | `StreamingResponse` with `async generator` |
+| Lazy loading | Frontend pages | `React.lazy()` + `Suspense` |
+| Context providers | Auth, Theme, Wizard | Wrap app/pages for global state |
+| Dynamic schema | IS Catalog | Schema stored in DB, UI adapts to field definitions |
+| Processor scripts | Script execution | Two-phase: run check → process output via processor |
+
+## Data Flow: Project Execution
+
+```
+1. User clicks "Execute" on ProjectExecutionPage
+2. POST /api/projects/{id}/execute?token=...
+3. Backend creates execution_session_id
+4. For each task (host + scripts):
+   a. Check network access (ping/port)
+   b. Check SSH/WinRM login + sudo
+   c. Execute each script on host
+   d. Run processor script on output
+   e. Save Execution document to MongoDB
+   f. Yield SSE event to frontend
+5. Frontend updates UI in real-time via EventSource
+6. Session complete → results available at /api/executions
+```
+
+## Database Collections
+
+| Collection | Key Fields | Indexes |
+|------------|-----------|---------|
+| `users` | id, username (unique), password_hash, is_admin | username, created_by |
+| `hosts` | id, hostname, port, connection_type, encrypted password/key | hostname, created_by |
+| `categories` | id, name | name |
+| `systems` | id, category_id, name, os_type | category_id |
+| `scripts` | id, system_id, content, processor_script | system_id |
+| `projects` | id, name, status, created_by | name, created_by |
+| `project_tasks` | id, project_id, host_id, system_id, script_ids | project_id |
+| `executions` | id, project_id, execution_session_id, check_status | project_id+session, executed_at |
+| `scheduler_jobs` | id, project_id, job_type, is_active | project_id |
+| `roles` | id, name, permissions[] | name |
+| `audit_logs` | id, event, user_id, created_at | created_at, event, user_id |
+| `is_catalog` | id, dynamic fields per schema | — |
+| `ib_profiles` | id, category_id, system_id, version, status | — |
+| `refresh_tokens` | token_id (unique), user_id, expires_at (TTL) | token_id, TTL |
