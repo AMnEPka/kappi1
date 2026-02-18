@@ -2,11 +2,12 @@
 Offline check: script generation and result upload processing.
 """
 
+import base64
 import json
 import hashlib
 import uuid
 from datetime import datetime, timezone
-from typing import List, Tuple, Optional, Any
+from typing import List, Tuple, Optional
 
 from config.config_init import db, logger
 from models.execution_models import OfflineSession, Execution
@@ -15,6 +16,27 @@ from services.services_execution import run_processor_on_output
 
 # Max output size per check in generated script (1MB)
 OFFLINE_OUTPUT_MAX_BYTES = 1 * 1024 * 1024
+
+
+def _decode_script_content(content: str) -> str:
+    """If content looks like base64 and decodes to a valid shell command, return decoded; else return as-is."""
+    s = (content or "").strip()
+    if not s:
+        return "true"
+    # Heuristic: base64 uses A-Za-z0-9+/= and often has padding; decoded should be printable
+    b64_candidates = s.replace("\n", "").replace("\r", "")
+    if len(b64_candidates) < 20 or not all(c.isalnum() or c in "+/=" for c in b64_candidates):
+        return s
+    try:
+        raw = base64.b64decode(b64_candidates, validate=True)
+        decoded = raw.decode("utf-8", errors="replace")
+        if "\x00" in decoded or not decoded.strip():
+            return s
+        if all(c.isprintable() or c in "\n\r\t" for c in decoded):
+            return decoded.strip()
+    except Exception:
+        pass
+    return s
 
 
 async def generate_offline_script(
@@ -133,18 +155,23 @@ def _generate_bash_script(
     for idx, script in enumerate(scripts_list):
         sid = script.get("id", "")
         name = (script.get("name") or "").replace('"', '\\"')
-        content = (script.get("content") or "").strip()
-        if not content:
+        content = _decode_script_content(script.get("content") or "")
+        if not content.strip():
             content = "true"
         name_esc = (script.get("name") or "").replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ").replace("'", "'\"'\"'")
         lines.append(f"# --- Check {idx + 1}: {name} ---")
-        lines.append("OUT=$( { " + content + " } 2>&1 ) || true")
+        # Use subshell so multiline commands work; avoid { } (bash requires newline/semicolon before })
+        lines.append("OUT=$(")
+        for cmd_line in content.splitlines():
+            lines.append("  " + cmd_line)
+        lines.append("  2>&1) || true")
         lines.append("EXIT=$?")
         lines.append(f'if [ ${{#OUT}} -gt {OFFLINE_OUTPUT_MAX_BYTES} ]; then OUT="${{OUT:0:{OFFLINE_OUTPUT_MAX_BYTES}}}\\n... (truncated)"; fi')
         lines.append('[ $FIRST -eq 0 ] && echo "," >> "$RESULTS_FILE"')
         lines.append("FIRST=0")
         lines.append('ESC=$(printf "%s" "$OUT" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null)')
-        lines.append('[ -z "$ESC" ] && ESC="\"$(printf "%s" "$OUT" | sed \'s/\\\\/\\\\\\\\/g;s/"/\\\\"/g;s/\t/\\\\t/g;s/\n/\\\\n/g\' | tr -d \'\\n\')\""')
+        # sed: \\n in Python -> \n in output (backslash-n for newline replacement)
+        lines.append(r'[ -z "$ESC" ] && ESC="\"$(printf "%s" "$OUT" | sed \'s/\\/\\\\/g;s/"/\\"/g;s/\t/\\t/g;s/\n/\\n/g\' | tr -d \'\n\')\""')
         lines.append(f'printf \'{{"script_id":"{sid}","script_name":"{name_esc}","exit_code":%s,"output":%s}}\' "$EXIT" "$ESC" >> "$RESULTS_FILE"')
         lines.append("")
     lines.append('echo "]" >> "$RESULTS_FILE"')
@@ -177,8 +204,8 @@ def _generate_powershell_script(
     for idx, script in enumerate(scripts_list):
         sid = script.get("id", "")
         name = (script.get("name") or "").replace('"', '`"')
-        content = (script.get("content") or "").strip()
-        if not content:
+        content = _decode_script_content(script.get("content") or "")
+        if not content.strip():
             content = "Write-Output ok"
         lines.append(f"# --- Check {idx + 1}: {name} ---")
         lines.append("try {")
