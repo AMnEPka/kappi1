@@ -11,7 +11,7 @@ from typing import List, Tuple, Optional
 
 from config.config_init import db, logger
 from models.execution_models import OfflineSession, Execution
-from utils.db_utils import prepare_for_mongo
+from utils.db_utils import prepare_for_mongo, decode_script_from_storage
 from services.services_execution import run_processor_on_output
 
 # Max output size per check in generated script (1MB)
@@ -263,9 +263,10 @@ async def process_offline_upload(
 
     tasks_for_host = await db.project_tasks.find(
         {"project_id": project_id, "host_id": host_id},
-        {"_id": 0, "id": 1, "reference_data": 1, "system_id": 1}
+        {"_id": 0, "id": 1, "reference_data": 1, "system_id": 1, "script_ids": 1}
     ).to_list(10)
     reference_data_map: dict = {}
+    script_to_task: dict = {}  # script_id -> task doc (for project_task_id and system_id per script)
     system_id = ""
     for t in tasks_for_host:
         if t.get("system_id"):
@@ -273,6 +274,8 @@ async def process_offline_upload(
         ref = t.get("reference_data") or {}
         for k, v in ref.items():
             reference_data_map[k] = v
+        for sid in t.get("script_ids") or []:
+            script_to_task[sid] = t
     task_doc = tasks_for_host[0] if tasks_for_host else None
 
     execution_session_id = session_id
@@ -288,11 +291,16 @@ async def process_offline_upload(
         if not script_doc:
             warnings.append(f"Проверка {script_id} не найдена, пропущена")
             continue
-        script_name = script_doc.get("name", script_id)
-        processor_script = script_doc.get("processor_script")
+        # Decode content and processor_script from storage (base64, processor_script_version)
+        script_decoded = decode_script_from_storage(script_doc)
+        script_name = script_decoded.get("name", script_id)
+        processor_script = script_decoded.get("processor_script")
         ref_data = reference_data_map.get(script_id) or ""
         if isinstance(ref_data, dict):
-            ref_data = str(ref_data.get("text", ref_data))
+            ref_data = str(ref_data.get("text", ref_data) or "")
+        ref_data = (ref_data or "").strip() or None
+        task_for_script = script_to_task.get(script_id) or task_doc
+        system_id_for_script = (task_for_script or {}).get("system_id") or system_id
         raw_output = entry.get("output")
         if raw_output is None:
             raw_output = ""
@@ -303,17 +311,17 @@ async def process_offline_upload(
             host_name=host_name,
             raw_output=raw_output,
             processor_script=processor_script,
-            reference_data=ref_data or None,
+            reference_data=ref_data,
             script_id=script_id,
             script_name=script_name,
         )
 
         execution = Execution(
             project_id=project_id,
-            project_task_id=task_doc.get("id") if task_doc else None,
+            project_task_id=task_for_script.get("id") if task_for_script else None,
             execution_session_id=execution_session_id,
             host_id=host_id,
-            system_id=system_id,
+            system_id=system_id_for_script,
             script_id=script_id,
             script_name=script_name,
             success=result.success,
@@ -322,7 +330,7 @@ async def process_offline_upload(
             check_status=result.check_status,
             error_code=result.error_code,
             error_description=result.error_description,
-            reference_data=ref_data or None,
+            reference_data=ref_data,
             actual_data=result.actual_data,
             executed_at=executed_at,
             executed_by=user_id,
