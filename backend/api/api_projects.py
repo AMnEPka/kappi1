@@ -143,7 +143,9 @@ async def delete_project(project_id: str, current_user: User = Depends(get_curre
     await db.project_access.delete_many({"project_id": project_id})
    
     result = await db.projects.delete_one({"id": project_id})
-    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+
     log_audit(
         "22",  # Удаление проекта
         user_id=current_user.id,
