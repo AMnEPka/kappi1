@@ -164,7 +164,7 @@ def _generate_bash_script(
         lines.append("OUT=$(")
         for cmd_line in content.splitlines():
             lines.append("  " + cmd_line)
-        lines.append("  2>&1) || true")
+        lines.append("  2>&1)")
         lines.append("EXIT=$?")
         lines.append(f'if [ ${{#OUT}} -gt {OFFLINE_OUTPUT_MAX_BYTES} ]; then OUT="${{OUT:0:{OFFLINE_OUTPUT_MAX_BYTES}}}\\n... (truncated)"; fi')
         lines.append('[ $FIRST -eq 0 ] && echo "," >> "$RESULTS_FILE"')

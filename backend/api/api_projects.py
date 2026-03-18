@@ -135,6 +135,7 @@ async def delete_project(project_id: str, current_user: User = Depends(get_curre
     
     # Cascade delete: remove all data linked to this project
     await db.executions.delete_many({"project_id": project_id})
+    await db.offline_sessions.delete_many({"project_id": project_id})
     job_ids = [doc["id"] for doc in await db.scheduler_jobs.find({"project_id": project_id}, {"id": 1}).to_list(1000)]
     if job_ids:
         await db.scheduler_runs.delete_many({"job_id": {"$in": job_ids}})
