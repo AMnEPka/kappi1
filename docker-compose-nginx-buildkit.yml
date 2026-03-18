@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   ssh-runner-network:
     name: ssh-runner-network

@@ -19,7 +19,7 @@ def prepare_for_mongo(data: dict) -> dict:
         Dictionary with datetime objects converted to ISO strings
     """
     prepared = data.copy()
-    for field in ["created_at", "updated_at", "executed_at", "next_run_at", "last_run_at", "started_at", "finished_at"]:
+    for field in ["created_at", "updated_at", "executed_at", "next_run_at", "last_run_at", "started_at", "finished_at", "last_check_at", "initialized_at", "uploaded_at"]:
         if isinstance(prepared.get(field), datetime):
             prepared[field] = prepared[field].isoformat()
     if isinstance(prepared.get("run_times"), list):
@@ -65,7 +65,7 @@ def parse_from_mongo(item: dict) -> dict:
         Dictionary with ISO strings converted to datetime objects
     """
     parsed = item.copy()
-    for field in ["created_at", "updated_at", "executed_at", "next_run_at", "last_run_at", "started_at", "finished_at"]:
+    for field in ["created_at", "updated_at", "executed_at", "next_run_at", "last_run_at", "started_at", "finished_at", "last_check_at", "initialized_at", "uploaded_at"]:
         if isinstance(parsed.get(field), str):
             parsed[field] = datetime.fromisoformat(parsed[field])
     if isinstance(parsed.get("run_times"), list):

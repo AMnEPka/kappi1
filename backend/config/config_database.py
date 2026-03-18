@@ -104,6 +104,12 @@ async def ensure_indexes():
         await db.ib_profile_applications.create_index("session_id")
         await db.ib_profile_apply_sessions.create_index("session_id", unique=True)
 
+        # Config integrity hosts
+        await db.config_integrity_hosts.create_index("id", unique=True)
+        await db.config_integrity_hosts.create_index("ip_address")
+        await db.config_integrity_hosts.create_index("created_by")
+        await db.config_integrity_hosts.create_index([("created_at", -1)])
+
         # Offline check sessions
         await db.offline_sessions.create_index("project_id")
         await db.offline_sessions.create_index("execution_session_id", unique=True)
