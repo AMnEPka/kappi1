@@ -485,16 +485,18 @@ async def get_project_sessions(project_id: str, current_user: User = Depends(get
     ]
     
     sessions = await db.executions.aggregate(pipeline).to_list(1000)
-    
+    offline_ids = set()
+    async for doc in db.offline_sessions.find({"project_id": project_id}, {"execution_session_id": 1}):
+        offline_ids.add(doc.get("execution_session_id"))
     return [{
         "session_id": s["_id"],
         "executed_at": s["executed_at"],
         "total_checks": s["count"],
         "passed_count": s["passed_count"],
         "failed_count": s["failed_count"],
-        # Combine explicit errors and unknown statuses
         "error_count": s["explicit_error_count"] + s["other_count"],
-        "operator_count": s["operator_count"]
+        "operator_count": s["operator_count"],
+        "is_offline": s["_id"] in offline_ids,
     } for s in sessions]
 
 

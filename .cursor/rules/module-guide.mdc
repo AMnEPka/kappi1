@@ -1,0 +1,189 @@
+---
+description: Module guide — purpose, key files, API, and common pitfalls per module
+alwaysApply: true
+---
+
+# Module Guide
+
+## Backend Modules
+
+### api/ — HTTP Route Handlers
+
+Each file defines a FastAPI `APIRouter`. All routers are aggregated in `api/__init__.py` under the `/api` prefix.
+
+| File | Prefix | Key Endpoints |
+|------|--------|--------------|
+| `api_auth.py` | `/auth` | login, refresh, logout, me, permissions |
+| `api_hosts.py` | `/hosts` | CRUD, connection test |
+| `api_categories.py` | `/categories` | Categories + Systems CRUD |
+| `api_scripts.py` | `/scripts` | Script CRUD, versioning, reference files |
+| `api_projects.py` | `/projects` | Project CRUD, tasks, access control |
+| `api_users.py` | `/users` | User CRUD, role assignment, password reset |
+| `api_executions.py` | `/executions` | Results query, SSE execution stream |
+| `api_scheduler.py` | `/scheduler` | Job CRUD (one-time, recurring) |
+| `api_check_groups.py` | `/check-groups` | Check group CRUD |
+| `api_audit.py` | `/audit` | Audit log query (admin) |
+| `api_export.py` | `/export` | Excel export of execution results |
+| `api_ai.py` | `/ai` | LLM chat integration |
+| `api_is_catalog.py` | `/is-catalog` | IS catalog: schema, items, file upload/download |
+| `api_ib_profiles.py` | `/ib-profiles` | IB profiles: CRUD, export, apply (SSE) |
+| `api_offline.py` | (none) | `/projects/{id}/offline/generate`, `/offline/upload` |
+
+**Pattern for adding a new endpoint:**
+
+```python
+from fastapi import APIRouter, Depends
+from models.auth_models import User
+from services.services_auth import get_current_user, require_permission
+
+router = APIRouter(prefix="/my-feature", tags=["my-feature"])
+
+@router.get("")
+async def list_items(current_user: User = Depends(get_current_user)):
+    await require_permission(current_user, "my_feature_view")
+    # ... logic ...
+```
+
+Then register in `api/__init__.py`:
+```python
+from .api_my_feature import router as my_feature_router
+api_router.include_router(my_feature_router)
+```
+
+### services/ — Business Logic
+
+| File | Purpose |
+|------|---------|
+| `services_auth.py` | `get_current_user`, `require_permission`, `has_permission`, `can_access_project` |
+| `services_execution.py` | SSH/WinRM command execution, connection checks, processor scripts |
+| `services_scheduler.py` | Next-run calculation for jobs (one_time, multi_run, recurring) |
+| `services_offline.py` | Generate offline .sh/.ps1 scripts, process uploaded results |
+| `services_ib_profiles_apply.py` | Apply IB profiles to hosts with SSE event streaming |
+| `services_crud.py` | Generic helpers (`get_or_create_category`) |
+| `services_export.py` | Excel export via openpyxl |
+| `services_notifications.py` | Notification placeholders (email, slack, telegram) |
+| `services_helpers.py` | Datetime parsing, scheduler time normalization |
+| `services_init.py` | Startup initialization routines |
+
+### models/ — Pydantic Domain Models
+
+| File | Key Models |
+|------|-----------|
+| `auth_models.py` | `User`, `Role`, `UserRole`, `LoginRequest/Response`, `RefreshToken` |
+| `content_models.py` | `Category`, `System`, `Host`, `Script`, `CheckGroup` |
+| `project_models.py` | `Project`, `ProjectTask`, `ProjectAccess` |
+| `execution_models.py` | `Execution`, `SchedulerJob`, `SchedulerRun`, `OfflineSession` |
+| `is_catalog_models.py` | `ISCatalogSchema`, `ISCatalogSchemaField`, `ISCatalogItem` |
+| `ib_profile_models.py` | `IBProfile`, `IBProfileApplySession`, `IBProfileApplication` |
+| `audit_models.py` | `AuditLog` |
+
+**Common pitfall:** All models use `id: str = Field(default_factory=lambda: str(uuid.uuid4()))`. MongoDB's `_id` is separate — use `prepare_for_mongo()` / `parse_from_mongo()` from `utils/db_utils.py`.
+
+### config/ — Configuration
+
+| File | Exports |
+|------|---------|
+| `config_init.py` | Re-exports everything: `db`, `logger`, `encrypt_password`, `verify_password`, etc. |
+| `config_settings.py` | `MONGO_URL`, `DB_NAME`, `JWT_SECRET_KEY`, `PERMISSIONS`, permission groups, logging setup |
+| `config_database.py` | `db` (Motor database), `ensure_indexes()`, `check_db_health()` |
+| `config_security.py` | `hash_password`, `verify_password`, `create_access_token`, `create_refresh_token`, `encrypt_password` (Fernet) |
+| `config_rate_limit.py` | `limiter` (slowapi), rate-limit settings |
+
+**Import convention:** Always import from `config.config_init`:
+```python
+from config.config_init import db, logger
+```
+
+### utils/ — Stateless Helpers
+
+| File | Key Functions |
+|------|--------------|
+| `db_utils.py` | `prepare_for_mongo(doc)`, `parse_from_mongo(doc)`, `encode_script_for_storage(content)`, `decode_script_from_storage(encoded)` |
+| `audit_utils.py` | `log_audit(event, user_id, username, details)` — fire-and-forget async audit |
+| `error_codes.py` | Error code dict (11–60+), `detect_command_error()`, `extract_error_code_from_output()` |
+| `ssh_logger.py` | `log_ssh_connection()`, `log_ssh_command()` — file-based SSH session logging |
+
+### scheduler/ — Background Worker
+
+| File | Purpose |
+|------|---------|
+| `scheduler_worker.py` | Polling loop: checks `scheduler_jobs` every N seconds, triggers executions |
+| `scheduler_execution.py` | Runs project execution for a scheduled job |
+| `scheduler_utils.py` | Cron-like next-run calculation |
+
+---
+
+## Frontend Modules
+
+### pages/ — Route Components
+
+| Page | Route | Purpose |
+|------|-------|---------|
+| `LoginPage` | `/login` | Authentication form |
+| `ProjectsPage` | `/` | Project list, create/edit/delete |
+| `ProjectWizard/` | `/new` | 6-step project creation wizard |
+| `ProjectExecutionPage` | `/:id/execute` | Real-time execution with SSE |
+| `ProjectResultsPage/` | `/:id/results` | Results viewer, reference comparison |
+| `HostsPage` | `/hosts` | Host CRUD, connection test |
+| `ScriptsPage/` | `/scripts` | Script CRUD, versioning, groups |
+| `SchedulerPage` | `/scheduler` | Scheduled job management |
+| `HistoryPage` | `/history` | Execution history log |
+| `IsCatalogPage` | `/is-catalog` | IS catalog with dynamic schema |
+| `SecurityProfilesPage` | `/ib-profiles` | IB profile management |
+| `ApplyProfilePage` | `/ib-profiles/apply` | Apply profiles to hosts (SSE) |
+| `AdminPage` | `/admin` | Categories + Systems management |
+| `UsersPage` | `/users` | User management |
+| `RolesPage` | `/roles` | Role + permission management |
+| `LogsPage` | `/logs` | Audit log viewer |
+| `AITestPage` | `/ai-test` | LLM chat testing |
+
+### components/ui/ — shadcn/ui Components
+
+50+ Radix UI-based components. Key ones:
+
+| Component | Usage |
+|-----------|-------|
+| `button`, `input`, `textarea` | Basic form elements |
+| `dialog`, `alert-dialog` | Modal dialogs |
+| `table` | Data tables |
+| `select`, `dropdown-menu` | Selection controls |
+| `tabs`, `accordion` | Layout controls |
+| `toast`, `sonner` | Notifications |
+| `code-editor`, `advanced-code-editor` | Script editing |
+| `datetime-picker` | Date/time selection |
+
+### hooks/ — Custom React Hooks
+
+| Hook | Purpose |
+|------|---------|
+| `useApiLoader` | Multi-endpoint data fetching with AbortController |
+| `usePermissions` | Permission checks against AuthContext |
+| `useDialog` | Dialog open/close state management |
+| `useProjectNavigation` | Route helpers: `goToProjects()`, `goToProjectExecute(id)` |
+| `use-toast` | Sonner toast wrapper |
+
+### contexts/ — Global State
+
+| Context | Provides |
+|---------|----------|
+| `AuthContext` | `user`, `login()`, `logout()`, `hasPermission()`, `isAdmin` |
+| `WizardContext` | Multi-step form state for ProjectWizard |
+| `ThemeProvider` | Theme mode (light/dark), MD3 theme switching |
+
+### config/ — Frontend Configuration
+
+| File | Purpose |
+|------|---------|
+| `api.js` | Axios instance, JWT storage, auto-refresh (5 min before expiry), 401 retry queue |
+| `errorcodes.js` | Error code → description mapping for execution results |
+
+---
+
+## Common Pitfalls
+
+1. **MongoDB `_id` vs `id`** — Always use `prepare_for_mongo()` before insert and `parse_from_mongo()` after read. The app uses string `id` fields, not ObjectId.
+2. **Password fields on host update** — Sending empty string means "don't change". See `api_hosts.py` update logic.
+3. **SSE auth** — SSE endpoints receive JWT via `?token=` query param, not Authorization header. See `api_executions.py` and `api_ib_profiles.py`.
+4. **Permission names** — Must match keys in `PERMISSIONS` dict in `config_settings.py`. Typos silently deny access.
+5. **Script encoding** — Script content is base64-encoded for storage. Use `encode_script_for_storage()` / `decode_script_from_storage()`.
+6. **Frontend API calls** — No service layer; `api.get("/endpoint")` calls are inlined in components/hooks. The Axios instance in `config/api.js` handles auth headers automatically.

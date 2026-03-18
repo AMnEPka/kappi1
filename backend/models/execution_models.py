@@ -120,3 +120,20 @@ class ExecuteRequest(BaseModel):
     """Legacy request to execute a single script on multiple hosts"""
     script_id: str
     host_ids: List[str]
+
+
+class OfflineSession(BaseModel):
+    """Offline check session: generated script + optional uploaded results."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    project_id: str
+    execution_session_id: str  # links to Execution records after upload
+    os_type: str  # "linux" or "windows"
+    script_ids: List[str] = Field(default_factory=list)
+    host_ids: List[str] = Field(default_factory=list)
+    status: Literal["generated", "uploaded", "processed"] = "generated"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str = ""
+    uploaded_at: Optional[datetime] = None
+    result_file_hash: Optional[str] = None  # SHA-256 of uploaded file

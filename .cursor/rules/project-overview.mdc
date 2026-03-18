@@ -1,0 +1,68 @@
+---
+description: Project overview — tech stack, entry points, key components
+alwaysApply: true
+---
+
+# SSH Script Runner — Project Overview
+
+Full-stack application for managing and executing compliance checks on remote hosts via SSH/WinRM. Includes project-based execution workflow, RBAC, scheduling, IS catalog, IB security profiles, and offline mode.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | FastAPI 0.110 (Python 3.11), Uvicorn |
+| Database | MongoDB 6.0 via Motor (async) |
+| Frontend | React 19, React Router 7, Tailwind CSS, Radix UI (shadcn/ui) |
+| Auth | JWT (access + refresh tokens), bcrypt, Fernet encryption |
+| Real-time | Server-Sent Events (SSE) |
+| Remote exec | Paramiko (SSH), pywinrm (WinRM) |
+| Build | Docker, Docker Compose (dev / prod / offline), nginx |
+| Testing | pytest (backend), React Testing Library + MSW (frontend) |
+
+## Entry Points
+
+| Entry | Path | Details |
+|-------|------|---------|
+| Backend server | `backend/server.py` | FastAPI app, startup: DB indexes, admin user, default roles, scheduler |
+| Frontend app | `frontend/src/index.js` → `App.js` | React root, BrowserRouter, lazy-loaded routes |
+| API root | `/api` | All backend endpoints under this prefix |
+| Health check | `GET /api/health` | Returns DB status |
+
+## Main Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| API layer | `backend/api/` | 15 route modules (auth, hosts, projects, executions, etc.) |
+| Services | `backend/services/` | Business logic (execution, scheduler, offline, IB apply) |
+| Models | `backend/models/` | Pydantic models for all domain entities |
+| Config | `backend/config/` | Settings, DB, security, rate limiting |
+| Pages | `frontend/src/pages/` | 17+ page components with lazy loading |
+| UI kit | `frontend/src/components/ui/` | 50+ shadcn/ui components, MD3 theme layer |
+| Hooks | `frontend/src/hooks/` | useApiLoader, usePermissions, useDialog, etc. |
+| Auth context | `frontend/src/contexts/AuthContext.js` | Global auth state, permissions |
+| API client | `frontend/src/config/api.js` | Axios instance with auto token refresh |
+
+## Key Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MONGO_URL` | `mongodb://localhost:27017` | MongoDB connection |
+| `DB_NAME` | `ssh_runner_db` | Database name |
+| `JWT_SECRET_KEY` | — | JWT signing key |
+| `ENCRYPTION_KEY` | — | Fernet key for host credentials |
+| `CORS_ORIGINS` | `*` | Allowed CORS origins |
+| `SCHEDULER_POLL_SECONDS` | `30` | Scheduler interval |
+
+## Default Credentials (dev)
+
+- Admin: `admin` / `admin123` (created on first startup)
+
+## Docker Compose Variants
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Dev (ports 8001/3000, hot reload) |
+| `docker-compose-dev.yml` | Dev alt (ports 435/415) |
+| `docker-compose.prod.yml` | Production (multi-worker, nginx) |
+| `docker-compose.offline.yml` | Air-gapped deployment |

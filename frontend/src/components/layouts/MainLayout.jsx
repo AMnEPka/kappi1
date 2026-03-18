@@ -16,6 +16,7 @@ import {
   Bot,
   Library,
   ShieldCheck,
+  Fingerprint,
 } from "lucide-react";
 import { Button, AppBar, AppBarContent, Sidebar, SidebarContent } from '@/components/ui/md3';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,10 +30,12 @@ export const MainLayout = ({ children }) => {
   const showScheduler = isAdmin || hasPermission('projects_execute');
   const showCatalog = hasPermission('is_catalog_view');
   const showIbProfiles = hasPermission('ib_profiles_view') || hasPermission('ib_profiles_apply');
+  const showConfigIntegrity = hasPermission('config_integrity_view') || hasPermission('config_integrity_manage');
   const isActive = (path) => {
     if (path === '/hosts') return location.pathname === '/hosts';
     if (path === '/is-catalog') return location.pathname === '/is-catalog';
     if (path === '/ib-profiles') return location.pathname.startsWith('/ib-profiles');
+    if (path === '/config-integrity') return location.pathname === '/config-integrity';
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
@@ -162,6 +165,18 @@ export const MainLayout = ({ children }) => {
             </>
           )}
 
+          {showConfigIntegrity && (
+            <Link to="/config-integrity" className="md3-sidebar-item-link">
+              <Button
+                variant={isActive('/config-integrity') ? "tonal" : "text"}
+                className={`md3-sidebar-button ${isActive('/config-integrity') ? 'md3-sidebar-button-active' : ''}`}
+              >
+                <Fingerprint className="md3-icon" />
+                {isSidebarExpanded && "Неизменность конфигурации"}
+              </Button>
+            </Link>
+          )}
+
           {/* Admin Section Separator */}
           {isAdmin && (
             <>
@@ -276,7 +291,8 @@ const getPageTitle = (pathname) => {
     '/roles': 'Роли и разрешения',
     '/new': 'Новый проект',
     '/execute': 'Запуск проверок',
-    '/history': 'История выполнений'
+    '/history': 'История выполнений',
+    '/config-integrity': 'Проверка неизменности конфигурации'
   };
   
   // For dynamic routes like /projectId/execute

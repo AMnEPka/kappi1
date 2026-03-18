@@ -4,7 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../components/ui/dialog";
+import { ChevronLeft, Play, CheckCircle, XCircle, Loader2, Users, CircleCheck, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { api, getAccessToken } from '../config/api';
 import { ERROR_CODES, getErrorDescription, extractErrorCode } from '../config/errorcodes';
@@ -45,6 +52,13 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
   // Состояние для отслеживания завершения начальных статусов
   const [statusDone, setStatusDone] = useState(false);
   const [infoDone, setInfoDone] = useState(false);
+  // Офлайн-проверки
+  const [offlineDialogOpen, setOfflineDialogOpen] = useState(false);
+  const [selectedHostIdOffline, setSelectedHostIdOffline] = useState("");
+  const [generatingOffline, setGeneratingOffline] = useState(false);
+  const [uploadingOffline, setUploadingOffline] = useState(false);
+  const [offlineSessions, setOfflineSessions] = useState([]);
+  const offlineFileInputRef = useRef(null);
 
   useEffect(() => {
     fetchProject();
@@ -76,6 +90,13 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
       setHosts(hostsRes.data);
       setSystems(systemsRes.data);
       setProjectUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+
+      try {
+        const sessionsRes = await api.get(`/api/projects/${projectId}/offline/sessions`);
+        setOfflineSessions(Array.isArray(sessionsRes.data) ? sessionsRes.data : []);
+      } catch {
+        setOfflineSessions([]);
+      }
 
       // Load scripts per system type from project tasks so each system (e.g. Linux and Windows) gets its full list of checks (avoids 1000 limit showing only first system's scripts)
       const systemIds = [...new Set((tasksRes.data || []).map(t => t.system_id).filter(Boolean))];
@@ -381,6 +402,87 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
     }
   };
 
+  const projectHostIds = [...new Set((tasks || []).map((t) => t.host_id))].filter(Boolean);
+
+  const generateOfflineScript = async () => {
+    if (!selectedHostIdOffline) {
+      toast.error("Выберите хост");
+      return;
+    }
+    setGeneratingOffline(true);
+    try {
+      const res = await api.post(
+        `/api/projects/${projectId}/offline/generate`,
+        { host_id: selectedHostIdOffline },
+        { responseType: "blob" }
+      );
+      let filename = `offline_checks_${Date.now()}.sh`;
+      const disp = res.headers?.["content-disposition"];
+      if (disp && typeof disp === "string") {
+        const m = disp.match(/filename="?([^";\n]+)"?/);
+        if (m?.[1]) filename = m[1].trim();
+      }
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.setAttribute("download", filename);
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      toast.success("Скрипт сохранён. Выполните его на целевом хосте и загрузите файл результатов.");
+      setOfflineDialogOpen(false);
+      setSelectedHostIdOffline("");
+      const sessionsRes = await api.get(`/api/projects/${projectId}/offline/sessions`);
+      setOfflineSessions(Array.isArray(sessionsRes?.data) ? sessionsRes.data : []);
+    } catch (err) {
+      let msg = "Не удалось создать офлайн-скрипт";
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const j = JSON.parse(text);
+          if (j?.detail) msg = j.detail;
+        } catch (_) {}
+      } else if (err.response?.data?.detail) {
+        msg = err.response.data.detail;
+      } else if (err.message) {
+        msg = err.message;
+      }
+      toast.error(msg);
+    } finally {
+      setGeneratingOffline(false);
+    }
+  };
+
+  const handleOfflineUpload = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      toast.error("Выберите файл результатов в формате .json");
+      return;
+    }
+    setUploadingOffline(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post(`/api/projects/${projectId}/offline/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success(`Загружено проверок: ${res.data?.executions_count ?? 0}. Сессия: ${res.data?.session_id?.slice(0, 8) ?? ""}`);
+      if (res.data?.session_id && typeof onNavigate === "function") {
+        onNavigate("project-results", projectId);
+      }
+      const sessionsRes = await api.get(`/api/projects/${projectId}/offline/sessions`);
+      setOfflineSessions(Array.isArray(sessionsRes?.data) ? sessionsRes.data : []);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      toast.error(detail ?? "Не удалось загрузить результаты");
+    } finally {
+      setUploadingOffline(false);
+      e.target.value = "";
+    }
+  };
+
   const getLogIcon = (type) => {
     switch (type) {
       case 'status':
@@ -534,12 +636,69 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
           )}
         </div>
         {!executing && (
-          <Button onClick={() => startExecution(true)} size="lg">
-            <Play className="mr-2 h-4 w-4" />
-            Запустить проект
-          </Button>
+          <>
+            <Button onClick={() => startExecution(true)} size="lg">
+              <Play className="mr-2 h-4 w-4" />
+              Запустить проект
+            </Button>
+            <Button variant="outline" size="lg" onClick={() => setOfflineDialogOpen(true)}>
+              <Download className="mr-2 h-4 w-4" />
+              Создать офлайн-скрипт
+            </Button>
+            <input
+              ref={offlineFileInputRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={handleOfflineUpload}
+            />
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={uploadingOffline}
+              onClick={() => offlineFileInputRef.current?.click()}
+            >
+              {uploadingOffline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              Загрузить офлайн-результаты
+            </Button>
+          </>
         )}
       </div>
+
+      <Dialog open={offlineDialogOpen} onOpenChange={setOfflineDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Создать офлайн-скрипт</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Выберите хост. Будет сгенерирован скрипт для выполнения проверок на этом хосте без подключения к системе.
+          </p>
+          <Select value={selectedHostIdOffline} onValueChange={setSelectedHostIdOffline}>
+            <SelectTrigger>
+              <SelectValue placeholder="Выберите хост" />
+            </SelectTrigger>
+            <SelectContent>
+              {projectHostIds.map((hid) => {
+                const host = hosts.find((h) => h.id === hid);
+                return (
+                  <SelectItem key={hid} value={hid}>
+                    {host?.name ?? hid}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOfflineDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={generateOfflineScript} disabled={generatingOffline || !selectedHostIdOffline}>
+              {generatingOffline ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Скачать скрипт
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Users with access */}
       {projectUsers.length > 0 && (

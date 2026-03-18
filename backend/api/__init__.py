@@ -20,6 +20,8 @@ from .api_export import router as export_router
 from .api_ai import router as ai_router
 from .api_is_catalog import router as is_catalog_router
 from .api_ib_profiles import router as ib_profiles_router
+from .api_offline import router as offline_router
+from .api_config_integrity import router as config_integrity_router
 
 # Create main API router with /api prefix
 api_router = APIRouter(prefix="/api")
@@ -39,5 +41,7 @@ api_router.include_router(export_router, tags=["export"])
 api_router.include_router(ai_router, tags=["ai"])
 api_router.include_router(is_catalog_router)
 api_router.include_router(ib_profiles_router)
+api_router.include_router(offline_router, tags=["offline"])
+api_router.include_router(config_integrity_router)
 
 __all__ = ['api_router']

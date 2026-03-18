@@ -54,7 +54,16 @@ from models.execution_models import (
     SchedulerJobUpdate,
     SchedulerRun,
     ExecuteProjectRequest,
-    ExecuteRequest
+    ExecuteRequest,
+    OfflineSession,
+)
+
+# Config integrity models
+from models.config_integrity_models import (
+    ConfigIntegrityHost,
+    ConfigIntegrityHostCreate,
+    ConfigIntegrityHostImport,
+    ConfigIntegrityActionRequest,
 )
 
 # Audit models
@@ -107,7 +116,14 @@ __all__ = [
     "SchedulerRun",
     "ExecuteProjectRequest",
     "ExecuteRequest",
+    "OfflineSession",
     
+    # Config integrity models
+    "ConfigIntegrityHost",
+    "ConfigIntegrityHostCreate",
+    "ConfigIntegrityHostImport",
+    "ConfigIntegrityActionRequest",
+
     # Audit models
     "AuditLog"
 ]
