@@ -344,7 +344,7 @@ async def process_offline_upload(
         {
             "$set": {
                 "status": "processed",
-                "uploaded_at": executed_at,
+                "uploaded_at": executed_at.isoformat(),
                 "result_file_hash": file_hash,
             }
         },
