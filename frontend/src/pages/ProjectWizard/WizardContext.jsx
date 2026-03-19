@@ -16,6 +16,7 @@ export const useWizard = () => {
 const INITIAL_PROJECT_DATA = {
   name: '',
   description: '',
+  system_input_target: 'ОПЭ',
   hosts: [],
   tasks: [],
   accessUserIds: [],
@@ -227,6 +228,7 @@ export const WizardProvider = ({ children, onNavigate, initialPreset }) => {
       const projectResponse = await api.post('/api/projects', {
         name: projectData.name,
         description: projectData.description,
+        system_input_target: projectData.system_input_target,
       });
       
       const projectId = projectResponse.data.id;
