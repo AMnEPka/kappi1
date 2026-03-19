@@ -11,6 +11,14 @@ import { HelpCircle, CheckCircle2, Loader2, History } from "lucide-react";
 import { AdvancedCodeEditor } from "@/components/ui/advanced-code-editor";
 import { useAuth } from '@/contexts/AuthContext';
 
+const NON_COMPLIANCE_CRITICALITY_OPTIONS = [
+  "Нет",
+  "Низкая",
+  "Средняя",
+  "Высокая",
+  "Высокая (Стоп-фактор)"
+];
+
 export default function ScriptFormDialog({ 
   open, 
   onOpenChange, 
@@ -164,6 +172,34 @@ fi`;
                   onChange={(e) => handleFormChange('description', e.target.value)}
                   placeholder="Опционально"
                 />
+              </div>
+
+              <div>
+                <Label>Критичность несоответствия (ОПЭ)</Label>
+                <SelectNative
+                  value={formData.non_compliance_criticality_ope || "Нет"}
+                  onChange={(e) => handleFormChange('non_compliance_criticality_ope', e.target.value)}
+                >
+                  {NON_COMPLIANCE_CRITICALITY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </SelectNative>
+              </div>
+
+              <div>
+                <Label>Критичность несоответствия (ПЭ)</Label>
+                <SelectNative
+                  value={formData.non_compliance_criticality_pe || "Нет"}
+                  onChange={(e) => handleFormChange('non_compliance_criticality_pe', e.target.value)}
+                >
+                  {NON_COMPLIANCE_CRITICALITY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </SelectNative>
               </div>
 
               <div>

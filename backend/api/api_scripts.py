@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from utils.audit_utils import log_audit
 
 router = APIRouter()
+DEFAULT_NON_COMPLIANCE_CRITICALITY = "Нет"
 
 
 class CategoryImportPayload(BaseModel):
@@ -49,6 +50,8 @@ class ScriptImportPayload(BaseModel):
     has_reference_files: bool = False
     test_methodology: Optional[str] = None
     success_criteria: Optional[str] = None
+    non_compliance_criticality_ope: str = "Нет"
+    non_compliance_criticality_pe: str = "Нет"
     order: int = 0
     category_name: str
     category_icon: Optional[str] = "📁"
@@ -142,6 +145,8 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
         script_data = parse_from_mongo(script)
         # Decode script content and processor_script from Base64
         script_data = decode_script_from_storage(script_data)
+        script_data.setdefault("non_compliance_criticality_ope", DEFAULT_NON_COMPLIANCE_CRITICALITY)
+        script_data.setdefault("non_compliance_criticality_pe", DEFAULT_NON_COMPLIANCE_CRITICALITY)
         
         # Check if script has system_id (old scripts might not have it)
         if "system_id" not in script_data or not script_data["system_id"]:
@@ -191,6 +196,8 @@ async def get_script(script_id: str, current_user: User = Depends(get_current_us
     script_data = parse_from_mongo(script)
     # Decode script content and processor_script from Base64
     script_data = decode_script_from_storage(script_data)
+    script_data.setdefault("non_compliance_criticality_ope", DEFAULT_NON_COMPLIANCE_CRITICALITY)
+    script_data.setdefault("non_compliance_criticality_pe", DEFAULT_NON_COMPLIANCE_CRITICALITY)
     return Script(**script_data)
 
 
@@ -330,6 +337,8 @@ async def update_script(script_id: str, script_update: ScriptUpdate, current_use
     script_data = parse_from_mongo(updated_script)
     # Decode script content and processor_script from Base64
     script_data = decode_script_from_storage(script_data)
+    script_data.setdefault("non_compliance_criticality_ope", DEFAULT_NON_COMPLIANCE_CRITICALITY)
+    script_data.setdefault("non_compliance_criticality_pe", DEFAULT_NON_COMPLIANCE_CRITICALITY)
     return Script(**script_data)
 
 
@@ -581,6 +590,8 @@ async def export_all_scripts(current_user: User = Depends(get_current_user)):
             "has_reference_files": decoded.get("has_reference_files", False),
             "test_methodology": decoded.get("test_methodology"),
             "success_criteria": decoded.get("success_criteria"),
+            "non_compliance_criticality_ope": decoded.get("non_compliance_criticality_ope", DEFAULT_NON_COMPLIANCE_CRITICALITY),
+            "non_compliance_criticality_pe": decoded.get("non_compliance_criticality_pe", DEFAULT_NON_COMPLIANCE_CRITICALITY),
             "order": decoded.get("order", 0),
             "category_name": category.get("name") if category else "",
             "category_icon": category.get("icon", "📁") if category else "📁",
@@ -714,6 +725,8 @@ async def import_scripts(
             has_reference_files=script.has_reference_files,
             test_methodology=script.test_methodology,
             success_criteria=script.success_criteria,
+            non_compliance_criticality_ope=script.non_compliance_criticality_ope or DEFAULT_NON_COMPLIANCE_CRITICALITY,
+            non_compliance_criticality_pe=script.non_compliance_criticality_pe or DEFAULT_NON_COMPLIANCE_CRITICALITY,
             order=script.order,
             group_ids=group_ids
         )

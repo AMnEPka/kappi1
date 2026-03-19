@@ -13,6 +13,8 @@ const INITIAL_FORM_DATA = {
   has_reference_files: false,
   test_methodology: "",
   success_criteria: "",
+  non_compliance_criticality_ope: "Нет",
+  non_compliance_criticality_pe: "Нет",
   order: 0,
   group_ids: []
 };
@@ -148,6 +150,8 @@ export const useScriptsData = () => {
         has_reference_files: scriptData.has_reference_files || false,
         test_methodology: scriptData.test_methodology || "",
         success_criteria: scriptData.success_criteria || "",
+        non_compliance_criticality_ope: scriptData.non_compliance_criticality_ope || "Нет",
+        non_compliance_criticality_pe: scriptData.non_compliance_criticality_pe || "Нет",
         order: scriptData.order || 0,
         group_ids: scriptData.group_ids || []
       });

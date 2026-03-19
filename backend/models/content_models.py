@@ -4,7 +4,7 @@ Pydantic models for categories, systems, hosts, and scripts
 """
 
 from pydantic import BaseModel, Field, ConfigDict # pyright: ignore[reportMissingImports]
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime, timezone
 import uuid
 
@@ -124,6 +124,15 @@ class ProcessorScriptVersion(BaseModel):
     created_by: Optional[str] = None
 
 
+ScriptNonComplianceCriticality = Literal[
+    "Нет",
+    "Низкая",
+    "Средняя",
+    "Высокая",
+    "Высокая (Стоп-фактор)",
+]
+
+
 class Script(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -139,6 +148,8 @@ class Script(BaseModel):
     has_reference_files: bool = False  # Есть ли эталонные файлы
     test_methodology: Optional[str] = None  # Описание методики испытания
     success_criteria: Optional[str] = None  # Критерий успешного прохождения испытания
+    non_compliance_criticality_ope: ScriptNonComplianceCriticality = "Нет"
+    non_compliance_criticality_pe: ScriptNonComplianceCriticality = "Нет"
     order: int = 0  # Порядок отображения
     group_ids: List[str] = Field(default_factory=list)  # Список ID групп проверок
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -155,6 +166,8 @@ class ScriptCreate(BaseModel):
     has_reference_files: bool = False
     test_methodology: Optional[str] = None
     success_criteria: Optional[str] = None
+    non_compliance_criticality_ope: ScriptNonComplianceCriticality = "Нет"
+    non_compliance_criticality_pe: ScriptNonComplianceCriticality = "Нет"
     order: int = 0
     group_ids: List[str] = Field(default_factory=list)
 
@@ -170,5 +183,7 @@ class ScriptUpdate(BaseModel):
     has_reference_files: Optional[bool] = None
     test_methodology: Optional[str] = None
     success_criteria: Optional[str] = None
+    non_compliance_criticality_ope: Optional[ScriptNonComplianceCriticality] = None
+    non_compliance_criticality_pe: Optional[ScriptNonComplianceCriticality] = None
     order: Optional[int] = None
     group_ids: Optional[List[str]] = None
