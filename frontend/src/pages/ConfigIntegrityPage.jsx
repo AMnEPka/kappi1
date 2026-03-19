@@ -36,10 +36,24 @@ import {
   ShieldCheck,
   FileText,
   RefreshCw,
+  CalendarClock,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "../config/api";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+
+const SCHEDULE_INTERVALS = [
+  { value: "daily", short: "24 ч", label: "Раз в 24 часа" },
+  { value: "weekly", short: "7 дн.", label: "Раз в 7 дней" },
+  { value: "monthly", short: "Месяц", label: "Раз в месяц" },
+];
+
+function intervalToIndex(interval) {
+  const i = SCHEDULE_INTERVALS.findIndex((x) => x.value === interval);
+  return i >= 0 ? i : 0;
+}
 
 export default function ConfigIntegrityPage() {
   const { hasPermission, isAdmin } = useAuth();
@@ -56,6 +70,11 @@ export default function ConfigIntegrityPage() {
 
   const [initLoading, setInitLoading] = useState(false);
   const [checkLoading, setCheckLoading] = useState(false);
+
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleIntervalIdx, setScheduleIntervalIdx] = useState(0);
+  const [scheduleNextRun, setScheduleNextRun] = useState(null);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -87,9 +106,42 @@ export default function ConfigIntegrityPage() {
     }
   }, []);
 
+  const fetchSchedule = useCallback(async () => {
+    try {
+      const res = await api.get("/api/config-integrity/schedule");
+      const s = res.data;
+      setScheduleEnabled(Boolean(s.enabled));
+      setScheduleIntervalIdx(intervalToIndex(s.interval));
+      setScheduleNextRun(s.next_run_at || null);
+    } catch {
+      /* нет права просмотра или сеть */
+    }
+  }, []);
+
+  const persistSchedule = useCallback(
+    async (enabled, intervalIdx) => {
+      const interval = SCHEDULE_INTERVALS[intervalIdx]?.value || "daily";
+      setScheduleSaving(true);
+      try {
+        const res = await api.put("/api/config-integrity/schedule", {
+          enabled,
+          interval,
+        });
+        setScheduleNextRun(res.data.next_run_at || null);
+      } catch (e) {
+        toast.error(e.response?.data?.detail || "Не удалось сохранить расписание");
+        await fetchSchedule();
+      } finally {
+        setScheduleSaving(false);
+      }
+    },
+    [fetchSchedule]
+  );
+
   useEffect(() => {
     fetchHosts();
-  }, [fetchHosts]);
+    fetchSchedule();
+  }, [fetchHosts, fetchSchedule]);
 
   const resetForm = () => {
     setFormData({
@@ -295,49 +347,134 @@ export default function ConfigIntegrityPage() {
         </div>
       </div>
 
-      {/* Action buttons */}
-      {canManage && hosts.length > 0 && (
+      {/* Action buttons + automatic schedule */}
+      {hosts.length > 0 && (
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={handleInitialize}
-                disabled={initLoading || checkLoading}
-                variant="default"
+            <div
+              className={`flex flex-wrap gap-8 items-start ${canManage ? "justify-between" : ""}`}
+            >
+              {canManage && (
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    onClick={handleInitialize}
+                    disabled={initLoading || checkLoading}
+                    variant="default"
+                  >
+                    {initLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="h-4 w-4 mr-2" />
+                    )}
+                    Инициализация инструмента проверки
+                    {selectedIds.size > 0 && ` (${selectedIds.size})`}
+                  </Button>
+                  <Button
+                    onClick={handleCheck}
+                    disabled={checkLoading || initLoading}
+                    variant="secondary"
+                  >
+                    {checkLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Проверить неизменность конфигурации
+                    {selectedIds.size > 0 && ` (${selectedIds.size})`}
+                  </Button>
+                </div>
+              )}
+
+              <div
+                className={`flex flex-col gap-3 min-w-[min(100%,280px)] max-w-sm flex-1 border-border/60 pt-4 border-t md:pt-0 md:border-t-0 ${
+                  canManage ? "md:border-l md:pl-8" : ""
+                }`}
               >
-                {initLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  Автопроверка по расписанию
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Для всех мониторируемых хостов (как кнопка «Проверить…»).
+                </p>
+                {canManage ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm">Включить</span>
+                      <div className="flex items-center gap-2">
+                        {scheduleSaving && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <Switch
+                          checked={scheduleEnabled}
+                          disabled={scheduleSaving}
+                          onCheckedChange={(v) => {
+                            setScheduleEnabled(v);
+                            persistSchedule(v, scheduleIntervalIdx);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div
+                      className={`space-y-2 ${!scheduleEnabled ? "opacity-50 pointer-events-none" : ""}`}
+                    >
+                      <Slider
+                        value={[scheduleIntervalIdx]}
+                        min={0}
+                        max={2}
+                        step={1}
+                        disabled={!scheduleEnabled || scheduleSaving}
+                        onValueChange={(v) => {
+                          const idx = v[0] ?? 0;
+                          setScheduleIntervalIdx(idx);
+                        }}
+                        onValueCommit={(v) => {
+                          const idx = v[0] ?? 0;
+                          if (scheduleEnabled) persistSchedule(true, idx);
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground px-0.5">
+                        {SCHEDULE_INTERVALS.map((x) => (
+                          <span key={x.value} className="text-center max-w-[5.5rem]">
+                            {x.short}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {SCHEDULE_INTERVALS[scheduleIntervalIdx].label}
+                      </p>
+                    </div>
+                  </>
                 ) : (
-                  <Play className="h-4 w-4 mr-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {scheduleEnabled
+                      ? `${SCHEDULE_INTERVALS[scheduleIntervalIdx].label}. Следующий запуск: ${fmtDate(scheduleNextRun)}`
+                      : "Автопроверка выключена."}
+                  </p>
                 )}
-                Инициализация инструмента проверки
-                {selectedIds.size > 0 && ` (${selectedIds.size})`}
-              </Button>
-              <Button
-                onClick={handleCheck}
-                disabled={checkLoading || initLoading}
-                variant="secondary"
-              >
-                {checkLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                {scheduleEnabled && scheduleNextRun && canManage && (
+                  <p className="text-xs text-muted-foreground">
+                    Следующий запуск: {fmtDate(scheduleNextRun)}
+                  </p>
                 )}
-                Проверить неизменность конфигурации
-                {selectedIds.size > 0 && ` (${selectedIds.size})`}
-              </Button>
+              </div>
             </div>
-            {selectedIds.size > 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Выбрано хостов: {selectedIds.size}. Действие будет выполнено
-                только для выбранных.
-              </p>
-            )}
-            {selectedIds.size === 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Инициализация — для неинициализированных хостов. Проверка — для
-                всех мониторируемых.
-              </p>
+            {canManage && (
+              <>
+                {selectedIds.size > 0 && (
+                  <p className="text-sm text-muted-foreground mt-4">
+                    Выбрано хостов: {selectedIds.size}. Действие будет выполнено
+                    только для выбранных.
+                  </p>
+                )}
+                {selectedIds.size === 0 && (
+                  <p className="text-sm text-muted-foreground mt-4">
+                    Инициализация — для неинициализированных хостов. Проверка — для
+                    всех мониторируемых.
+                  </p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

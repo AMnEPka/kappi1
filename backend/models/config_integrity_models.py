@@ -4,9 +4,14 @@ Pydantic models for configuration integrity checking via afick
 """
 
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime, timezone
 import uuid
+
+
+ConfigIntegrityScheduleInterval = Literal["daily", "weekly", "monthly"]
+
+SCHEDULE_DOC_ID = "default"
 
 
 class ConfigIntegrityHost(BaseModel):
@@ -55,3 +60,8 @@ class ConfigIntegrityHostImport(BaseModel):
 
 class ConfigIntegrityActionRequest(BaseModel):
     host_ids: List[str]
+
+
+class ConfigIntegrityScheduleUpdate(BaseModel):
+    enabled: bool
+    interval: ConfigIntegrityScheduleInterval = "daily"

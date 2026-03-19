@@ -7,10 +7,10 @@ import asyncio
 import re
 import paramiko
 from typing import Tuple, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from config.config_init import logger, decrypt_password, db, encrypt_password
-from utils.db_utils import prepare_for_mongo
+from models.config_integrity_models import SCHEDULE_DOC_ID
 
 SSH_CONNECT_TIMEOUT = 10
 SSH_COMMAND_TIMEOUT = 120
@@ -200,3 +200,62 @@ async def check_host(host_doc: dict) -> dict:
         }
         await db.config_integrity_hosts.update_one({"id": host_id}, {"$set": update})
     return {"host_id": host_id, **result}
+
+
+def _next_check_after(from_dt: datetime, interval: str) -> datetime:
+    """Next scheduled run moment after from_dt (UTC)."""
+    if interval == "weekly":
+        return from_dt + timedelta(days=7)
+    if interval == "monthly":
+        return from_dt + timedelta(days=30)
+    return from_dt + timedelta(days=1)
+
+
+async def process_config_integrity_schedule_due() -> None:
+    """
+    If automatic config-integrity checks are enabled and next_run_at is due,
+    run afick -k on all monitored hosts, then bump next_run_at.
+    Safe with multiple app instances: claims the slot by matching next_run_at.
+    """
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    doc = await db.config_integrity_schedule.find_one(
+        {
+            "id": SCHEDULE_DOC_ID,
+            "enabled": True,
+            "next_run_at": {"$ne": None, "$lte": now_iso},
+        },
+        {"_id": 0},
+    )
+    if not doc:
+        return
+
+    next_at = doc.get("next_run_at")
+    claimed = await db.config_integrity_schedule.update_one(
+        {"id": SCHEDULE_DOC_ID, "next_run_at": next_at},
+        {"$set": {"next_run_at": None, "updated_at": now_iso}},
+    )
+    if claimed.modified_count == 0:
+        return
+
+    interval = doc.get("interval") or "daily"
+    try:
+        hosts = await db.config_integrity_hosts.find({"is_monitored": True}).to_list(2000)
+        if hosts:
+            tasks = [check_host(h) for h in hosts]
+            await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info(
+            "Config integrity scheduled check finished (%s host(s)), interval=%s",
+            len(hosts),
+            interval,
+        )
+    except Exception:
+        logger.exception("Config integrity scheduled check failed")
+    finally:
+        cur = await db.config_integrity_schedule.find_one({"id": SCHEDULE_DOC_ID}, {"_id": 0})
+        if cur and cur.get("enabled"):
+            nxt = _next_check_after(datetime.now(timezone.utc), interval)
+            await db.config_integrity_schedule.update_one(
+                {"id": SCHEDULE_DOC_ID},
+                {"$set": {"next_run_at": nxt.isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}},
+            )

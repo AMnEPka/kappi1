@@ -3,16 +3,19 @@ API for configuration integrity checking (afick).
 """
 
 import asyncio
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 
-from config.config_init import db, logger, encrypt_password
+from config.config_init import db, encrypt_password
 from models.auth_models import User
 from models.config_integrity_models import (
     ConfigIntegrityHost,
     ConfigIntegrityHostCreate,
     ConfigIntegrityHostImport,
     ConfigIntegrityActionRequest,
+    ConfigIntegrityScheduleUpdate,
+    SCHEDULE_DOC_ID,
 )
 from services.services_auth import get_current_user, require_permission
 from services.services_config_integrity import initialize_host, check_host
@@ -28,6 +31,54 @@ def _encrypt_credentials(data: dict) -> dict:
     if data.get("ssh_key"):
         data["ssh_key"] = encrypt_password(data["ssh_key"])
     return data
+
+
+@router.get("/schedule")
+async def get_config_integrity_schedule(current_user: User = Depends(get_current_user)):
+    await require_permission(current_user, "config_integrity_view")
+    doc = await db.config_integrity_schedule.find_one({"id": SCHEDULE_DOC_ID}, {"_id": 0})
+    if not doc:
+        return {"enabled": False, "interval": "daily", "next_run_at": None}
+    return {
+        "enabled": bool(doc.get("enabled")),
+        "interval": doc.get("interval") or "daily",
+        "next_run_at": doc.get("next_run_at"),
+    }
+
+
+@router.put("/schedule")
+async def put_config_integrity_schedule(
+    body: ConfigIntegrityScheduleUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    await require_permission(current_user, "config_integrity_manage")
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    next_run_at = now_iso if body.enabled else None
+    payload = {
+        "id": SCHEDULE_DOC_ID,
+        "enabled": body.enabled,
+        "interval": body.interval,
+        "next_run_at": next_run_at,
+        "updated_at": now_iso,
+        "updated_by": current_user.id,
+    }
+    await db.config_integrity_schedule.update_one(
+        {"id": SCHEDULE_DOC_ID},
+        {"$set": payload},
+        upsert=True,
+    )
+    log_audit(
+        "config_integrity_schedule_updated",
+        user_id=current_user.id,
+        username=current_user.username,
+        details={"enabled": body.enabled, "interval": body.interval},
+    )
+    return {
+        "enabled": body.enabled,
+        "interval": body.interval,
+        "next_run_at": next_run_at,
+    }
 
 
 @router.get("/hosts")

@@ -110,6 +110,9 @@ async def ensure_indexes():
         await db.config_integrity_hosts.create_index("created_by")
         await db.config_integrity_hosts.create_index([("created_at", -1)])
 
+        # Config integrity automatic check schedule (singleton)
+        await db.config_integrity_schedule.create_index("id", unique=True)
+
         # Offline check sessions
         await db.offline_sessions.create_index("project_id")
         await db.offline_sessions.create_index("execution_session_id", unique=True)
