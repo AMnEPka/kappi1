@@ -68,6 +68,10 @@ export const WizardProvider = ({ children, onNavigate, initialPreset }) => {
     setProjectData((prev) => ({
       ...prev,
       name: initialPreset.projectName || prev.name,
+      system_input_target:
+        initialPreset.systemInputTarget === "ПЭ" || initialPreset.systemInputTarget === "ОПЭ"
+          ? initialPreset.systemInputTarget
+          : prev.system_input_target,
       hostsList: preselectedHosts
     }));
   }, [hosts, initialPreset]);

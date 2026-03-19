@@ -4,7 +4,7 @@ Pydantic models for IS Catalog: schema of fields and catalog items.
 """
 
 from pydantic import BaseModel, Field, ConfigDict  # pyright: ignore[reportMissingImports]
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, timezone
 import uuid
 
@@ -16,14 +16,17 @@ import uuid
 # Allowed file field types: word (.doc, .docx), excel (.xls, .xlsx), pdf
 FIELD_TYPE_TEXT = "text"
 FIELD_TYPE_FILE = "file"
-FIELD_TYPES = [FIELD_TYPE_TEXT, FIELD_TYPE_FILE]
+FIELD_TYPE_SELECT = "select"
+FIELD_TYPES = [FIELD_TYPE_TEXT, FIELD_TYPE_FILE, FIELD_TYPE_SELECT]
+FieldType = Literal["text", "file", "select"]
 
 class ISCatalogSchemaField(BaseModel):
     """Single field definition in the IS catalog schema."""
     key: str
     label: str
     order: int = 0
-    field_type: str = FIELD_TYPE_TEXT  # "text" | "file"
+    field_type: FieldType = FIELD_TYPE_TEXT  # "text" | "file" | "select"
+    field_options: List[str] = Field(default_factory=list)  # for field_type="select"
 
 
 class ISCatalogSchema(BaseModel):

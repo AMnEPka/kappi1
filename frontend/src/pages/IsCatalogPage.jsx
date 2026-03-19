@@ -95,6 +95,8 @@ function generateFieldKeyFromLabel(label, existingKeys) {
 
 const FIELD_TYPE_TEXT = "text";
 const FIELD_TYPE_FILE = "file";
+const FIELD_TYPE_SELECT = "select";
+const SYSTEM_INPUT_TARGET_OPTIONS = ["ОПЭ", "ПЭ"];
 const ACCEPT_FILES = ".doc,.docx,.xls,.xlsx,.pdf";
 
 async function downloadIsCatalogFile(api, fileId, filename) {
@@ -126,6 +128,7 @@ export default function IsCatalogPage() {
   const [addFieldLabel, setAddFieldLabel] = useState("");
   const [addFieldOrder, setAddFieldOrder] = useState(0);
   const [addFieldType, setAddFieldType] = useState(FIELD_TYPE_TEXT);
+  const [addFieldOptions, setAddFieldOptions] = useState("");
   const [confirmDelete, setConfirmDelete] = useState({
     open: false,
     fieldKey: null,
@@ -233,11 +236,24 @@ export default function IsCatalogPage() {
     const key = generateFieldKeyFromLabel(label, existingKeys);
     const nextOrder = current.length ? Math.max(...current.map((f) => f.order), 0) + 1 : 0;
     const order = addFieldOrder !== undefined && addFieldOrder !== "" ? Number(addFieldOrder) : nextOrder;
-    const newFields = [...current, { key, label, order, field_type: addFieldType }].sort((a, b) => a.order - b.order);
+    const parsedOptions = addFieldOptions
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (addFieldType === FIELD_TYPE_SELECT && parsedOptions.length === 0) {
+      toast.error("Для выпадающего списка укажите варианты через запятую");
+      return;
+    }
+    const newField = { key, label, order, field_type: addFieldType };
+    if (addFieldType === FIELD_TYPE_SELECT) {
+      newField.field_options = parsedOptions;
+    }
+    const newFields = [...current, newField].sort((a, b) => a.order - b.order);
     handleSaveSchema(newFields);
     setAddFieldLabel("");
     setAddFieldOrder(nextOrder);
     setAddFieldType(FIELD_TYPE_TEXT);
+    setAddFieldOptions("");
   };
 
   const handleDeleteField = (fieldKey) => {
@@ -524,6 +540,38 @@ export default function IsCatalogPage() {
 
   /** Переход в мастер создания проекта с хостами текущей ИС (шаг 2 уже заполнен) */
   const conductOsib = () => {
+    const resolveSystemInputTarget = () => {
+      const ordered = schemaFieldsOrdered(schema);
+      const merged = { ...(selectedItem || {}), ...(editForm || {}) };
+
+      // Prefer explicit select fields with OPE/PE options.
+      const targetSelectField = ordered.find(
+        (f) =>
+          f.field_type === FIELD_TYPE_SELECT &&
+          Array.isArray(f.field_options) &&
+          SYSTEM_INPUT_TARGET_OPTIONS.every((opt) => f.field_options.includes(opt))
+      );
+      if (targetSelectField) {
+        const value = merged[targetSelectField.key];
+        if (SYSTEM_INPUT_TARGET_OPTIONS.includes(value)) return value;
+      }
+
+      // Fallback: any field with matching label and value.
+      const labelField = ordered.find((f) =>
+        (f.label || "").toLowerCase().includes("куда вводится система")
+      );
+      if (labelField) {
+        const value = merged[labelField.key];
+        if (SYSTEM_INPUT_TARGET_OPTIONS.includes(value)) return value;
+      }
+
+      // Final fallback: scan all values.
+      const anyValue = Object.values(merged).find((v) =>
+        typeof v === "string" && SYSTEM_INPUT_TARGET_OPTIONS.includes(v)
+      );
+      return anyValue || "ОПЭ";
+    };
+
     const hostIds = editForm.host_ids ?? selectedItem?.host_ids ?? [];
     if (hostIds.length === 0) {
       toast.error("В ИС нет хостов. Добавьте хосты перед проведением ОСИБ.");
@@ -538,6 +586,7 @@ export default function IsCatalogPage() {
         fromIsCatalog: true,
         hostIds: [...hostIds],
         projectName: `${projectName} — ОСИБ`,
+        systemInputTarget: resolveSystemInputTarget(),
       },
     });
   };
@@ -733,9 +782,22 @@ export default function IsCatalogPage() {
                   <SelectContent>
                     <SelectItem value={FIELD_TYPE_TEXT}>Текст</SelectItem>
                     <SelectItem value={FIELD_TYPE_FILE}>Файл</SelectItem>
+                    <SelectItem value={FIELD_TYPE_SELECT}>Выпадающий список</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {addFieldType === FIELD_TYPE_SELECT && (
+                <div className="space-y-2">
+                  <Label htmlFor="field-options">Варианты (через запятую)</Label>
+                  <Input
+                    id="field-options"
+                    placeholder="ОПЭ, ПЭ"
+                    value={addFieldOptions}
+                    onChange={(e) => setAddFieldOptions(e.target.value)}
+                    className="w-64"
+                  />
+                </div>
+              )}
               <Button type="submit" disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                 Добавить поле
@@ -830,7 +892,13 @@ export default function IsCatalogPage() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>{f.field_type === FIELD_TYPE_FILE ? "Файл" : "Текст"}</TableCell>
+                          <TableCell>
+                            {f.field_type === FIELD_TYPE_FILE
+                              ? "Файл"
+                              : f.field_type === FIELD_TYPE_SELECT
+                              ? "Выпадающий список"
+                              : "Текст"}
+                          </TableCell>
                           <TableCell>
                             <Button
                               type="button"
@@ -967,6 +1035,22 @@ export default function IsCatalogPage() {
                               </div>
                             )}
                           </div>
+                        ) : f.field_type === FIELD_TYPE_SELECT ? (
+                          <Select
+                            value={(editForm[f.key] ?? "").toString()}
+                            onValueChange={(value) => setEditForm((prev) => ({ ...prev, [f.key]: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Выберите значение" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(f.field_options || []).map((opt) => (
+                                <SelectItem key={opt} value={opt}>
+                                  {opt}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
                           <Input
                             value={editForm[f.key] ?? ""}
@@ -1361,6 +1445,26 @@ export default function IsCatalogPage() {
                           </Button>
                         )}
                       </div>
+                    ) : f.field_type === FIELD_TYPE_SELECT ? (
+                      <Select
+                        value={
+                          typeof createForm[f.key] === "object"
+                            ? ""
+                            : (createForm[f.key] ?? "").toString()
+                        }
+                        onValueChange={(value) => setCreateForm((prev) => ({ ...prev, [f.key]: value }))}
+                      >
+                        <SelectTrigger id={`create-${f.key}`}>
+                          <SelectValue placeholder="Выберите значение" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(f.field_options || []).map((opt) => (
+                            <SelectItem key={opt} value={opt}>
+                              {opt}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <Input
                         id={`create-${f.key}`}

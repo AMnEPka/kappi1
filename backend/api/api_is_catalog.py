@@ -21,6 +21,7 @@ from models.is_catalog_models import (
     ISCatalogItemCreate,
     ISCatalogItemUpdate,
     FIELD_TYPE_FILE,
+    FIELD_TYPE_SELECT,
     FIELD_TYPE_TEXT,
 )
 from models.auth_models import User
@@ -66,10 +67,21 @@ def _get_upload_dir() -> Path:
 
 
 def _get_schema_fields_with_type(schema_doc: dict) -> List[tuple]:
-    """Return list of (key, field_type) from schema, ordered."""
+    """Return list of (key, field_type, field_options) from schema, ordered."""
     fields = schema_doc.get("fields") or []
     sorted_fields = sorted(fields, key=lambda x: x.get("order", 0))
-    return [(f.get("key"), f.get("field_type") or FIELD_TYPE_TEXT) for f in sorted_fields if f.get("key")]
+    out = []
+    for f in sorted_fields:
+        key = f.get("key")
+        if not key:
+            continue
+        field_type = f.get("field_type") or FIELD_TYPE_TEXT
+        field_options = f.get("field_options") or []
+        if not isinstance(field_options, list):
+            field_options = []
+        normalized_options = [str(opt).strip() for opt in field_options if str(opt).strip()]
+        out.append((key, field_type, normalized_options))
+    return out
 
 
 async def ensure_default_schema():
@@ -86,7 +98,7 @@ async def ensure_default_schema():
 
 def _get_schema_field_keys(schema_doc: dict) -> List[str]:
     """Return ordered list of field keys from schema document."""
-    return [k for k, _ in _get_schema_fields_with_type(schema_doc)]
+    return [k for k, _, _ in _get_schema_fields_with_type(schema_doc)]
 
 
 async def _item_response(doc: dict, schema_doc: dict) -> dict:
@@ -98,7 +110,7 @@ async def _item_response(doc: dict, schema_doc: dict) -> dict:
         "created_at": doc.get("created_at") if doc.get("created_at") is not None else "",
         "created_by": doc.get("created_by"),
     }
-    for k, field_type in keys_with_type:
+    for k, field_type, _ in keys_with_type:
         val = doc.get(k)
         if field_type == FIELD_TYPE_FILE and val and isinstance(val, str):
             file_meta = await db.is_catalog_files.find_one({"id": val}, {"_id": 0, "filename": 1, "content_type": 1})
@@ -115,7 +127,7 @@ def _filter_data_to_schema(data: dict, schema_doc: dict) -> dict:
     """Keep only keys that exist in schema. Text as string; file as file_id string."""
     keys_with_type = _get_schema_fields_with_type(schema_doc)
     result = {}
-    for k, field_type in keys_with_type:
+    for k, field_type, field_options in keys_with_type:
         if k not in data:
             continue
         v = data[k]
@@ -126,6 +138,9 @@ def _filter_data_to_schema(data: dict, schema_doc: dict) -> dict:
                 result[k] = v.strip()
             else:
                 result[k] = ""
+        elif field_type == FIELD_TYPE_SELECT:
+            value = str(v).strip() if v is not None else ""
+            result[k] = value if (not field_options or value in field_options) else ""
         else:
             result[k] = str(v).strip() if v is not None else ""
     return result
