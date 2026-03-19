@@ -89,6 +89,15 @@ webpackConfig.devServer = (devServerConfig) => {
     devServerConfig.liveReload = false;
     devServerConfig.webSocketServer = false; // Disable WebSocket server entirely
     devServerConfig.client = false; // Disable client script entirely (no WebSocket, no overlay)
+  } else {
+    // За reverse-proxy (nginx на :405): клиент HMR подключается к тому же host/port, что и страница, путь /ws
+    const client = devServerConfig.client;
+    if (client !== false) {
+      devServerConfig.client =
+        client && typeof client === "object"
+          ? { ...client, webSocketURL: "auto://0.0.0.0:0/ws" }
+          : { webSocketURL: "auto://0.0.0.0:0/ws" };
+    }
   }
 
   // Apply visual edits dev server setup if enabled
