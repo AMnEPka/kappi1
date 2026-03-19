@@ -12,6 +12,7 @@ import uuid
 ConfigIntegrityScheduleInterval = Literal["daily", "weekly", "monthly"]
 
 SCHEDULE_DOC_ID = "default"
+REPORT_SCHEDULE_DOC_ID = "default"
 
 
 class ConfigIntegrityHost(BaseModel):
@@ -65,3 +66,42 @@ class ConfigIntegrityActionRequest(BaseModel):
 class ConfigIntegrityScheduleUpdate(BaseModel):
     enabled: bool
     interval: ConfigIntegrityScheduleInterval = "daily"
+
+
+ConfigIntegrityReportInterval = Literal["weekly", "monthly"]
+
+
+class ConfigIntegrityReportScheduleUpdate(BaseModel):
+    enabled: bool
+    interval: ConfigIntegrityReportInterval = "weekly"
+
+
+class ConfigIntegrityReportGenerateRequest(BaseModel):
+    # 7 или 30 дней; если не задано — берём из расписания
+    period_days: Optional[int] = None
+
+
+class ConfigIntegrityHostReportRow(BaseModel):
+    host_id: str
+    name: str
+    ip_address: str
+    monitored_days: int
+    violations_count: int
+    has_violations: bool
+    last_check_at: Optional[datetime] = None
+
+
+class ConfigIntegrityReportSummary(BaseModel):
+    period_days: int
+    total_hosts: int
+    hosts_with_violations: int
+    percent_hosts_with_violations: float
+    total_violations: int
+    generated_at: datetime
+
+
+class ConfigIntegrityReportResponse(BaseModel):
+    report_id: str
+    html: str
+    summary: ConfigIntegrityReportSummary
+    rows: List[ConfigIntegrityHostReportRow]

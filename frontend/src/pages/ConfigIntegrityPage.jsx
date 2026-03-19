@@ -37,6 +37,7 @@ import {
   FileText,
   RefreshCw,
   CalendarClock,
+  FileDown,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -49,6 +50,16 @@ const SCHEDULE_INTERVALS = [
   { value: "weekly", short: "7 дн.", label: "Раз в 7 дней" },
   { value: "monthly", short: "Месяц", label: "Раз в месяц" },
 ];
+
+const REPORT_INTERVALS = [
+  { value: "weekly", short: "7 дн.", label: "Раз в 7 дней", periodDays: 7 },
+  { value: "monthly", short: "30 дн.", label: "Раз в 30 дней", periodDays: 30 },
+];
+
+function reportIntervalToIndex(interval) {
+  const i = REPORT_INTERVALS.findIndex((x) => x.value === interval);
+  return i >= 0 ? i : 0;
+}
 
 function intervalToIndex(interval) {
   const i = SCHEDULE_INTERVALS.findIndex((x) => x.value === interval);
@@ -80,6 +91,16 @@ export default function ConfigIntegrityPage() {
 
   const scheduleEnabledRef = useRef(false);
   const schedulePersistTimerRef = useRef(null);
+
+  const [reportEnabled, setReportEnabled] = useState(false);
+  const [reportIntervalIdx, setReportIntervalIdx] = useState(0);
+  const [reportNextRun, setReportNextRun] = useState(null);
+  const [reportSaving, setReportSaving] = useState(false);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const [reports, setReports] = useState([]);
+
+  const reportEnabledRef = useRef(false);
+  const reportPersistTimerRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -125,6 +146,27 @@ export default function ConfigIntegrityPage() {
     }
   }, []);
 
+  const fetchReportSchedule = useCallback(async () => {
+    try {
+      const res = await api.get("/api/config-integrity/report-schedule");
+      const s = res.data;
+      setReportEnabled(Boolean(s.enabled));
+      setReportIntervalIdx(reportIntervalToIndex(s.interval));
+      setReportNextRun(s.next_run_at || null);
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
+  const fetchReports = useCallback(async () => {
+    try {
+      const res = await api.get("/api/config-integrity/reports");
+      setReports(res.data || []);
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
   const persistSchedule = useCallback(
     async (enabled, intervalIdx) => {
       const interval = SCHEDULE_INTERVALS[intervalIdx]?.value || "daily";
@@ -147,14 +189,73 @@ export default function ConfigIntegrityPage() {
     [fetchSchedule]
   );
 
+  const persistReportSchedule = useCallback(
+    async (enabled, intervalIdx) => {
+      const interval = REPORT_INTERVALS[intervalIdx]?.value || "weekly";
+      setReportSaving(true);
+      try {
+        const res = await api.put("/api/config-integrity/report-schedule", {
+          enabled,
+          interval,
+        });
+        setReportNextRun(res.data.next_run_at || null);
+      } catch (e) {
+        toast.error(e.response?.data?.detail || "Не удалось сохранить расписание отчёта");
+        await fetchReportSchedule();
+      } finally {
+        setReportSaving(false);
+      }
+    },
+    [fetchReportSchedule]
+  );
+
+  const handleGenerateReport = async () => {
+    setReportGenerating(true);
+    try {
+      const periodDays = REPORT_INTERVALS[reportIntervalIdx]?.periodDays || 7;
+      const res = await api.post(
+        "/api/config-integrity/report/pdf",
+        { period_days: periodDays },
+        { responseType: "blob" }
+      );
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `config-integrity-report-${periodDays}d.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("PDF отчёт сформирован");
+    } catch (e) {
+      const msg =
+        e.response?.data?.detail ||
+        e.message ||
+        "Не удалось сформировать PDF отчёт";
+      toast.error(msg);
+    } finally {
+      setReportGenerating(false);
+    }
+  };
+
   useEffect(() => {
     scheduleEnabledRef.current = scheduleEnabled;
   }, [scheduleEnabled]);
 
   useEffect(() => {
+    reportEnabledRef.current = reportEnabled;
+  }, [reportEnabled]);
+
+  useEffect(() => {
     return () => {
       if (schedulePersistTimerRef.current) {
         clearTimeout(schedulePersistTimerRef.current);
+      }
+      if (reportPersistTimerRef.current) {
+        clearTimeout(reportPersistTimerRef.current);
       }
     };
   }, []);
@@ -162,7 +263,9 @@ export default function ConfigIntegrityPage() {
   useEffect(() => {
     fetchHosts();
     fetchSchedule();
-  }, [fetchHosts, fetchSchedule]);
+    fetchReportSchedule();
+    fetchReports();
+  }, [fetchHosts, fetchSchedule, fetchReportSchedule, fetchReports]);
 
   const resetForm = () => {
     setFormData({
@@ -368,7 +471,7 @@ export default function ConfigIntegrityPage() {
         </div>
       </div>
 
-      {/* Action buttons + automatic schedule */}
+      {/* Action buttons + schedules + reports */}
       {hosts.length > 0 && (
         <Card>
           <CardContent className="pt-6">
@@ -406,85 +509,200 @@ export default function ConfigIntegrityPage() {
                 </div>
               )}
 
-              <div
-                className={`flex flex-col gap-3 min-w-[min(100%,280px)] max-w-sm flex-1 border-border/60 pt-4 border-t md:pt-0 md:border-t-0 ${
-                  canManage ? "md:border-l md:pl-8" : ""
-                }`}
-              >
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                  Автопроверка по расписанию
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Для всех контролируемых хостов (как кнопка «Проверить…»). Старт в{" "}
-                  <span className="font-medium text-foreground">{scheduleWallTime}</span>{" "}
-                  ({scheduleTimezone}).
-                </p>
-                {canManage ? (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm">Включить</span>
-                      <div className="flex items-center gap-2">
-                        {scheduleSaving && (
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        )}
-                        <Switch
-                          checked={scheduleEnabled}
-                          disabled={scheduleSaving}
-                          onCheckedChange={(v) => {
-                            setScheduleEnabled(v);
-                            persistSchedule(v, scheduleIntervalIdx);
-                          }}
-                        />
+              <div className={`flex flex-col gap-4 min-w-[min(100%,280px)] max-w-sm flex-1 border-border/60 pt-4 border-t md:pt-0 md:border-t-0 ${canManage ? "md:border-l md:pl-8" : ""}`}>
+                {/* Auto-check schedule */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                    Автопроверка по расписанию
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Для всех контролируемых хостов (как кнопка «Проверить…»). Старт в{" "}
+                    <span className="font-medium text-foreground">{scheduleWallTime}</span>{" "}
+                    ({scheduleTimezone}).
+                  </p>
+                  {canManage ? (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm">Включить</span>
+                        <div className="flex items-center gap-2">
+                          {scheduleSaving && (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                          <Switch
+                            checked={scheduleEnabled}
+                            disabled={scheduleSaving}
+                            onCheckedChange={(v) => {
+                              setScheduleEnabled(v);
+                              persistSchedule(v, scheduleIntervalIdx);
+                            }}
+                          />
+                        </div>
                       </div>
+                      <div className={`space-y-2 ${!scheduleEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+                        <Slider
+                          value={[scheduleIntervalIdx]}
+                          min={0}
+                          max={2}
+                          step={1}
+                          disabled={!scheduleEnabled || scheduleSaving}
+                          onValueChange={(v) => {
+                            const idx = v[0] ?? 0;
+                            setScheduleIntervalIdx(idx);
+                            if (schedulePersistTimerRef.current) clearTimeout(schedulePersistTimerRef.current);
+                            if (!scheduleEnabledRef.current) return;
+                            schedulePersistTimerRef.current = setTimeout(() => {
+                              persistSchedule(true, idx);
+                              schedulePersistTimerRef.current = null;
+                            }, 400);
+                          }}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground px-0.5">
+                          {SCHEDULE_INTERVALS.map((x) => (
+                            <span key={x.value} className="text-center max-w-[5.5rem]">
+                              {x.short}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {SCHEDULE_INTERVALS[scheduleIntervalIdx].label}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {scheduleEnabled
+                        ? `${SCHEDULE_INTERVALS[scheduleIntervalIdx].label}. Следующий запуск: ${fmtDate(scheduleNextRun)}`
+                        : "Автопроверка выключена."}
+                    </p>
+                  )}
+                  {scheduleEnabled && scheduleNextRun && canManage && (
+                    <p className="text-xs text-muted-foreground">
+                      Следующий запуск: {fmtDate(scheduleNextRun)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="h-px bg-border/60" />
+
+                {/* Report schedule + manual generate */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <FileDown className="h-4 w-4 text-muted-foreground" />
+                    Отчётность
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Отчёт по целостности: таблица по всем контролируемым хостам + итоги за период.
+                  </p>
+                  {canManage && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        disabled={reportGenerating}
+                        onClick={handleGenerateReport}
+                      >
+                        {reportGenerating ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileDown className="h-4 w-4 mr-2" />
+                        )}
+                        Сформировать отчёт
+                      </Button>
                     </div>
-                    <div
-                      className={`space-y-2 ${!scheduleEnabled ? "opacity-50 pointer-events-none" : ""}`}
-                    >
-                      <Slider
-                        value={[scheduleIntervalIdx]}
-                        min={0}
-                        max={2}
-                        step={1}
-                        disabled={!scheduleEnabled || scheduleSaving}
-                        onValueChange={(v) => {
-                          const idx = v[0] ?? 0;
-                          setScheduleIntervalIdx(idx);
-                          if (schedulePersistTimerRef.current) {
-                            clearTimeout(schedulePersistTimerRef.current);
-                          }
-                          if (!scheduleEnabledRef.current) return;
-                          schedulePersistTimerRef.current = setTimeout(() => {
-                            persistSchedule(true, idx);
-                            schedulePersistTimerRef.current = null;
-                          }, 400);
-                        }}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground px-0.5">
-                        {SCHEDULE_INTERVALS.map((x) => (
-                          <span key={x.value} className="text-center max-w-[5.5rem]">
-                            {x.short}
-                          </span>
+                  )}
+
+                  {canManage ? (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm">Автогенерация</span>
+                        <div className="flex items-center gap-2">
+                          {reportSaving && (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                          <Switch
+                            checked={reportEnabled}
+                            disabled={reportSaving}
+                            onCheckedChange={(v) => {
+                              setReportEnabled(v);
+                              persistReportSchedule(v, reportIntervalIdx);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className={`space-y-2 ${!reportEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+                        <Slider
+                          value={[reportIntervalIdx]}
+                          min={0}
+                          max={1}
+                          step={1}
+                          disabled={!reportEnabled || reportSaving}
+                          onValueChange={(v) => {
+                            const idx = v[0] ?? 0;
+                            setReportIntervalIdx(idx);
+                            if (reportPersistTimerRef.current) clearTimeout(reportPersistTimerRef.current);
+                            if (!reportEnabledRef.current) return;
+                            reportPersistTimerRef.current = setTimeout(() => {
+                              persistReportSchedule(true, idx);
+                              reportPersistTimerRef.current = null;
+                            }, 400);
+                          }}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground px-0.5">
+                          {REPORT_INTERVALS.map((x) => (
+                            <span key={x.value} className="text-center max-w-[7rem]">
+                              {x.short}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {REPORT_INTERVALS[reportIntervalIdx].label}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {reportEnabled
+                        ? `${REPORT_INTERVALS[reportIntervalIdx].label}. Следующий запуск: ${fmtDate(reportNextRun)}`
+                        : "Автоотчёт выключен."}
+                    </p>
+                  )}
+                  {reportEnabled && reportNextRun && canManage && (
+                    <p className="text-xs text-muted-foreground">
+                      Следующий запуск: {fmtDate(reportNextRun)}
+                    </p>
+                  )}
+
+                  {reports?.length > 0 && (
+                    <div className="pt-2">
+                      <div className="text-xs text-muted-foreground mb-1">Последние отчёты</div>
+                      <div className="space-y-1">
+                        {reports.slice(0, 3).map((r) => (
+                          <Button
+                            key={r.id}
+                            variant="ghost"
+                            className="justify-start h-auto py-1 px-2 text-left"
+                            onClick={async () => {
+                              const doc = await api.get(`/api/config-integrity/reports/${r.id}`);
+                              const html = doc.data?.html;
+                              const w = window.open("", "_blank", "noopener,noreferrer");
+                              if (w) {
+                                w.location.href =
+                                  "data:text/html;charset=utf-8," +
+                                  encodeURIComponent(html || "<pre>Report HTML missing</pre>");
+                              }
+                            }}
+                          >
+                            <span className="text-xs">
+                              {r.generated_at ? fmtDate(r.generated_at) : r.id}
+                            </span>
+                          </Button>
                         ))}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {SCHEDULE_INTERVALS[scheduleIntervalIdx].label}
-                      </p>
                     </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {scheduleEnabled
-                      ? `${SCHEDULE_INTERVALS[scheduleIntervalIdx].label}. Следующий запуск: ${fmtDate(scheduleNextRun)}`
-                      : "Автопроверка выключена."}
-                  </p>
-                )}
-                {scheduleEnabled && scheduleNextRun && canManage && (
-                  <p className="text-xs text-muted-foreground">
-                    Следующий запуск: {fmtDate(scheduleNextRun)}
-                  </p>
-                )}
+                  )}
+                </div>
               </div>
             </div>
             {canManage && (

@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 
 from config.config_init import db, logger, SCHEDULER_POLL_SECONDS
 from .scheduler_execution import handle_due_scheduler_job
-from services.services_config_integrity import process_config_integrity_schedule_due
+from services.services_config_integrity import (
+    process_config_integrity_schedule_due,
+    process_config_integrity_report_schedule_due,
+)
 
 
 async def scheduler_worker():
@@ -30,6 +33,7 @@ async def scheduler_worker():
             for job_doc in jobs:
                 await handle_due_scheduler_job(job_doc)
             await process_config_integrity_schedule_due()
+            await process_config_integrity_report_schedule_due()
         except Exception as exc:
             logger.error(f"Scheduler worker error: {str(exc)}")
         await asyncio.sleep(SCHEDULER_POLL_SECONDS)

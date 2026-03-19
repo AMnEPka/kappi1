@@ -16,7 +16,8 @@ from config.config_settings import (
     CONFIG_INTEGRITY_SCHEDULE_HOUR,
     CONFIG_INTEGRITY_SCHEDULE_MINUTE,
 )
-from models.config_integrity_models import SCHEDULE_DOC_ID
+from models.config_integrity_models import SCHEDULE_DOC_ID, REPORT_SCHEDULE_DOC_ID
+from utils.db_utils import prepare_for_mongo
 
 SSH_CONNECT_TIMEOUT = 10
 SSH_COMMAND_TIMEOUT = 120
@@ -205,7 +206,77 @@ async def check_host(host_doc: dict) -> dict:
             "last_check_at": now.isoformat(),
         }
         await db.config_integrity_hosts.update_one({"id": host_id}, {"$set": update})
+        try:
+            await db.config_integrity_checks.insert_one(
+                prepare_for_mongo(
+                    {
+                        "host_id": host_id,
+                        "checked_at": now.isoformat(),
+                        "changed_files_count": result.get("changed"),
+                        "scanned_files_count": result.get("scanned"),
+                        "success": True,
+                    }
+                )
+            )
+        except Exception:
+            logger.exception("Failed to persist config integrity check history for host_id=%s", host_id)
     return {"host_id": host_id, **result}
+
+
+def _report_period_days(interval: str) -> int:
+    return 30 if interval == "monthly" else 7
+
+
+async def process_config_integrity_report_schedule_due() -> None:
+    """
+    If report schedule is enabled and due, generate report snapshot and save it to DB.
+    Uses the same fixed wall-clock time (9:00 local) logic by reusing compute_next_config_integrity_run_at_iso.
+    """
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    doc = await db.config_integrity_report_schedule.find_one(
+        {
+            "id": REPORT_SCHEDULE_DOC_ID,
+            "enabled": True,
+            "next_run_at": {"$ne": None, "$lte": now_iso},
+        },
+        {"_id": 0},
+    )
+    if not doc:
+        return
+
+    next_at = doc.get("next_run_at")
+    claimed = await db.config_integrity_report_schedule.update_one(
+        {"id": REPORT_SCHEDULE_DOC_ID, "next_run_at": next_at},
+        {"$set": {"next_run_at": None, "updated_at": now_iso}},
+    )
+    if claimed.modified_count == 0:
+        return
+
+    interval = doc.get("interval") or "weekly"
+    period_days = _report_period_days(interval)
+    try:
+        from services.services_config_integrity_report import generate_config_integrity_report
+
+        report = await generate_config_integrity_report(period_days=period_days)
+        logger.info("Config integrity report generated on schedule, period_days=%s", period_days)
+        _ = report
+    except Exception:
+        logger.exception("Config integrity scheduled report generation failed")
+    finally:
+        cur = await db.config_integrity_report_schedule.find_one(
+            {"id": REPORT_SCHEDULE_DOC_ID}, {"_id": 0}
+        )
+        if cur and cur.get("enabled"):
+            effective_interval = cur.get("interval") or "weekly"
+            nxt = compute_next_config_integrity_run_at_iso(
+                "monthly" if effective_interval == "monthly" else "weekly",
+                datetime.now(timezone.utc),
+            )
+            await db.config_integrity_report_schedule.update_one(
+                {"id": REPORT_SCHEDULE_DOC_ID},
+                {"$set": {"next_run_at": nxt, "updated_at": datetime.now(timezone.utc).isoformat()}},
+            )
 
 
 def _schedule_tz() -> ZoneInfo:
