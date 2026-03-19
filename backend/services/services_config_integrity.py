@@ -7,9 +7,15 @@ import asyncio
 import re
 import paramiko
 from typing import Tuple, Optional
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, time, date, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from config.config_init import logger, decrypt_password, db, encrypt_password
+from config.config_settings import (
+    CONFIG_INTEGRITY_SCHEDULE_TZ,
+    CONFIG_INTEGRITY_SCHEDULE_HOUR,
+    CONFIG_INTEGRITY_SCHEDULE_MINUTE,
+)
 from models.config_integrity_models import SCHEDULE_DOC_ID
 
 SSH_CONNECT_TIMEOUT = 10
@@ -202,13 +208,58 @@ async def check_host(host_doc: dict) -> dict:
     return {"host_id": host_id, **result}
 
 
-def _next_check_after(from_dt: datetime, interval: str) -> datetime:
-    """Next scheduled run moment after from_dt (UTC)."""
+def _schedule_tz() -> ZoneInfo:
+    try:
+        return ZoneInfo(CONFIG_INTEGRITY_SCHEDULE_TZ)
+    except Exception:
+        logger.warning(
+            "Invalid CONFIG_INTEGRITY_SCHEDULE_TZ=%r, using UTC",
+            CONFIG_INTEGRITY_SCHEDULE_TZ,
+        )
+        return ZoneInfo("UTC")
+
+
+def _wallclock_run_local(d: date, tz: ZoneInfo) -> datetime:
+    return datetime.combine(
+        d,
+        time(CONFIG_INTEGRITY_SCHEDULE_HOUR, CONFIG_INTEGRITY_SCHEDULE_MINUTE),
+        tz,
+    )
+
+
+def compute_next_config_integrity_run_at_iso(interval: str, anchor_utc: datetime) -> str:
+    """
+    Следующий запуск автопроверки в локальном времени CONFIG_INTEGRITY_SCHEDULE_TZ
+    (по умолчанию 9:00). Интервалы: ежедневно — ближайшее такое время;
+    раз в 7 дней / месяц — через 7 / 30 календарных дней в ту же локальную отметку.
+    Возвращает ISO-UTC для хранения в БД.
+    """
+    if anchor_utc.tzinfo is None:
+        anchor_utc = anchor_utc.replace(tzinfo=timezone.utc)
+    tz = _schedule_tz()
+    local = anchor_utc.astimezone(tz)
+
+    if interval == "daily":
+        d = local.date()
+        cand = _wallclock_run_local(d, tz)
+        if cand <= local:
+            cand = _wallclock_run_local(d + timedelta(days=1), tz)
+        return cand.astimezone(timezone.utc).isoformat()
+
     if interval == "weekly":
-        return from_dt + timedelta(days=7)
-    if interval == "monthly":
-        return from_dt + timedelta(days=30)
-    return from_dt + timedelta(days=1)
+        d = local.date()
+        cand = _wallclock_run_local(d + timedelta(days=7), tz)
+        while cand <= local:
+            cand += timedelta(days=7)
+        return cand.astimezone(timezone.utc).isoformat()
+
+    # monthly: шаг 30 календарных дней (как в продукте ранее)
+    d = local.date()
+    cand = _wallclock_run_local(d + timedelta(days=30), tz)
+    while cand <= local:
+        next_d = cand.date() + timedelta(days=30)
+        cand = _wallclock_run_local(next_d, tz)
+    return cand.astimezone(timezone.utc).isoformat()
 
 
 async def process_config_integrity_schedule_due() -> None:
@@ -254,8 +305,15 @@ async def process_config_integrity_schedule_due() -> None:
     finally:
         cur = await db.config_integrity_schedule.find_one({"id": SCHEDULE_DOC_ID}, {"_id": 0})
         if cur and cur.get("enabled"):
-            nxt = _next_check_after(datetime.now(timezone.utc), interval)
+            nxt = compute_next_config_integrity_run_at_iso(
+                interval, datetime.now(timezone.utc)
+            )
             await db.config_integrity_schedule.update_one(
                 {"id": SCHEDULE_DOC_ID},
-                {"$set": {"next_run_at": nxt.isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}},
+                {
+                    "$set": {
+                        "next_run_at": nxt,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                },
             )

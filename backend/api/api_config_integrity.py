@@ -8,6 +8,11 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 
 from config.config_init import db, encrypt_password
+from config.config_settings import (
+    CONFIG_INTEGRITY_SCHEDULE_TZ,
+    CONFIG_INTEGRITY_SCHEDULE_HOUR,
+    CONFIG_INTEGRITY_SCHEDULE_MINUTE,
+)
 from models.auth_models import User
 from models.config_integrity_models import (
     ConfigIntegrityHost,
@@ -18,7 +23,11 @@ from models.config_integrity_models import (
     SCHEDULE_DOC_ID,
 )
 from services.services_auth import get_current_user, require_permission
-from services.services_config_integrity import initialize_host, check_host
+from services.services_config_integrity import (
+    initialize_host,
+    check_host,
+    compute_next_config_integrity_run_at_iso,
+)
 from utils.db_utils import prepare_for_mongo, parse_from_mongo
 from utils.audit_utils import log_audit
 
@@ -38,11 +47,19 @@ async def get_config_integrity_schedule(current_user: User = Depends(get_current
     await require_permission(current_user, "config_integrity_view")
     doc = await db.config_integrity_schedule.find_one({"id": SCHEDULE_DOC_ID}, {"_id": 0})
     if not doc:
-        return {"enabled": False, "interval": "daily", "next_run_at": None}
+        return {
+            "enabled": False,
+            "interval": "daily",
+            "next_run_at": None,
+            "schedule_timezone": CONFIG_INTEGRITY_SCHEDULE_TZ,
+            "schedule_wall_time": f"{CONFIG_INTEGRITY_SCHEDULE_HOUR:02d}:{CONFIG_INTEGRITY_SCHEDULE_MINUTE:02d}",
+        }
     return {
         "enabled": bool(doc.get("enabled")),
         "interval": doc.get("interval") or "daily",
         "next_run_at": doc.get("next_run_at"),
+        "schedule_timezone": CONFIG_INTEGRITY_SCHEDULE_TZ,
+        "schedule_wall_time": f"{CONFIG_INTEGRITY_SCHEDULE_HOUR:02d}:{CONFIG_INTEGRITY_SCHEDULE_MINUTE:02d}",
     }
 
 
@@ -54,7 +71,11 @@ async def put_config_integrity_schedule(
     await require_permission(current_user, "config_integrity_manage")
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
-    next_run_at = now_iso if body.enabled else None
+    next_run_at = (
+        compute_next_config_integrity_run_at_iso(body.interval, now)
+        if body.enabled
+        else None
+    )
     payload = {
         "id": SCHEDULE_DOC_ID,
         "enabled": body.enabled,
@@ -78,6 +99,8 @@ async def put_config_integrity_schedule(
         "enabled": body.enabled,
         "interval": body.interval,
         "next_run_at": next_run_at,
+        "schedule_timezone": CONFIG_INTEGRITY_SCHEDULE_TZ,
+        "schedule_wall_time": f"{CONFIG_INTEGRITY_SCHEDULE_HOUR:02d}:{CONFIG_INTEGRITY_SCHEDULE_MINUTE:02d}",
     }
 
 

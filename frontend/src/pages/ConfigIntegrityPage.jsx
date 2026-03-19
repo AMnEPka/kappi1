@@ -75,6 +75,11 @@ export default function ConfigIntegrityPage() {
   const [scheduleIntervalIdx, setScheduleIntervalIdx] = useState(0);
   const [scheduleNextRun, setScheduleNextRun] = useState(null);
   const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleWallTime, setScheduleWallTime] = useState("09:00");
+  const [scheduleTimezone, setScheduleTimezone] = useState("Europe/Moscow");
+
+  const scheduleEnabledRef = useRef(false);
+  const schedulePersistTimerRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -113,6 +118,8 @@ export default function ConfigIntegrityPage() {
       setScheduleEnabled(Boolean(s.enabled));
       setScheduleIntervalIdx(intervalToIndex(s.interval));
       setScheduleNextRun(s.next_run_at || null);
+      if (s.schedule_wall_time) setScheduleWallTime(s.schedule_wall_time);
+      if (s.schedule_timezone) setScheduleTimezone(s.schedule_timezone);
     } catch {
       /* нет права просмотра или сеть */
     }
@@ -128,6 +135,8 @@ export default function ConfigIntegrityPage() {
           interval,
         });
         setScheduleNextRun(res.data.next_run_at || null);
+        if (res.data.schedule_wall_time) setScheduleWallTime(res.data.schedule_wall_time);
+        if (res.data.schedule_timezone) setScheduleTimezone(res.data.schedule_timezone);
       } catch (e) {
         toast.error(e.response?.data?.detail || "Не удалось сохранить расписание");
         await fetchSchedule();
@@ -137,6 +146,18 @@ export default function ConfigIntegrityPage() {
     },
     [fetchSchedule]
   );
+
+  useEffect(() => {
+    scheduleEnabledRef.current = scheduleEnabled;
+  }, [scheduleEnabled]);
+
+  useEffect(() => {
+    return () => {
+      if (schedulePersistTimerRef.current) {
+        clearTimeout(schedulePersistTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchHosts();
@@ -252,7 +273,7 @@ export default function ConfigIntegrityPage() {
           )
         : monitoredIds;
     if (ids.length === 0) {
-      toast.info("Нет мониторируемых хостов для проверки");
+      toast.info("Нет контролируемых хостов для проверки");
       return;
     }
     setCheckLoading(true);
@@ -395,7 +416,9 @@ export default function ConfigIntegrityPage() {
                   Автопроверка по расписанию
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Для всех мониторируемых хостов (как кнопка «Проверить…»).
+                  Для всех контролируемых хостов (как кнопка «Проверить…»). Старт в{" "}
+                  <span className="font-medium text-foreground">{scheduleWallTime}</span>{" "}
+                  ({scheduleTimezone}).
                 </p>
                 {canManage ? (
                   <>
@@ -427,10 +450,14 @@ export default function ConfigIntegrityPage() {
                         onValueChange={(v) => {
                           const idx = v[0] ?? 0;
                           setScheduleIntervalIdx(idx);
-                        }}
-                        onValueCommit={(v) => {
-                          const idx = v[0] ?? 0;
-                          if (scheduleEnabled) persistSchedule(true, idx);
+                          if (schedulePersistTimerRef.current) {
+                            clearTimeout(schedulePersistTimerRef.current);
+                          }
+                          if (!scheduleEnabledRef.current) return;
+                          schedulePersistTimerRef.current = setTimeout(() => {
+                            persistSchedule(true, idx);
+                            schedulePersistTimerRef.current = null;
+                          }, 400);
                         }}
                         className="w-full"
                       />
@@ -470,8 +497,8 @@ export default function ConfigIntegrityPage() {
                 )}
                 {selectedIds.size === 0 && (
                   <p className="text-sm text-muted-foreground mt-4">
-                    Инициализация — для неинициализированных хостов. Проверка — для
-                    всех мониторируемых.
+                    Инициализация — запускается один раз для каждого хоста, который не на контроле. Проверка — для
+                    всех контролируемых (или всех отмеченных).
                   </p>
                 )}
               </>
