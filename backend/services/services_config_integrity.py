@@ -305,8 +305,10 @@ async def process_config_integrity_schedule_due() -> None:
     finally:
         cur = await db.config_integrity_schedule.find_one({"id": SCHEDULE_DOC_ID}, {"_id": 0})
         if cur and cur.get("enabled"):
+            # Интервал мог измениться в UI пока шли SSH-проверки — берём из актуального документа
+            effective_interval = cur.get("interval") or "daily"
             nxt = compute_next_config_integrity_run_at_iso(
-                interval, datetime.now(timezone.utc)
+                effective_interval, datetime.now(timezone.utc)
             )
             await db.config_integrity_schedule.update_one(
                 {"id": SCHEDULE_DOC_ID},
