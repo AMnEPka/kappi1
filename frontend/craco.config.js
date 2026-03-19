@@ -95,8 +95,8 @@ webpackConfig.devServer = (devServerConfig) => {
     if (client !== false) {
       devServerConfig.client =
         client && typeof client === "object"
-          ? { ...client, webSocketURL: "auto://0.0.0.0:0/ws" }
-          : { webSocketURL: "auto://0.0.0.0:0/ws" };
+          ? { ...client, webSocketURL: "auto:///ws" }
+          : { webSocketURL: "auto:///ws" };
     }
   }
 

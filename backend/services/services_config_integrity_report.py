@@ -82,7 +82,8 @@ async def generate_config_integrity_report(*, period_days: int) -> Dict[str, Any
                 monitored_days = 0
 
         vcount = violations_by_host.get(hid, 0)
-        has_v = vcount > 0 or (isinstance(h.get("changed_files_count"), int) and h.get("changed_files_count") > 0)
+        # "has_violations" must reflect only violations within the selected period
+        has_v = vcount > 0
         if has_v:
             hosts_with_violations += 1
         total_violations += vcount
