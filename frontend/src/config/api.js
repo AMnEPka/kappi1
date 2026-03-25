@@ -279,18 +279,16 @@ api.interceptors.response.use(
         }
       }
 
-      // All refresh attempts failed
+      // All refresh attempts failed.
+      // We're inside the `error.response?.status === 401` block, which means
+      // the server IS reachable and explicitly rejected our token. If we also
+      // can't refresh, the session is dead — always force-logout.
+      // (Network resilience for "server completely down" is handled separately
+      // in fetchCurrentUser, which never enters this 401 branch.)
       console.error('❌ All token refresh attempts failed');
       processQueue(lastError, null);
       isRefreshing = false;
-      
-      // Only force-logout on definitive auth errors (server explicitly rejected the token).
-      // Network errors (server unavailable, timeout) should NOT wipe the session —
-      // the token may still be valid once the server comes back.
-      const refreshStatus = lastError?.response?.status;
-      if (refreshStatus === 401 || refreshStatus === 403) {
-        forceLogout('session_expired');
-      }
+      forceLogout('session_expired');
       return Promise.reject(lastError);
     }
 
