@@ -18,6 +18,7 @@ const IsCatalogPage = lazy(() => import("@/pages/IsCatalogPage"));
 const SecurityProfilesPage = lazy(() => import("@/pages/SecurityProfilesPage"));
 const ApplyProfilePage = lazy(() => import("@/pages/ApplyProfilePage"));
 const ConfigIntegrityPage = lazy(() => import("@/pages/ConfigIntegrityPage"));
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 
 // Page wrappers (pages that need router props)
 import {
@@ -76,6 +77,7 @@ function App() {
                             <Route path="/roles" element={<RolesPage />} />
                             <Route path="/config-integrity" element={<ConfigIntegrityPage />} />
                             <Route path="/ai-test" element={<AITestPage />} />
+                            <Route path="*" element={<NotFoundPage />} />
                           </Routes>
                         </Suspense>
                       </ErrorBoundary>
