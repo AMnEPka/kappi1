@@ -32,7 +32,6 @@ export const MainLayout = ({ children }) => {
   const showIbProfiles = hasPermission('ib_profiles_view') || hasPermission('ib_profiles_apply');
   const showConfigIntegrity = hasPermission('config_integrity_view') || hasPermission('config_integrity_manage');
   const isActive = (path) => {
-    if (path === '/hosts') return location.pathname === '/hosts';
     if (path === '/is-catalog') return location.pathname === '/is-catalog';
     if (path === '/ib-profiles') return location.pathname.startsWith('/ib-profiles');
     if (path === '/config-integrity') return location.pathname === '/config-integrity';
@@ -282,7 +281,6 @@ const getPageTitle = (pathname) => {
     '/is-catalog': 'Каталог ИС/ИР',
     '/ib-profiles': 'Перечень профилей ИБ',
     '/ib-profiles/apply': 'Применение профилей ИБ',
-    '/hosts': 'Хосты',
     '/scripts': 'Проверки',
     '/scheduler': 'Планировщик',
     '/logs': 'Логи системы',

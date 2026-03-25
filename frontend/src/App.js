@@ -10,7 +10,6 @@ const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const RolesPage = lazy(() => import("@/pages/RolesPage"));
 const LogsPage = lazy(() => import("@/pages/LogsPage"));
 const SchedulerPage = lazy(() => import("@/pages/SchedulerPage"));
-const HostsPage = lazy(() => import("@/pages/HostsPage"));
 const ScriptsPage = lazy(() => import("@/pages/ScriptsPage"));
 const ExecutePage = lazy(() => import("@/pages/ExecutePage"));
 const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
@@ -67,7 +66,6 @@ function App() {
                             <Route path="/is-catalog" element={<IsCatalogPage />} />
                             <Route path="/ib-profiles" element={<SecurityProfilesPage />} />
                             <Route path="/ib-profiles/apply" element={<ApplyProfilePage />} />
-                            <Route path="/hosts" element={<HostsPage />} />
                             <Route path="/scripts" element={<ScriptsPage />} />
                             <Route path="/execute" element={<ExecutePage />} />
                             <Route path="/history" element={<HistoryPage />} />
