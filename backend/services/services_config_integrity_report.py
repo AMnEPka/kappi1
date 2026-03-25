@@ -41,12 +41,14 @@ def _fmt_dt_ru(iso: str | None) -> str:
         return iso
 
 
-async def generate_config_integrity_report(*, period_days: int) -> Dict[str, Any]:
+async def _aggregate_config_integrity_report_data(
+    *, period_days: int, now: datetime | None = None
+) -> Dict[str, Any]:
     """
-    Builds report from current monitored hosts + check history for the last N days.
-    Stores HTML snapshot in `config_integrity_reports` and returns the stored doc.
+    Aggregates report rows + summary for the last N days.
+    Does NOT store anything in the database.
     """
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
     since_iso = (now - timedelta(days=period_days)).isoformat()
 
     hosts = await db.config_integrity_hosts.find({"is_monitored": True}, {"_id": 0}).to_list(5000)
@@ -105,6 +107,31 @@ async def generate_config_integrity_report(*, period_days: int) -> Dict[str, Any
     total_hosts = len(rows)
     percent = (hosts_with_violations / total_hosts * 100.0) if total_hosts else 0.0
 
+    generated_at = now.isoformat()
+    return {
+        "generated_at": generated_at,
+        "period_days": period_days,
+        "summary": {
+            "period_days": period_days,
+            "total_hosts": total_hosts,
+            "hosts_with_violations": hosts_with_violations,
+            "percent_hosts_with_violations": percent,
+            "total_violations": total_violations,
+            "generated_at": generated_at,
+        },
+        "rows": rows,
+    }
+
+
+async def generate_config_integrity_report(*, period_days: int) -> Dict[str, Any]:
+    """
+    Builds report from current monitored hosts + check history for the last N days.
+    Stores HTML snapshot in `config_integrity_reports` and returns the stored doc.
+    """
+    data = await _aggregate_config_integrity_report_data(period_days=period_days)
+    summary = data.get("summary") or {}
+    rows = data.get("rows") or []
+
     # Build HTML
     html_rows = []
     for r in rows:
@@ -122,7 +149,7 @@ async def generate_config_integrity_report(*, period_days: int) -> Dict[str, Any
         )
 
     report_id = str(uuid.uuid4())
-    generated_at = now.isoformat()
+    generated_at = data.get("generated_at")
     title = f"Отчёт по целостности конфигурации (период {period_days} дней)"
     html = f"""<!doctype html>
 <html lang="ru">
@@ -187,14 +214,7 @@ async def generate_config_integrity_report(*, period_days: int) -> Dict[str, Any
         "id": report_id,
         "generated_at": generated_at,
         "period_days": period_days,
-        "summary": {
-            "period_days": period_days,
-            "total_hosts": total_hosts,
-            "hosts_with_violations": hosts_with_violations,
-            "percent_hosts_with_violations": percent,
-            "total_violations": total_violations,
-            "generated_at": generated_at,
-        },
+        "summary": summary,
         "rows": rows,
         "html": html,
     }
@@ -213,7 +233,8 @@ async def generate_config_integrity_report_pdf_bytes(*, period_days: int) -> byt
     Generates a PDF report (bytes) for the last N days.
     Uses the same underlying data aggregation as HTML report.
     """
-    data = await generate_config_integrity_report(period_days=period_days)
+    # IMPORTANT: do not persist report docs when user only requests a PDF download
+    data = await _aggregate_config_integrity_report_data(period_days=period_days)
     summary = data.get("summary") or {}
     rows = data.get("rows") or []
 
