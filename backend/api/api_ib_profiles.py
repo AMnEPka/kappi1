@@ -71,8 +71,39 @@ async def list_profiles(
             {"version": {"$regex": search.strip(), "$options": "i"}},
         ]
 
-    cursor = db.ib_profiles.find(query, {"_id": 0}).sort("updated_at", -1)
-    docs = await cursor.to_list(1000)
+    # NOTE:
+    # Historically some write paths stored `updated_at` as BSON Date while others store ISO strings.
+    # MongoDB sorts Date > String regardless of value, which breaks "most recent first".
+    # We normalize sorting by converting both types to a Date in an aggregation pipeline.
+    pipeline = [
+        {"$match": query},
+        {
+            "$addFields": {
+                "_updated_at_sort": {
+                    "$ifNull": [
+                        {
+                            "$cond": [
+                                {"$eq": [{"$type": "$updated_at"}, "date"]},
+                                "$updated_at",
+                                {
+                                    "$dateFromString": {
+                                        "dateString": "$updated_at",
+                                        "onError": datetime.fromtimestamp(0, tz=timezone.utc),
+                                        "onNull": datetime.fromtimestamp(0, tz=timezone.utc),
+                                    }
+                                },
+                            ]
+                        },
+                        datetime.fromtimestamp(0, tz=timezone.utc),
+                    ]
+                }
+            }
+        },
+        {"$sort": {"_updated_at_sort": -1}},
+        {"$project": {"_id": 0, "_updated_at_sort": 0}},
+        {"$limit": 1000},
+    ]
+    docs = await db.ib_profiles.aggregate(pipeline).to_list(1000)
 
     result = []
     for doc in docs:
@@ -187,7 +218,11 @@ async def update_profile(
         # Архивировать текущий, создать новую версию (новая запись с новым id)
         await db.ib_profiles.update_one(
             {"id": profile_id},
-            {"$set": {"status": "archived", "updated_at": datetime.now(timezone.utc)}}
+            {
+                "$set": prepare_for_mongo(
+                    {"status": "archived", "updated_at": datetime.now(timezone.utc)}
+                )
+            }
         )
         new_id = str(uuid.uuid4())
         new_version = (body.version or existing.get("version", "1")).strip() or "1"

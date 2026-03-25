@@ -4,9 +4,12 @@ Pydantic models for projects, tasks, and access control
 """
 
 from pydantic import BaseModel, Field, ConfigDict # pyright: ignore[reportMissingImports]
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Literal
 from datetime import datetime, timezone
 import uuid
+
+
+ProjectSystemInputTarget = Literal["ОПЭ", "ПЭ"]
 
 
 class Project(BaseModel):
@@ -15,6 +18,7 @@ class Project(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     description: Optional[str] = None
+    system_input_target: ProjectSystemInputTarget = "ОПЭ"
     status: str = "draft"  # draft, running, completed, failed
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: Optional[datetime] = None
@@ -27,11 +31,13 @@ class Project(BaseModel):
 class ProjectCreate(BaseModel):
     name: str
     description: Optional[str] = None
+    system_input_target: ProjectSystemInputTarget = "ОПЭ"
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    system_input_target: Optional[ProjectSystemInputTarget] = None
     status: Optional[str] = None
 
 

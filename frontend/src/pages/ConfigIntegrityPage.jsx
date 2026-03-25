@@ -36,10 +36,35 @@ import {
   ShieldCheck,
   FileText,
   RefreshCw,
+  CalendarClock,
+  FileDown,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "../config/api";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
+
+const SCHEDULE_INTERVALS = [
+  { value: "daily", short: "24 ч", label: "Раз в 24 часа" },
+  { value: "weekly", short: "7 дн.", label: "Раз в 7 дней" },
+  { value: "monthly", short: "Месяц", label: "Раз в месяц" },
+];
+
+const REPORT_INTERVALS = [
+  { value: "weekly", short: "7 дн.", label: "Раз в 7 дней", periodDays: 7 },
+  { value: "monthly", short: "30 дн.", label: "Раз в 30 дней", periodDays: 30 },
+];
+
+function reportIntervalToIndex(interval) {
+  const i = REPORT_INTERVALS.findIndex((x) => x.value === interval);
+  return i >= 0 ? i : 0;
+}
+
+function intervalToIndex(interval) {
+  const i = SCHEDULE_INTERVALS.findIndex((x) => x.value === interval);
+  return i >= 0 ? i : 0;
+}
 
 export default function ConfigIntegrityPage() {
   const { hasPermission, isAdmin } = useAuth();
@@ -50,12 +75,32 @@ export default function ConfigIntegrityPage() {
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  // Import is handled via a hidden file input (no modal dialog)
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [configContent, setConfigContent] = useState({ name: "", content: "" });
 
   const [initLoading, setInitLoading] = useState(false);
   const [checkLoading, setCheckLoading] = useState(false);
+
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleIntervalIdx, setScheduleIntervalIdx] = useState(0);
+  const [scheduleNextRun, setScheduleNextRun] = useState(null);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleWallTime, setScheduleWallTime] = useState("09:00");
+  const [scheduleTimezone, setScheduleTimezone] = useState("Europe/Moscow");
+
+  const scheduleEnabledRef = useRef(false);
+  const schedulePersistTimerRef = useRef(null);
+
+  const [reportEnabled, setReportEnabled] = useState(false);
+  const [reportIntervalIdx, setReportIntervalIdx] = useState(0);
+  const [reportNextRun, setReportNextRun] = useState(null);
+  const [reportSaving, setReportSaving] = useState(false);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const [reports, setReports] = useState([]);
+
+  const reportEnabledRef = useRef(false);
+  const reportPersistTimerRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -87,9 +132,140 @@ export default function ConfigIntegrityPage() {
     }
   }, []);
 
+  const fetchSchedule = useCallback(async () => {
+    try {
+      const res = await api.get("/api/config-integrity/schedule");
+      const s = res.data;
+      setScheduleEnabled(Boolean(s.enabled));
+      setScheduleIntervalIdx(intervalToIndex(s.interval));
+      setScheduleNextRun(s.next_run_at || null);
+      if (s.schedule_wall_time) setScheduleWallTime(s.schedule_wall_time);
+      if (s.schedule_timezone) setScheduleTimezone(s.schedule_timezone);
+    } catch {
+      /* нет права просмотра или сеть */
+    }
+  }, []);
+
+  const fetchReportSchedule = useCallback(async () => {
+    try {
+      const res = await api.get("/api/config-integrity/report-schedule");
+      const s = res.data;
+      setReportEnabled(Boolean(s.enabled));
+      setReportIntervalIdx(reportIntervalToIndex(s.interval));
+      setReportNextRun(s.next_run_at || null);
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
+  const fetchReports = useCallback(async () => {
+    try {
+      const res = await api.get("/api/config-integrity/reports");
+      setReports(res.data || []);
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
+  const persistSchedule = useCallback(
+    async (enabled, intervalIdx) => {
+      const interval = SCHEDULE_INTERVALS[intervalIdx]?.value || "daily";
+      setScheduleSaving(true);
+      try {
+        const res = await api.put("/api/config-integrity/schedule", {
+          enabled,
+          interval,
+        });
+        setScheduleNextRun(res.data.next_run_at || null);
+        if (res.data.schedule_wall_time) setScheduleWallTime(res.data.schedule_wall_time);
+        if (res.data.schedule_timezone) setScheduleTimezone(res.data.schedule_timezone);
+      } catch (e) {
+        toast.error(e.response?.data?.detail || "Не удалось сохранить расписание");
+        await fetchSchedule();
+      } finally {
+        setScheduleSaving(false);
+      }
+    },
+    [fetchSchedule]
+  );
+
+  const persistReportSchedule = useCallback(
+    async (enabled, intervalIdx) => {
+      const interval = REPORT_INTERVALS[intervalIdx]?.value || "weekly";
+      setReportSaving(true);
+      try {
+        const res = await api.put("/api/config-integrity/report-schedule", {
+          enabled,
+          interval,
+        });
+        setReportNextRun(res.data.next_run_at || null);
+      } catch (e) {
+        toast.error(e.response?.data?.detail || "Не удалось сохранить расписание отчёта");
+        await fetchReportSchedule();
+      } finally {
+        setReportSaving(false);
+      }
+    },
+    [fetchReportSchedule]
+  );
+
+  const handleGenerateReport = async () => {
+    setReportGenerating(true);
+    try {
+      const periodDays = REPORT_INTERVALS[reportIntervalIdx]?.periodDays || 7;
+      const res = await api.post(
+        "/api/config-integrity/report/pdf",
+        { period_days: periodDays },
+        { responseType: "blob" }
+      );
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `config-integrity-report-${periodDays}d.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("PDF отчёт сформирован");
+    } catch (e) {
+      const msg =
+        e.response?.data?.detail ||
+        e.message ||
+        "Не удалось сформировать PDF отчёт";
+      toast.error(msg);
+    } finally {
+      setReportGenerating(false);
+    }
+  };
+
+  useEffect(() => {
+    scheduleEnabledRef.current = scheduleEnabled;
+  }, [scheduleEnabled]);
+
+  useEffect(() => {
+    reportEnabledRef.current = reportEnabled;
+  }, [reportEnabled]);
+
+  useEffect(() => {
+    return () => {
+      if (schedulePersistTimerRef.current) {
+        clearTimeout(schedulePersistTimerRef.current);
+      }
+      if (reportPersistTimerRef.current) {
+        clearTimeout(reportPersistTimerRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     fetchHosts();
-  }, [fetchHosts]);
+    fetchSchedule();
+    fetchReportSchedule();
+    fetchReports();
+  }, [fetchHosts, fetchSchedule, fetchReportSchedule, fetchReports]);
 
   const resetForm = () => {
     setFormData({
@@ -128,7 +304,6 @@ export default function ConfigIntegrityPage() {
       const hostsArr = Array.isArray(json) ? json : json.hosts || [json];
       await api.post("/api/config-integrity/hosts/import", { hosts: hostsArr });
       toast.success(`Импортировано хостов: ${hostsArr.length}`);
-      setImportDialogOpen(false);
       fetchHosts();
     } catch (e) {
       toast.error("Ошибка импорта: " + (e.response?.data?.detail || e.message));
@@ -200,7 +375,7 @@ export default function ConfigIntegrityPage() {
           )
         : monitoredIds;
     if (ids.length === 0) {
-      toast.info("Нет мониторируемых хостов для проверки");
+      toast.info("Нет контролируемых хостов для проверки");
       return;
     }
     setCheckLoading(true);
@@ -277,70 +452,263 @@ export default function ConfigIntegrityPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">
-          Проверка неизменности конфигурации
-        </h1>
-        <div className="flex flex-wrap gap-2">
-          {canManage && (
-            <>
-              <Button onClick={() => setAddDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" /> Добавить хост
-              </Button>
-              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" /> Импорт JSON
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold">
+        Проверка неизменности конфигурации
+      </h1>
 
-      {/* Action buttons */}
-      {canManage && hosts.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={handleInitialize}
-                disabled={initLoading || checkLoading}
-                variant="default"
-              >
-                {initLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+      {/* Action buttons + schedules + reports */}
+      {hosts.length > 0 && (
+        <div className="space-y-4">
+          {canManage && (
+            <Card>
+              <CardContent className="p-4 flex flex-wrap items-start gap-x-4 gap-y-2">
+                <div className="flex flex-col gap-1">
+                  <Button
+                    onClick={handleInitialize}
+                    disabled={initLoading || checkLoading}
+                    variant="default"
+                  >
+                    {initLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="h-4 w-4 mr-2" />
+                    )}
+                    Инициализация инструмента проверки
+                    {selectedIds.size > 0 && ` (${selectedIds.size})`}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {selectedIds.size > 0
+                      ? `Выбрано хостов: ${selectedIds.size}. Действие — только для выбранных.`
+                      : "Инициализация — один раз для хостов не на контроле."}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Button
+                    onClick={handleCheck}
+                    disabled={checkLoading || initLoading}
+                    variant="secondary"
+                  >
+                    {checkLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Проверить неизменность конфигурации
+                    {selectedIds.size > 0 && ` (${selectedIds.size})`}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Проверка — для всех контролируемых (или всех отмеченных).
+                  </span>
+                </div>
+                <div className="flex gap-2 ml-auto">
+                  <Button onClick={() => setAddDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> Добавить хост
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-2" /> Импорт JSON
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  Автопроверка по расписанию
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Для всех контролируемых хостов. Старт в{" "}
+                  <span className="font-medium text-foreground">{scheduleWallTime}</span>{" "}
+                  ({scheduleTimezone}).
+                </p>
+                {canManage ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm">Включить</span>
+                      <div className="flex items-center gap-2">
+                        {scheduleSaving && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <Switch
+                          checked={scheduleEnabled}
+                          disabled={scheduleSaving}
+                          onCheckedChange={(v) => {
+                            setScheduleEnabled(v);
+                            persistSchedule(v, scheduleIntervalIdx);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className={`space-y-2 ${!scheduleEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+                      <Slider
+                        value={[scheduleIntervalIdx]}
+                        min={0}
+                        max={2}
+                        step={1}
+                        disabled={!scheduleEnabled || scheduleSaving}
+                        onValueChange={(v) => {
+                          const idx = v[0] ?? 0;
+                          setScheduleIntervalIdx(idx);
+                          if (schedulePersistTimerRef.current) clearTimeout(schedulePersistTimerRef.current);
+                          if (!scheduleEnabledRef.current) return;
+                          schedulePersistTimerRef.current = setTimeout(() => {
+                            persistSchedule(true, idx);
+                            schedulePersistTimerRef.current = null;
+                          }, 400);
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground px-0.5">
+                        {SCHEDULE_INTERVALS.map((x) => (
+                          <span key={x.value} className="text-center max-w-[5.5rem]">
+                            {x.short}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {SCHEDULE_INTERVALS[scheduleIntervalIdx].label}
+                      </p>
+                    </div>
+                  </>
                 ) : (
-                  <Play className="h-4 w-4 mr-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {scheduleEnabled
+                      ? `${SCHEDULE_INTERVALS[scheduleIntervalIdx].label}. Следующий запуск: ${fmtDate(scheduleNextRun)}`
+                      : "Автопроверка выключена."}
+                  </p>
                 )}
-                Инициализация инструмента проверки
-                {selectedIds.size > 0 && ` (${selectedIds.size})`}
-              </Button>
-              <Button
-                onClick={handleCheck}
-                disabled={checkLoading || initLoading}
-                variant="secondary"
-              >
-                {checkLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {scheduleEnabled && scheduleNextRun && canManage && (
+                  <p className="text-xs text-muted-foreground">
+                    Следующий запуск: {fmtDate(scheduleNextRun)}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <FileDown className="h-4 w-4 text-muted-foreground" />
+                  Отчётность
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Таблица по всем контролируемым хостам + итоги за период.
+                </p>
+                {canManage && (
+                  <Button
+                    variant="outline"
+                    disabled={reportGenerating}
+                    onClick={handleGenerateReport}
+                  >
+                    {reportGenerating ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileDown className="h-4 w-4 mr-2" />
+                    )}
+                    Сформировать отчёт
+                  </Button>
+                )}
+                {canManage ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm">Автогенерация</span>
+                      <div className="flex items-center gap-2">
+                        {reportSaving && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <Switch
+                          checked={reportEnabled}
+                          disabled={reportSaving}
+                          onCheckedChange={(v) => {
+                            setReportEnabled(v);
+                            persistReportSchedule(v, reportIntervalIdx);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className={`space-y-2 ${!reportEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+                      <Slider
+                        value={[reportIntervalIdx]}
+                        min={0}
+                        max={1}
+                        step={1}
+                        disabled={!reportEnabled || reportSaving}
+                        onValueChange={(v) => {
+                          const idx = v[0] ?? 0;
+                          setReportIntervalIdx(idx);
+                          if (reportPersistTimerRef.current) clearTimeout(reportPersistTimerRef.current);
+                          if (!reportEnabledRef.current) return;
+                          reportPersistTimerRef.current = setTimeout(() => {
+                            persistReportSchedule(true, idx);
+                            reportPersistTimerRef.current = null;
+                          }, 400);
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground px-0.5">
+                        {REPORT_INTERVALS.map((x) => (
+                          <span key={x.value} className="text-center max-w-[7rem]">
+                            {x.short}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {REPORT_INTERVALS[reportIntervalIdx].label}
+                      </p>
+                    </div>
+                  </>
                 ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {reportEnabled
+                      ? `${REPORT_INTERVALS[reportIntervalIdx].label}. Следующий запуск: ${fmtDate(reportNextRun)}`
+                      : "Автоотчёт выключен."}
+                  </p>
                 )}
-                Проверить неизменность конфигурации
-                {selectedIds.size > 0 && ` (${selectedIds.size})`}
-              </Button>
-            </div>
-            {selectedIds.size > 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Выбрано хостов: {selectedIds.size}. Действие будет выполнено
-                только для выбранных.
-              </p>
-            )}
-            {selectedIds.size === 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Инициализация — для неинициализированных хостов. Проверка — для
-                всех мониторируемых.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+                {reportEnabled && reportNextRun && canManage && (
+                  <p className="text-xs text-muted-foreground">
+                    Следующий запуск: {fmtDate(reportNextRun)}
+                  </p>
+                )}
+                {reports?.length > 0 && (
+                  <div className="pt-1">
+                    <div className="text-xs text-muted-foreground mb-1">Последние отчёты</div>
+                    <div className="flex flex-wrap gap-1">
+                      {reports.slice(0, 3).map((r) => (
+                        <Button
+                          key={r.id}
+                          variant="ghost"
+                          className="justify-start h-auto py-1 px-2 text-left"
+                          onClick={async () => {
+                            const doc = await api.get(`/api/config-integrity/reports/${r.id}`);
+                            const html = doc.data?.html;
+                            const w = window.open("", "_blank", "noopener,noreferrer");
+                            if (w) {
+                              w.location.href =
+                                "data:text/html;charset=utf-8," +
+                                encodeURIComponent(html || "<pre>Report HTML missing</pre>");
+                            }
+                          }}
+                        >
+                          <span className="text-xs">
+                            {r.generated_at ? fmtDate(r.generated_at) : r.id}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
 
       {/* Hosts table */}
@@ -352,6 +720,21 @@ export default function ConfigIntegrityPage() {
             <p className="text-sm mt-1">
               Добавьте хост вручную или импортируйте из JSON-файла.
             </p>
+            {canManage && (
+              <div className="flex justify-center gap-2 mt-4">
+                <Button onClick={() => setAddDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> Добавить хост
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <Upload className="h-4 w-4 mr-2" /> Импорт JSON
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -580,38 +963,14 @@ export default function ConfigIntegrityPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Import dialog */}
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Импорт хостов из JSON</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Загрузите файл (.json или .txt) с массивом хостов в формате JSON:
-            </p>
-            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-{`[
-  {
-    "name": "server-01",
-    "ip_address": "10.0.0.1",
-    "port": 22,
-    "username": "root",
-    "auth_type": "password",
-    "password": "secret"
-  }
-]`}
-            </pre>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,.txt"
-              className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:opacity-90 cursor-pointer"
-              onChange={handleImportJson}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Hidden file input for JSON import (no modal) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,.txt,application/json,text/plain"
+        className="hidden"
+        onChange={handleImportJson}
+      />
 
       {/* Afick config viewer dialog */}
       <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>

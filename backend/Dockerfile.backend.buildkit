@@ -10,6 +10,7 @@ WORKDIR /app/backend
 RUN apt-get update && apt-get install -y \
     openssh-client \
     curl \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем и устанавливаем Python зависимости с кэшированием
@@ -48,6 +49,7 @@ COPY --from=builder /app/backend .
 RUN apt-get update && apt-get install -y \
     openssh-client \
     curl \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Добавляем зависимости в PATH (under /app for appuser access)

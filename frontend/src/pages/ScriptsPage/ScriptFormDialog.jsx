@@ -4,12 +4,20 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectNative } from "@/components/ui/select-native";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, CheckCircle2, Loader2, History } from "lucide-react";
 import { AdvancedCodeEditor } from "@/components/ui/advanced-code-editor";
 import { useAuth } from '@/contexts/AuthContext';
+
+const NON_COMPLIANCE_CRITICALITY_OPTIONS = [
+  "Нет",
+  "Низкая",
+  "Средняя",
+  "Высокая",
+  "Высокая (Стоп-фактор)"
+];
 
 export default function ScriptFormDialog({ 
   open, 
@@ -101,13 +109,36 @@ fi`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" modal={false}>
-        <DialogHeader>
-          <DialogTitle>{editingScript ? "Редактировать проверку" : "Новая проверка"}</DialogTitle>
-          <DialogDescription>Создайте проверку для конкретной системы</DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        className={[
+          "max-w-6xl w-[min(96vw,72rem)] p-0 overflow-hidden",
+          "top-[calc(4rem+1rem)] translate-y-0",
+          "max-h-[calc(100vh-4rem-2rem)]",
+          "flex flex-col",
+          "[&>button.absolute]:hidden",
+        ].join(" ")}
+        modal={false}
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b bg-background px-6 py-4">
+          <div className="min-w-0">
+            <DialogTitle className="truncate">
+              {editingScript ? "Редактировать проверку" : "Новая проверка"}
+            </DialogTitle>
+            <DialogDescription>Создайте проверку для конкретной системы</DialogDescription>
+          </div>
+          <DialogClose asChild>
+            <button
+              type="button"
+              className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Закрыть"
+            >
+              ×
+            </button>
+          </DialogClose>
+        </div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <form id="script-form" onSubmit={onSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             {/* Left column */}
             <div className="space-y-4">
@@ -164,6 +195,34 @@ fi`;
                   onChange={(e) => handleFormChange('description', e.target.value)}
                   placeholder="Опционально"
                 />
+              </div>
+
+              <div>
+                <Label>Критичность несоответствия (ОПЭ)</Label>
+                <SelectNative
+                  value={formData.non_compliance_criticality_ope || "Нет"}
+                  onChange={(e) => handleFormChange('non_compliance_criticality_ope', e.target.value)}
+                >
+                  {NON_COMPLIANCE_CRITICALITY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </SelectNative>
+              </div>
+
+              <div>
+                <Label>Критичность несоответствия (ПЭ)</Label>
+                <SelectNative
+                  value={formData.non_compliance_criticality_pe || "Нет"}
+                  onChange={(e) => handleFormChange('non_compliance_criticality_pe', e.target.value)}
+                >
+                  {NON_COMPLIANCE_CRITICALITY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </SelectNative>
               </div>
 
               <div>
@@ -361,16 +420,17 @@ fi`;
               </div>
             </div>
           </div>
+          </form>
+        </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Отмена
-            </Button>
-            <Button type="submit" data-testid="save-script-btn">
-              {editingScript ? "Обновить" : "Создать"}
-            </Button>
-          </div>
-        </form>
+        <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t bg-background px-6 py-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Отмена
+          </Button>
+          <Button form="script-form" type="submit" data-testid="save-script-btn">
+            {editingScript ? "Обновить" : "Создать"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

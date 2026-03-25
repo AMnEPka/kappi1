@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SelectNative } from "@/components/ui/select-native";
 import { useWizard } from './WizardContext';
 
 export default function Step1BasicInfo() {
@@ -33,6 +34,17 @@ export default function Step1BasicInfo() {
             placeholder="Опишите цель проекта"
             rows={4}
           />
+        </div>
+        <div>
+          <Label htmlFor="system_input_target">Куда вводится система</Label>
+          <SelectNative
+            id="system_input_target"
+            value={projectData.system_input_target || "ОПЭ"}
+            onChange={(e) => setProjectData(prev => ({ ...prev, system_input_target: e.target.value }))}
+          >
+            <option value="ОПЭ">ОПЭ</option>
+            <option value="ПЭ">ПЭ</option>
+          </SelectNative>
         </div>
       </CardContent>
     </Card>

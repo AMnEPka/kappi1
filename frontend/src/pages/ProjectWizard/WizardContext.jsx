@@ -16,6 +16,7 @@ export const useWizard = () => {
 const INITIAL_PROJECT_DATA = {
   name: '',
   description: '',
+  system_input_target: 'ОПЭ',
   hosts: [],
   tasks: [],
   accessUserIds: [],
@@ -67,6 +68,10 @@ export const WizardProvider = ({ children, onNavigate, initialPreset }) => {
     setProjectData((prev) => ({
       ...prev,
       name: initialPreset.projectName || prev.name,
+      system_input_target:
+        initialPreset.systemInputTarget === "ПЭ" || initialPreset.systemInputTarget === "ОПЭ"
+          ? initialPreset.systemInputTarget
+          : prev.system_input_target,
       hostsList: preselectedHosts
     }));
   }, [hosts, initialPreset]);
@@ -227,6 +232,7 @@ export const WizardProvider = ({ children, onNavigate, initialPreset }) => {
       const projectResponse = await api.post('/api/projects', {
         name: projectData.name,
         description: projectData.description,
+        system_input_target: projectData.system_input_target,
       });
       
       const projectId = projectResponse.data.id;

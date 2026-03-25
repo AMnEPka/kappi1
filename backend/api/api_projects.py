@@ -70,6 +70,7 @@ async def get_projects(current_user: User = Depends(get_current_user)):
     
     # Enrich projects with creator username & fullname
     for project in projects:
+        project.setdefault("system_input_target", "ОПЭ")
         if project.get('created_by'):
             creator = await db.users.find_one({"id": project['created_by']}, {"_id": 0, "username": 1, "full_name": 1})
             if creator:
@@ -88,6 +89,7 @@ async def get_project(project_id: str, current_user: User = Depends(get_current_
         project = await db.projects.find_one({"id": project_id}, {"_id": 0})
         if not project:
             raise HTTPException(status_code=404, detail="Проект не найден")
+        project.setdefault("system_input_target", "ОПЭ")
         return Project(**parse_from_mongo(project))
     
     # Если нет глобального права - проверяем доступ к конкретному проекту
@@ -97,6 +99,7 @@ async def get_project(project_id: str, current_user: User = Depends(get_current_
     project = await db.projects.find_one({"id": project_id}, {"_id": 0})
     if not project:
         raise HTTPException(status_code=404, detail="Проект не найден")
+    project.setdefault("system_input_target", "ОПЭ")
     return Project(**parse_from_mongo(project))
 
 
@@ -121,6 +124,7 @@ async def update_project(project_id: str, project_update: ProjectUpdate, current
     )
     
     updated_project = await db.projects.find_one({"id": project_id}, {"_id": 0})
+    updated_project.setdefault("system_input_target", "ОПЭ")
     return Project(**parse_from_mongo(updated_project))
 
 @router.delete("/projects/{project_id}")

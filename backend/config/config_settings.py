@@ -39,6 +39,11 @@ JWT_ACCESS_TOKEN_EXPIRE_HOURS = 24
 # Scheduler Configuration
 SCHEDULER_POLL_SECONDS = int(os.environ.get("SCHEDULER_POLL_SECONDS", "30"))
 
+# Config integrity: автопроверки в фиксированное локальное время (IANA TZ, напр. Europe/Moscow)
+CONFIG_INTEGRITY_SCHEDULE_TZ = os.environ.get("CONFIG_INTEGRITY_SCHEDULE_TZ", "Europe/Moscow")
+CONFIG_INTEGRITY_SCHEDULE_HOUR = int(os.environ.get("CONFIG_INTEGRITY_SCHEDULE_HOUR", "9"))
+CONFIG_INTEGRITY_SCHEDULE_MINUTE = int(os.environ.get("CONFIG_INTEGRITY_SCHEDULE_MINUTE", "0"))
+
 # ============================================================================
 # LOGGING CONFIGURATION
 # ============================================================================

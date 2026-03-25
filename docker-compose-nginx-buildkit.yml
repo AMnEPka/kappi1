@@ -19,13 +19,14 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.backend.buildkit
+      target: development # образ с watchdog + uvicorn --reload (см. Dockerfile.backend.buildkit)
       # Ключевые настройки для кэширования:
       args:
         BUILDKIT_INLINE_CACHE: 1
     container_name: ssh-runner-backend
     restart: unless-stopped
     ports:
-      - "435:435" 
+      - "435:435"
     depends_on:
       - mongodb
     environment:
@@ -35,9 +36,25 @@ services:
       - PYTHONPATH=/app
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
       - PYTHONUNBUFFERED=1
+      # На Windows / bind-mount часто нужен polling; на Linux можно выставить false в .env
+      - WATCHFILES_FORCE_POLLING=${WATCHFILES_FORCE_POLLING:-true}
     volumes:
+      - ./backend:/app/backend
+      - /app/backend/__pycache__
       - ./logs:/app/logs
-      - pip-cache:/root/.cache/pip  # Кэш pip сохраняется между сборками
+      - pip-cache:/root/.cache/pip # Кэш pip сохраняется между сборками
+    command:
+      [
+        "uvicorn",
+        "server:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "435",
+        "--reload",
+        "--reload-dir",
+        "/app/backend",
+      ]
     networks:
       - ssh-runner-network
     logging:
@@ -66,12 +83,15 @@ services:
     environment:
       - REACT_APP_BACKEND_URL=/
       - REACT_APP_WS_URL=
-      - DISABLE_HOT_RELOAD=true
-      - FAST_REFRESH=false
+      # HMR/Fast Refresh через nginx (порт 405): путь /ws проксируется в webpack (см. craco webSocketURL)
+      - FAST_REFRESH=true
       - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=${CHOKIDAR_USEPOLLING:-true}
+      - WATCHPACK_POLLING=${WATCHPACK_POLLING:-true}
     volumes:
-      - node-modules:/app/frontend/node_modules  # node_modules не переустанавливаются
-      - npm-cache:/root/.npm  # Кэш npm сохраняется
+      - ./frontend:/app/frontend
+      - node-modules:/app/frontend/node_modules # node_modules не переустанавливаются
+      - npm-cache:/root/.npm # Кэш npm сохраняется
     command: sh -c "PORT=415 HOST=0.0.0.0 npm start"
 
   nginx:

@@ -76,6 +76,8 @@ export default function ScriptsPage() {
         has_reference_files: formData.has_reference_files,
         test_methodology: formData.test_methodology,
         success_criteria: formData.success_criteria,
+        non_compliance_criticality_ope: formData.non_compliance_criticality_ope,
+        non_compliance_criticality_pe: formData.non_compliance_criticality_pe,
         order: formData.order,
         group_ids: formData.group_ids
       };

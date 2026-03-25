@@ -68,7 +68,8 @@ async def init_database():
                     'results_view_all', 'results_export_all',
                     'projects_create', 'projects_execute',
                     'is_catalog_view', 'is_catalog_edit', 'is_catalog_manage_schema',
-                    'ib_profiles_view', 'ib_profiles_manage', 'ib_profiles_apply'
+                    'ib_profiles_view', 'ib_profiles_manage', 'ib_profiles_apply',
+                    'config_integrity_view', 'config_integrity_manage',
                 ]),
                 "description": "Полный доступ ко всем функциям системы",
                 "created_at": datetime.now(timezone.utc).isoformat(),

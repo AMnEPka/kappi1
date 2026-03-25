@@ -172,7 +172,7 @@ export const MainLayout = ({ children }) => {
                 className={`md3-sidebar-button ${isActive('/config-integrity') ? 'md3-sidebar-button-active' : ''}`}
               >
                 <Fingerprint className="md3-icon" />
-                {isSidebarExpanded && "Неизменность конфигурации"}
+                {isSidebarExpanded && "Неизменность конфига"}
               </Button>
             </Link>
           )}
