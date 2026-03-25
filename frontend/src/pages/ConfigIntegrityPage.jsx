@@ -75,7 +75,7 @@ export default function ConfigIntegrityPage() {
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  // Import is handled via a hidden file input (no modal dialog)
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [configContent, setConfigContent] = useState({ name: "", content: "" });
 
@@ -304,7 +304,6 @@ export default function ConfigIntegrityPage() {
       const hostsArr = Array.isArray(json) ? json : json.hosts || [json];
       await api.post("/api/config-integrity/hosts/import", { hosts: hostsArr });
       toast.success(`Импортировано хостов: ${hostsArr.length}`);
-      setImportDialogOpen(false);
       fetchHosts();
     } catch (e) {
       toast.error("Ошибка импорта: " + (e.response?.data?.detail || e.message));
@@ -453,33 +452,17 @@ export default function ConfigIntegrityPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">
-          Проверка неизменности конфигурации
-        </h1>
-        <div className="flex flex-wrap gap-2">
-          {canManage && (
-            <>
-              <Button onClick={() => setAddDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" /> Добавить хост
-              </Button>
-              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" /> Импорт JSON
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold">
+        Проверка неизменности конфигурации
+      </h1>
 
       {/* Action buttons + schedules + reports */}
       {hosts.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div
-              className={`flex flex-wrap gap-8 items-start ${canManage ? "justify-between" : ""}`}
-            >
-              {canManage && (
-                <div className="flex flex-wrap gap-3">
+        <div className="space-y-4">
+          {canManage && (
+            <Card>
+              <CardContent className="p-4 flex flex-wrap items-start gap-x-4 gap-y-2">
+                <div className="flex flex-col gap-1">
                   <Button
                     onClick={handleInitialize}
                     disabled={initLoading || checkLoading}
@@ -493,6 +476,13 @@ export default function ConfigIntegrityPage() {
                     Инициализация инструмента проверки
                     {selectedIds.size > 0 && ` (${selectedIds.size})`}
                   </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {selectedIds.size > 0
+                      ? `Выбрано хостов: ${selectedIds.size}. Действие — только для выбранных.`
+                      : "Инициализация — один раз для хостов не на контроле."}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1">
                   <Button
                     onClick={handleCheck}
                     disabled={checkLoading || initLoading}
@@ -506,223 +496,219 @@ export default function ConfigIntegrityPage() {
                     Проверить неизменность конфигурации
                     {selectedIds.size > 0 && ` (${selectedIds.size})`}
                   </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Проверка — для всех контролируемых (или всех отмеченных).
+                  </span>
                 </div>
-              )}
-
-              <div className={`flex flex-col gap-4 min-w-[min(100%,280px)] max-w-sm flex-1 border-border/60 pt-4 border-t md:pt-0 md:border-t-0 ${canManage ? "md:border-l md:pl-8" : ""}`}>
-                {/* Auto-check schedule */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                    Автопроверка по расписанию
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Для всех контролируемых хостов (как кнопка «Проверить…»). Старт в{" "}
-                    <span className="font-medium text-foreground">{scheduleWallTime}</span>{" "}
-                    ({scheduleTimezone}).
-                  </p>
-                  {canManage ? (
-                    <>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm">Включить</span>
-                        <div className="flex items-center gap-2">
-                          {scheduleSaving && (
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          )}
-                          <Switch
-                            checked={scheduleEnabled}
-                            disabled={scheduleSaving}
-                            onCheckedChange={(v) => {
-                              setScheduleEnabled(v);
-                              persistSchedule(v, scheduleIntervalIdx);
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div className={`space-y-2 ${!scheduleEnabled ? "opacity-50 pointer-events-none" : ""}`}>
-                        <Slider
-                          value={[scheduleIntervalIdx]}
-                          min={0}
-                          max={2}
-                          step={1}
-                          disabled={!scheduleEnabled || scheduleSaving}
-                          onValueChange={(v) => {
-                            const idx = v[0] ?? 0;
-                            setScheduleIntervalIdx(idx);
-                            if (schedulePersistTimerRef.current) clearTimeout(schedulePersistTimerRef.current);
-                            if (!scheduleEnabledRef.current) return;
-                            schedulePersistTimerRef.current = setTimeout(() => {
-                              persistSchedule(true, idx);
-                              schedulePersistTimerRef.current = null;
-                            }, 400);
-                          }}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground px-0.5">
-                          {SCHEDULE_INTERVALS.map((x) => (
-                            <span key={x.value} className="text-center max-w-[5.5rem]">
-                              {x.short}
-                            </span>
-                          ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {SCHEDULE_INTERVALS[scheduleIntervalIdx].label}
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {scheduleEnabled
-                        ? `${SCHEDULE_INTERVALS[scheduleIntervalIdx].label}. Следующий запуск: ${fmtDate(scheduleNextRun)}`
-                        : "Автопроверка выключена."}
-                    </p>
-                  )}
-                  {scheduleEnabled && scheduleNextRun && canManage && (
-                    <p className="text-xs text-muted-foreground">
-                      Следующий запуск: {fmtDate(scheduleNextRun)}
-                    </p>
-                  )}
+                <div className="flex gap-2 ml-auto">
+                  <Button onClick={() => setAddDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> Добавить хост
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-2" /> Импорт JSON
+                  </Button>
                 </div>
+              </CardContent>
+            </Card>
+          )}
 
-                <div className="h-px bg-border/60" />
-
-                {/* Report schedule + manual generate */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <FileDown className="h-4 w-4 text-muted-foreground" />
-                    Отчётность
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Отчёт по целостности: таблица по всем контролируемым хостам + итоги за период.
-                  </p>
-                  {canManage && (
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="outline"
-                        disabled={reportGenerating}
-                        onClick={handleGenerateReport}
-                      >
-                        {reportGenerating ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <FileDown className="h-4 w-4 mr-2" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  Автопроверка по расписанию
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Для всех контролируемых хостов. Старт в{" "}
+                  <span className="font-medium text-foreground">{scheduleWallTime}</span>{" "}
+                  ({scheduleTimezone}).
+                </p>
+                {canManage ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm">Включить</span>
+                      <div className="flex items-center gap-2">
+                        {scheduleSaving && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         )}
-                        Сформировать отчёт
-                      </Button>
-                    </div>
-                  )}
-
-                  {canManage ? (
-                    <>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm">Автогенерация</span>
-                        <div className="flex items-center gap-2">
-                          {reportSaving && (
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          )}
-                          <Switch
-                            checked={reportEnabled}
-                            disabled={reportSaving}
-                            onCheckedChange={(v) => {
-                              setReportEnabled(v);
-                              persistReportSchedule(v, reportIntervalIdx);
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div className={`space-y-2 ${!reportEnabled ? "opacity-50 pointer-events-none" : ""}`}>
-                        <Slider
-                          value={[reportIntervalIdx]}
-                          min={0}
-                          max={1}
-                          step={1}
-                          disabled={!reportEnabled || reportSaving}
-                          onValueChange={(v) => {
-                            const idx = v[0] ?? 0;
-                            setReportIntervalIdx(idx);
-                            if (reportPersistTimerRef.current) clearTimeout(reportPersistTimerRef.current);
-                            if (!reportEnabledRef.current) return;
-                            reportPersistTimerRef.current = setTimeout(() => {
-                              persistReportSchedule(true, idx);
-                              reportPersistTimerRef.current = null;
-                            }, 400);
+                        <Switch
+                          checked={scheduleEnabled}
+                          disabled={scheduleSaving}
+                          onCheckedChange={(v) => {
+                            setScheduleEnabled(v);
+                            persistSchedule(v, scheduleIntervalIdx);
                           }}
-                          className="w-full"
                         />
-                        <div className="flex justify-between text-xs text-muted-foreground px-0.5">
-                          {REPORT_INTERVALS.map((x) => (
-                            <span key={x.value} className="text-center max-w-[7rem]">
-                              {x.short}
-                            </span>
-                          ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {REPORT_INTERVALS[reportIntervalIdx].label}
-                        </p>
                       </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {reportEnabled
-                        ? `${REPORT_INTERVALS[reportIntervalIdx].label}. Следующий запуск: ${fmtDate(reportNextRun)}`
-                        : "Автоотчёт выключен."}
-                    </p>
-                  )}
-                  {reportEnabled && reportNextRun && canManage && (
-                    <p className="text-xs text-muted-foreground">
-                      Следующий запуск: {fmtDate(reportNextRun)}
-                    </p>
-                  )}
-
-                  {reports?.length > 0 && (
-                    <div className="pt-2">
-                      <div className="text-xs text-muted-foreground mb-1">Последние отчёты</div>
-                      <div className="space-y-1">
-                        {reports.slice(0, 3).map((r) => (
-                          <Button
-                            key={r.id}
-                            variant="ghost"
-                            className="justify-start h-auto py-1 px-2 text-left"
-                            onClick={async () => {
-                              const doc = await api.get(`/api/config-integrity/reports/${r.id}`);
-                              const html = doc.data?.html;
-                              const w = window.open("", "_blank", "noopener,noreferrer");
-                              if (w) {
-                                w.location.href =
-                                  "data:text/html;charset=utf-8," +
-                                  encodeURIComponent(html || "<pre>Report HTML missing</pre>");
-                              }
-                            }}
-                          >
-                            <span className="text-xs">
-                              {r.generated_at ? fmtDate(r.generated_at) : r.id}
-                            </span>
-                          </Button>
+                    </div>
+                    <div className={`space-y-2 ${!scheduleEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+                      <Slider
+                        value={[scheduleIntervalIdx]}
+                        min={0}
+                        max={2}
+                        step={1}
+                        disabled={!scheduleEnabled || scheduleSaving}
+                        onValueChange={(v) => {
+                          const idx = v[0] ?? 0;
+                          setScheduleIntervalIdx(idx);
+                          if (schedulePersistTimerRef.current) clearTimeout(schedulePersistTimerRef.current);
+                          if (!scheduleEnabledRef.current) return;
+                          schedulePersistTimerRef.current = setTimeout(() => {
+                            persistSchedule(true, idx);
+                            schedulePersistTimerRef.current = null;
+                          }, 400);
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground px-0.5">
+                        {SCHEDULE_INTERVALS.map((x) => (
+                          <span key={x.value} className="text-center max-w-[5.5rem]">
+                            {x.short}
+                          </span>
                         ))}
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        {SCHEDULE_INTERVALS[scheduleIntervalIdx].label}
+                      </p>
                     </div>
-                  )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {scheduleEnabled
+                      ? `${SCHEDULE_INTERVALS[scheduleIntervalIdx].label}. Следующий запуск: ${fmtDate(scheduleNextRun)}`
+                      : "Автопроверка выключена."}
+                  </p>
+                )}
+                {scheduleEnabled && scheduleNextRun && canManage && (
+                  <p className="text-xs text-muted-foreground">
+                    Следующий запуск: {fmtDate(scheduleNextRun)}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <FileDown className="h-4 w-4 text-muted-foreground" />
+                  Отчётность
                 </div>
-              </div>
-            </div>
-            {canManage && (
-              <>
-                {selectedIds.size > 0 && (
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Выбрано хостов: {selectedIds.size}. Действие будет выполнено
-                    только для выбранных.
+                <p className="text-xs text-muted-foreground">
+                  Таблица по всем контролируемым хостам + итоги за период.
+                </p>
+                {canManage && (
+                  <Button
+                    variant="outline"
+                    disabled={reportGenerating}
+                    onClick={handleGenerateReport}
+                  >
+                    {reportGenerating ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileDown className="h-4 w-4 mr-2" />
+                    )}
+                    Сформировать отчёт
+                  </Button>
+                )}
+                {canManage ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm">Автогенерация</span>
+                      <div className="flex items-center gap-2">
+                        {reportSaving && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <Switch
+                          checked={reportEnabled}
+                          disabled={reportSaving}
+                          onCheckedChange={(v) => {
+                            setReportEnabled(v);
+                            persistReportSchedule(v, reportIntervalIdx);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className={`space-y-2 ${!reportEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+                      <Slider
+                        value={[reportIntervalIdx]}
+                        min={0}
+                        max={1}
+                        step={1}
+                        disabled={!reportEnabled || reportSaving}
+                        onValueChange={(v) => {
+                          const idx = v[0] ?? 0;
+                          setReportIntervalIdx(idx);
+                          if (reportPersistTimerRef.current) clearTimeout(reportPersistTimerRef.current);
+                          if (!reportEnabledRef.current) return;
+                          reportPersistTimerRef.current = setTimeout(() => {
+                            persistReportSchedule(true, idx);
+                            reportPersistTimerRef.current = null;
+                          }, 400);
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground px-0.5">
+                        {REPORT_INTERVALS.map((x) => (
+                          <span key={x.value} className="text-center max-w-[7rem]">
+                            {x.short}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {REPORT_INTERVALS[reportIntervalIdx].label}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {reportEnabled
+                      ? `${REPORT_INTERVALS[reportIntervalIdx].label}. Следующий запуск: ${fmtDate(reportNextRun)}`
+                      : "Автоотчёт выключен."}
                   </p>
                 )}
-                {selectedIds.size === 0 && (
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Инициализация — запускается один раз для каждого хоста, который не на контроле. Проверка — для
-                    всех контролируемых (или всех отмеченных).
+                {reportEnabled && reportNextRun && canManage && (
+                  <p className="text-xs text-muted-foreground">
+                    Следующий запуск: {fmtDate(reportNextRun)}
                   </p>
                 )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+                {reports?.length > 0 && (
+                  <div className="pt-1">
+                    <div className="text-xs text-muted-foreground mb-1">Последние отчёты</div>
+                    <div className="flex flex-wrap gap-1">
+                      {reports.slice(0, 3).map((r) => (
+                        <Button
+                          key={r.id}
+                          variant="ghost"
+                          className="justify-start h-auto py-1 px-2 text-left"
+                          onClick={async () => {
+                            const doc = await api.get(`/api/config-integrity/reports/${r.id}`);
+                            const html = doc.data?.html;
+                            const w = window.open("", "_blank", "noopener,noreferrer");
+                            if (w) {
+                              w.location.href =
+                                "data:text/html;charset=utf-8," +
+                                encodeURIComponent(html || "<pre>Report HTML missing</pre>");
+                            }
+                          }}
+                        >
+                          <span className="text-xs">
+                            {r.generated_at ? fmtDate(r.generated_at) : r.id}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
 
       {/* Hosts table */}
@@ -734,6 +720,21 @@ export default function ConfigIntegrityPage() {
             <p className="text-sm mt-1">
               Добавьте хост вручную или импортируйте из JSON-файла.
             </p>
+            {canManage && (
+              <div className="flex justify-center gap-2 mt-4">
+                <Button onClick={() => setAddDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> Добавить хост
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <Upload className="h-4 w-4 mr-2" /> Импорт JSON
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -962,38 +963,14 @@ export default function ConfigIntegrityPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Import dialog */}
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Импорт хостов из JSON</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Загрузите файл (.json или .txt) с массивом хостов в формате JSON:
-            </p>
-            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-{`[
-  {
-    "name": "server-01",
-    "ip_address": "10.0.0.1",
-    "port": 22,
-    "username": "root",
-    "auth_type": "password",
-    "password": "secret"
-  }
-]`}
-            </pre>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,.txt"
-              className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:opacity-90 cursor-pointer"
-              onChange={handleImportJson}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Hidden file input for JSON import (no modal) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,.txt,application/json,text/plain"
+        className="hidden"
+        onChange={handleImportJson}
+      />
 
       {/* Afick config viewer dialog */}
       <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>

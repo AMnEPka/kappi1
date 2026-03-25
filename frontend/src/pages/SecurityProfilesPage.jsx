@@ -21,11 +21,10 @@ import {
 } from "@/components/ui/select";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -385,14 +384,37 @@ export default function SecurityProfilesPage() {
 
       {/* Create/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{editingProfile ? "Редактировать профиль" : "Новый профиль ИБ"}</DialogTitle>
-            <DialogDescription>
-              Категория и система задают принадлежность. Версия — произвольная строка. Содержимое — скрипт или текст.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 space-y-4">
+        <DialogContent
+          className={[
+            "max-w-4xl w-[min(96vw,72rem)] p-0 overflow-hidden",
+            "top-[calc(4rem+1rem)] translate-y-0",
+            "max-h-[calc(100vh-4rem-2rem)]",
+            "flex flex-col",
+            "[&>button.absolute]:hidden",
+          ].join(" ")}
+        >
+          <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b bg-background px-6 py-4">
+            <div className="min-w-0">
+              <DialogTitle className="truncate">
+                {editingProfile ? "Редактировать профиль" : "Новый профиль ИБ"}
+              </DialogTitle>
+              <DialogDescription>
+                Категория и система задают принадлежность. Версия — произвольная строка. Содержимое — скрипт или текст.
+              </DialogDescription>
+            </div>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </DialogClose>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <form id="ib-profile-form" onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Категория</Label>
@@ -504,29 +526,59 @@ export default function SecurityProfilesPage() {
                 </p>
               )}
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Отмена
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {editingProfile ? "Сохранить" : "Создать"}
-              </Button>
-            </DialogFooter>
-          </form>
+            </form>
+          </div>
+
+          <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t bg-background px-6 py-4">
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button form="ib-profile-form" type="submit" disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {editingProfile ? "Обновить" : "Создать"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Preview dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Просмотр профиля</DialogTitle>
-            <DialogDescription>Содержимое профиля (только чтение)</DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="flex-1 min-h-[300px] rounded-md border p-2">
-            <pre className="text-sm whitespace-pre-wrap font-mono">{previewContent || "—"}</pre>
-          </ScrollArea>
+        <DialogContent
+          className={[
+            "max-w-4xl w-[min(96vw,72rem)] p-0 overflow-hidden",
+            "top-[calc(4rem+1rem)] translate-y-0",
+            "max-h-[calc(100vh-4rem-2rem)]",
+            "flex flex-col",
+            "[&>button.absolute]:hidden",
+          ].join(" ")}
+        >
+          <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b bg-background px-6 py-4">
+            <div className="min-w-0">
+              <DialogTitle className="truncate">Просмотр профиля</DialogTitle>
+              <DialogDescription>Содержимое профиля (только чтение)</DialogDescription>
+            </div>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </DialogClose>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <ScrollArea className="min-h-[300px] rounded-md border p-2">
+              <pre className="text-sm whitespace-pre-wrap font-mono">{previewContent || "—"}</pre>
+            </ScrollArea>
+          </div>
+
+          <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t bg-background px-6 py-4">
+            <Button type="button" variant="outline" onClick={() => setPreviewOpen(false)}>
+              Закрыть
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
