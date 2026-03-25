@@ -147,7 +147,7 @@ export const clearTokens = () => {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem('user');
-  // Clear token refresh interval
+  localStorage.removeItem('user_data');
   if (tokenRefreshInterval) {
     clearInterval(tokenRefreshInterval);
     tokenRefreshInterval = null;
@@ -155,7 +155,7 @@ export const clearTokens = () => {
 };
 
 // Refresh access token using refresh token
-const refreshAccessToken = async () => {
+export const refreshAccessToken = async () => {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
     throw new Error('No refresh token available');
@@ -284,8 +284,13 @@ api.interceptors.response.use(
       processQueue(lastError, null);
       isRefreshing = false;
       
-      // Refresh failed - logout user
-      forceLogout('session_expired');
+      // Only force-logout on definitive auth errors (server explicitly rejected the token).
+      // Network errors (server unavailable, timeout) should NOT wipe the session —
+      // the token may still be valid once the server comes back.
+      const refreshStatus = lastError?.response?.status;
+      if (refreshStatus === 401 || refreshStatus === 403) {
+        forceLogout('session_expired');
+      }
       return Promise.reject(lastError);
     }
 

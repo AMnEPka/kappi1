@@ -7,15 +7,20 @@ from typing import List, Optional
 from fastapi import HTTPException, Depends, status, Query  # pyright: ignore[reportMissingImports]
 from fastapi.security import HTTPAuthorizationCredentials # pyright: ignore[reportMissingImports]
 
-from config.config_init import security, decode_token, logger, db, PERMISSIONS
+from config.config_init import security, decode_token, decode_token_with_grace, logger, db, PERMISSIONS
 from models.models_init import User
+
+# Grace period (seconds) — allow recently-expired access tokens to still work,
+# giving the frontend time to refresh without a jarring 401.
+ACCESS_TOKEN_GRACE_SECONDS = 120
+
 
 async def get_current_user_from_token(token: str) -> User:
     """
     Get current user from JWT token string (for query parameter auth in SSE)
     """
     try:
-        payload = decode_token(token)
+        payload = decode_token_with_grace(token, ACCESS_TOKEN_GRACE_SECONDS)
         user_id: str = payload.get("sub")
         
         if user_id is None:
@@ -25,50 +30,6 @@ async def get_current_user_from_token(token: str) -> User:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Get user from database
-        user_doc = await db.users.find_one({"id": user_id})
-        if not user_doc:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Пользователь не найден",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        return User(**user_doc)
-        
-    except Exception as e:
-        logger.error(f"Authentication error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Ошибка авторизации",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> User:
-    """
-    Dependency to get current user from JWT token
-    """
-    # Handle case when no credentials provided (auto_error=False in security)
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Требуется авторизация",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    try:
-        token = credentials.credentials
-        payload = decode_token(token)
-        user_id: str = payload.get("sub")
-        
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверный токен авторизации",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Get user from database
         user_doc = await db.users.find_one({"id": user_id})
         if not user_doc:
             raise HTTPException(
@@ -80,7 +41,50 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         return User(**user_doc)
         
     except HTTPException:
-        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Authentication error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Ошибка авторизации",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> User:
+    """
+    Dependency to get current user from JWT token.
+    Uses a grace period to tolerate recently-expired tokens.
+    """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Требуется авторизация",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    try:
+        token = credentials.credentials
+        payload = decode_token_with_grace(token, ACCESS_TOKEN_GRACE_SECONDS)
+        user_id: str = payload.get("sub")
+        
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный токен авторизации",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user_doc = await db.users.find_one({"id": user_id})
+        if not user_doc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Пользователь не найден",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        return User(**user_doc)
+        
+    except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Authentication error: {str(e)}")
