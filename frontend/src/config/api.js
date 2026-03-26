@@ -96,44 +96,76 @@ const tryProactiveRefresh = async () => {
   }
 };
 
-// Setup automatic token refresh
+// Setup automatic token refresh (20-second interval).
+// Also includes sleep-wake detection: if elapsed time between ticks exceeds
+// SLEEP_DETECT_THRESHOLD_MS, the computer was likely sleeping/suspended.
+const SLEEP_DETECT_THRESHOLD_MS = 60000; // 1 minute gap = was sleeping
+let lastTickTime = Date.now();
+
 const setupTokenRefresh = () => {
-  // Clear existing interval
   if (tokenRefreshInterval) {
     clearInterval(tokenRefreshInterval);
     tokenRefreshInterval = null;
   }
 
-  // Check token every 20 seconds
+  lastTickTime = Date.now();
   tokenRefreshInterval = setInterval(async () => {
     const token = getAccessToken();
     if (!token) {
-      // No token, clear interval
       if (tokenRefreshInterval) {
         clearInterval(tokenRefreshInterval);
         tokenRefreshInterval = null;
       }
       return;
     }
+
+    const now = Date.now();
+    const elapsed = now - lastTickTime;
+    lastTickTime = now;
+
+    if (elapsed > SLEEP_DETECT_THRESHOLD_MS) {
+      console.log(`⏰ Wake detected (gap ${Math.round(elapsed / 1000)}s), checking token...`);
+    }
+
     await tryProactiveRefresh();
-  }, 20000); // Check every 20 seconds
+  }, 20000);
 };
 
-// Handle tab visibility change and window focus — immediately check & refresh token
-// when user returns. visibilitychange fires when user switches tabs; focus fires when
-// user clicks into the browser window (covers "walked away with tab in foreground").
-let visibilityHandlerInstalled = false;
-const setupVisibilityHandler = () => {
-  if (typeof document === 'undefined' || visibilityHandlerInstalled) return;
-  visibilityHandlerInstalled = true;
+// Event-based refresh triggers (throttle-proof, unlike setInterval):
+// 1. visibilitychange — fires when user switches tabs back
+// 2. focus — fires when user clicks into the browser window
+// 3. mousedown/keydown — fires on first user interaction after any idle period
+//    (most reliable: even if the tab was in foreground the whole time,
+//     this catches the moment the user actually returns to the keyboard)
+let eventHandlersInstalled = false;
+let lastUserInteraction = Date.now();
+const INTERACTION_IDLE_THRESHOLD_MS = 120000; // 2 minutes idle → check token on next interaction
+
+const setupEventHandlers = () => {
+  if (typeof document === 'undefined' || eventHandlersInstalled) return;
+  eventHandlersInstalled = true;
+
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible') {
       await tryProactiveRefresh();
     }
   });
+
   window.addEventListener('focus', async () => {
     await tryProactiveRefresh();
   });
+
+  const onUserInteraction = async () => {
+    const now = Date.now();
+    const idle = now - lastUserInteraction;
+    lastUserInteraction = now;
+    if (idle > INTERACTION_IDLE_THRESHOLD_MS) {
+      await tryProactiveRefresh();
+    }
+  };
+
+  window.addEventListener('mousedown', onUserInteraction, { passive: true });
+  window.addEventListener('keydown', onUserInteraction, { passive: true });
 };
 
 // Process queued requests after token refresh
@@ -157,10 +189,9 @@ export const setTokens = (accessToken, refreshToken) => {
   if (refreshToken) {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
-  // Setup automatic token refresh when tokens are set
   if (accessToken) {
     setupTokenRefresh();
-    setupVisibilityHandler();
+    setupEventHandlers();
   }
 };
 
@@ -179,6 +210,9 @@ export const clearTokens = () => {
 export const refreshAccessToken = async () => {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
+    console.error('🔑 DIAGNOSTIC: refresh_token missing from localStorage!',
+      'access_token exists:', !!getAccessToken(),
+      'localStorage keys:', Object.keys(localStorage).join(', '));
     throw new Error('No refresh token available');
   }
 
@@ -355,16 +389,13 @@ export const getActiveSessionsApi = async () => {
   return response.data;
 };
 
-// Initialize token refresh & visibility handler on module load if token exists.
-// Critically, tryProactiveRefresh() runs IMMEDIATELY so that an expired token
-// (e.g. after computer sleep) gets refreshed BEFORE React components fire API calls.
-// It synchronously sets isRefreshing=true, causing the request interceptor to WAIT
-// for the refresh to complete rather than sending requests with an expired token.
+// Initialize on module load: start the 20s timer, install event handlers,
+// and immediately attempt a proactive refresh (handles page-reload with stale token).
 if (typeof window !== 'undefined') {
   const token = getAccessToken();
   if (token) {
     setupTokenRefresh();
-    setupVisibilityHandler();
+    setupEventHandlers();
     tryProactiveRefresh();
   }
 }
