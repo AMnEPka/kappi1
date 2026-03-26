@@ -327,12 +327,17 @@ export const getActiveSessionsApi = async () => {
   return response.data;
 };
 
-// Initialize token refresh & visibility handler on module load if token exists
+// Initialize token refresh & visibility handler on module load if token exists.
+// Critically, tryProactiveRefresh() runs IMMEDIATELY so that an expired token
+// (e.g. after computer sleep) gets refreshed BEFORE React components fire API calls.
+// It synchronously sets isRefreshing=true, causing the request interceptor to WAIT
+// for the refresh to complete rather than sending requests with an expired token.
 if (typeof window !== 'undefined') {
   const token = getAccessToken();
   if (token) {
     setupTokenRefresh();
     setupVisibilityHandler();
+    tryProactiveRefresh();
   }
 }
 
