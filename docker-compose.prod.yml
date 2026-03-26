@@ -5,6 +5,7 @@ services:
   backend:
     environment:
       - CORS_ORIGINS=${CORS_ORIGINS:-https://yourdomain.com}
+      - TZ=Europe/Moscow
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --workers 4
     restart: always
     logging:

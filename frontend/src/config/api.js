@@ -59,60 +59,113 @@ const shouldRefreshToken = (token) => {
   return timeUntilExpiry <= 300000; // 5 minutes = 300000 ms
 };
 
-// Attempt to refresh the token proactively (shared logic for interval & visibility handler)
+// Timestamp of when isRefreshing was set to true — used by the watchdog to detect stalls
+let isRefreshingSince = 0;
+const MAX_REFRESH_LOCK_MS = 20000; // 20 seconds — if isRefreshing is stuck longer, force-reset
+
+// Attempt to refresh the token proactively (shared logic for interval & visibility handler).
+// IMPORTANT: also calls processQueue so that any requests queued by the response interceptor
+// while this refresh was in flight get resolved (prevents zombie-queue deadlock).
 const tryProactiveRefresh = async () => {
   const token = getAccessToken();
   if (!token) return;
 
+  // Watchdog: if isRefreshing has been stuck for too long, force-reset it.
+  // This prevents a permanently-locked state from a hung network request.
+  if (isRefreshing && isRefreshingSince > 0 && (Date.now() - isRefreshingSince > MAX_REFRESH_LOCK_MS)) {
+    console.warn('⚠️ isRefreshing stuck for >' + MAX_REFRESH_LOCK_MS + 'ms — force-resetting');
+    isRefreshing = false;
+    processQueue(new Error('Refresh lock timeout'), null);
+  }
+
   if (shouldRefreshToken(token) && !isRefreshing) {
     console.log('🔄 Auto-refreshing token...');
     isRefreshing = true;
+    isRefreshingSince = Date.now();
     try {
-      await refreshAccessToken();
+      const newToken = await refreshAccessToken();
       console.log('✅ Token auto-refreshed successfully');
+      processQueue(null, newToken);
     } catch (error) {
       console.error('❌ Auto token refresh failed:', error);
-      // Don't logout on proactive refresh failure — let the 401 handler deal with it
+      processQueue(error, null);
     } finally {
       isRefreshing = false;
+      isRefreshingSince = 0;
     }
   }
 };
 
-// Setup automatic token refresh
+// Setup automatic token refresh (20-second interval).
+// Also includes sleep-wake detection: if elapsed time between ticks exceeds
+// SLEEP_DETECT_THRESHOLD_MS, the computer was likely sleeping/suspended.
+const SLEEP_DETECT_THRESHOLD_MS = 60000; // 1 minute gap = was sleeping
+let lastTickTime = Date.now();
+
 const setupTokenRefresh = () => {
-  // Clear existing interval
   if (tokenRefreshInterval) {
     clearInterval(tokenRefreshInterval);
     tokenRefreshInterval = null;
   }
 
-  // Check token every 20 seconds
+  lastTickTime = Date.now();
   tokenRefreshInterval = setInterval(async () => {
     const token = getAccessToken();
     if (!token) {
-      // No token, clear interval
       if (tokenRefreshInterval) {
         clearInterval(tokenRefreshInterval);
         tokenRefreshInterval = null;
       }
       return;
     }
+
+    const now = Date.now();
+    const elapsed = now - lastTickTime;
+    lastTickTime = now;
+
+    if (elapsed > SLEEP_DETECT_THRESHOLD_MS) {
+      console.log(`⏰ Wake detected (gap ${Math.round(elapsed / 1000)}s), checking token...`);
+    }
+
     await tryProactiveRefresh();
-  }, 20000); // Check every 20 seconds
+  }, 20000);
 };
 
-// Handle tab visibility change — immediately check & refresh token when user returns
-let visibilityHandlerInstalled = false;
-const setupVisibilityHandler = () => {
-  if (typeof document === 'undefined' || visibilityHandlerInstalled) return;
-  visibilityHandlerInstalled = true;
+// Event-based refresh triggers (throttle-proof, unlike setInterval):
+// 1. visibilitychange — fires when user switches tabs back
+// 2. focus — fires when user clicks into the browser window
+// 3. mousedown/keydown — fires on first user interaction after any idle period
+//    (most reliable: even if the tab was in foreground the whole time,
+//     this catches the moment the user actually returns to the keyboard)
+let eventHandlersInstalled = false;
+let lastUserInteraction = Date.now();
+const INTERACTION_IDLE_THRESHOLD_MS = 120000; // 2 minutes idle → check token on next interaction
+
+const setupEventHandlers = () => {
+  if (typeof document === 'undefined' || eventHandlersInstalled) return;
+  eventHandlersInstalled = true;
+
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible') {
-      // User switched back to the tab — refresh token if needed
       await tryProactiveRefresh();
     }
   });
+
+  window.addEventListener('focus', async () => {
+    await tryProactiveRefresh();
+  });
+
+  const onUserInteraction = async () => {
+    const now = Date.now();
+    const idle = now - lastUserInteraction;
+    lastUserInteraction = now;
+    if (idle > INTERACTION_IDLE_THRESHOLD_MS) {
+      await tryProactiveRefresh();
+    }
+  };
+
+  window.addEventListener('mousedown', onUserInteraction, { passive: true });
+  window.addEventListener('keydown', onUserInteraction, { passive: true });
 };
 
 // Process queued requests after token refresh
@@ -136,10 +189,9 @@ export const setTokens = (accessToken, refreshToken) => {
   if (refreshToken) {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
-  // Setup automatic token refresh when tokens are set
   if (accessToken) {
     setupTokenRefresh();
-    setupVisibilityHandler();
+    setupEventHandlers();
   }
 };
 
@@ -147,7 +199,7 @@ export const clearTokens = () => {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem('user');
-  // Clear token refresh interval
+  localStorage.removeItem('user_data');
   if (tokenRefreshInterval) {
     clearInterval(tokenRefreshInterval);
     tokenRefreshInterval = null;
@@ -155,19 +207,23 @@ export const clearTokens = () => {
 };
 
 // Refresh access token using refresh token
-const refreshAccessToken = async () => {
+export const refreshAccessToken = async () => {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
+    console.error('🔑 DIAGNOSTIC: refresh_token missing from localStorage!',
+      'access_token exists:', !!getAccessToken(),
+      'localStorage keys:', Object.keys(localStorage).join(', '));
     throw new Error('No refresh token available');
   }
 
   const response = await axios.post(`${API_URL}/api/auth/refresh`, {
     refresh_token: refreshToken
+  }, {
+    timeout: 15000,
   });
 
   const { access_token } = response.data;
   localStorage.setItem(ACCESS_TOKEN_KEY, access_token);
-  // Restart token refresh interval with new token
   setupTokenRefresh();
   return access_token;
 };
@@ -187,15 +243,18 @@ api.interceptors.request.use(
       // If token is expired or about to expire, try to refresh before sending request
       if (shouldRefreshToken(token) && !isRefreshing) {
         isRefreshing = true;
+        isRefreshingSince = Date.now();
         try {
           token = await refreshAccessToken();
           console.log('✅ Token refreshed in request interceptor');
+          processQueue(null, token);
         } catch (error) {
           console.warn('Token refresh in request interceptor failed, using existing token:', error);
-          // Re-read token in case another concurrent refresh succeeded
+          processQueue(error, null);
           token = getAccessToken();
         } finally {
           isRefreshing = false;
+          isRefreshingSince = 0;
         }
       } else if (isRefreshing) {
         // Another refresh is in progress — wait for it to complete
@@ -248,6 +307,7 @@ api.interceptors.response.use(
 
       originalRequest._retry = true;
       isRefreshing = true;
+      isRefreshingSince = Date.now();
 
       // Retry refresh up to 2 times with a small delay between attempts
       const MAX_REFRESH_RETRIES = 2;
@@ -259,6 +319,7 @@ api.interceptors.response.use(
           
           processQueue(null, newToken);
           isRefreshing = false;
+          isRefreshingSince = 0;
           
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
@@ -279,12 +340,16 @@ api.interceptors.response.use(
         }
       }
 
-      // All refresh attempts failed
+      // All refresh attempts failed.
+      // We're inside the `error.response?.status === 401` block, which means
+      // the server IS reachable and explicitly rejected our token. If we also
+      // can't refresh, the session is dead — always force-logout.
+      // (Network resilience for "server completely down" is handled separately
+      // in fetchCurrentUser, which never enters this 401 branch.)
       console.error('❌ All token refresh attempts failed');
       processQueue(lastError, null);
       isRefreshing = false;
-      
-      // Refresh failed - logout user
+      isRefreshingSince = 0;
       forceLogout('session_expired');
       return Promise.reject(lastError);
     }
@@ -324,12 +389,14 @@ export const getActiveSessionsApi = async () => {
   return response.data;
 };
 
-// Initialize token refresh & visibility handler on module load if token exists
+// Initialize on module load: start the 20s timer, install event handlers,
+// and immediately attempt a proactive refresh (handles page-reload with stale token).
 if (typeof window !== 'undefined') {
   const token = getAccessToken();
   if (token) {
     setupTokenRefresh();
-    setupVisibilityHandler();
+    setupEventHandlers();
+    tryProactiveRefresh();
   }
 }
 

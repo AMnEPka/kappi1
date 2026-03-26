@@ -1,12 +1,33 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import api, { 
   setTokens, 
   clearTokens, 
-  getAccessToken, 
+  getAccessToken,
+  getRefreshToken,
+  refreshAccessToken,
   logoutApi 
 } from '../config/api';
 
 const AuthContext = createContext(null);
+
+const USER_DATA_KEY = 'user_data';
+const SILENT_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+const saveUserToStorage = (userData, perms) => {
+  try {
+    localStorage.setItem(USER_DATA_KEY, JSON.stringify({ user: userData, permissions: perms }));
+  } catch (_) { /* quota exceeded — non-critical */ }
+};
+
+const getUserFromStorage = () => {
+  try {
+    const raw = localStorage.getItem(USER_DATA_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -17,11 +38,45 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [permissions, setPermissions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Instant restore: if we have a cached user in localStorage, show it immediately
+  // so there's no flash of "unauthorized" while the /me request is in flight.
+  const cached = getAccessToken() ? getUserFromStorage() : null;
 
-  // Check if user is logged in on mount
+  const [user, setUser] = useState(cached?.user || null);
+  const [permissions, setPermissions] = useState(cached?.permissions || []);
+  const [loading, setLoading] = useState(!cached?.user);
+  const silentRefreshRef = useRef(null);
+
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const response = await api.get('/api/auth/me');
+      
+      const userData = response.data.user || response.data;
+      const perms = response.data.permissions || [];
+
+      setUser(userData);
+      setPermissions(perms);
+      saveUserToStorage(userData, perms);
+      
+    } catch (error) {
+      const status = error.response?.status;
+
+      if (status === 401 || status === 403) {
+        // Definitive auth failure — server explicitly rejected the token.
+        clearTokens();
+        setUser(null);
+        setPermissions([]);
+        localStorage.removeItem(USER_DATA_KEY);
+      }
+      // Network errors (server unavailable, timeout, DNS) — do NOT touch tokens.
+      // The token is likely still valid; wiping it would force an unnecessary re-login.
+      // The user will keep seeing the cached profile until the server comes back.
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Verify session on mount — refresh cached data from the server
   useEffect(() => {
     const token = getAccessToken();
     if (token) {
@@ -29,7 +84,37 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [fetchCurrentUser]);
+
+  // Silent refresh every 6 hours to keep the session alive during long idle periods
+  useEffect(() => {
+    if (!user) {
+      if (silentRefreshRef.current) {
+        clearInterval(silentRefreshRef.current);
+        silentRefreshRef.current = null;
+      }
+      return;
+    }
+
+    silentRefreshRef.current = setInterval(async () => {
+      const rt = getRefreshToken();
+      if (!rt) return;
+      try {
+        await refreshAccessToken();
+        console.log('✅ Silent 6h token refresh succeeded');
+      } catch (e) {
+        // Non-critical: the per-request interceptor and 20s timer still act as safety nets
+        console.warn('⚠️ Silent 6h token refresh failed (non-critical):', e?.message);
+      }
+    }, SILENT_REFRESH_INTERVAL_MS);
+
+    return () => {
+      if (silentRefreshRef.current) {
+        clearInterval(silentRefreshRef.current);
+        silentRefreshRef.current = null;
+      }
+    };
+  }, [user]);
 
   const login = async (username, password) => {
     try {
@@ -38,15 +123,12 @@ export const AuthProvider = ({ children }) => {
         password
       });
 
-      const { access_token, refresh_token, user: userData } = response.data;
+      const { access_token, refresh_token } = response.data;
       
-      // Store both tokens
       setTokens(access_token, refresh_token);
       
-      // Fetch full user data with permissions
       await fetchCurrentUser();
       
-      // Redirect to home page
       window.location.href = '/';
       
       return { success: true };
@@ -59,40 +141,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const fetchCurrentUser = async () => {
-    try {
-      const response = await api.get('/api/auth/me');
-      
-      // Set user and permissions
-      if (response.data.user) {
-        setUser(response.data.user);
-      } else {
-        setUser(response.data);
-      }
-
-      setPermissions(response.data.permissions || []);
-      
-    } catch (error) {
-      console.error('❌ Failed to fetch current user:', error);
-      // Don't logout here - the api interceptor handles 401
-      if (error.response?.status !== 401) {
-        clearTokens();
-        setUser(null);
-        setPermissions([]);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const logout = async () => {
     try {
-      // Call logout API to invalidate refresh token
       await logoutApi();
     } catch (error) {
       console.warn('Logout API error:', error);
     }
     
+    localStorage.removeItem(USER_DATA_KEY);
     setUser(null);
     setPermissions([]);
     window.location.href = '/login';
@@ -102,6 +158,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/api/auth/logout-all');
       clearTokens();
+      localStorage.removeItem(USER_DATA_KEY);
       setUser(null);
       setPermissions([]);
       window.location.href = '/login';
@@ -109,6 +166,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout all sessions error:', error);
       clearTokens();
+      localStorage.removeItem(USER_DATA_KEY);
       setUser(null);
       setPermissions([]);
       window.location.href = '/login';

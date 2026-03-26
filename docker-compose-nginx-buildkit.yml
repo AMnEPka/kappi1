@@ -38,6 +38,7 @@ services:
       - PYTHONUNBUFFERED=1
       # На Windows / bind-mount часто нужен polling; на Linux можно выставить false в .env
       - WATCHFILES_FORCE_POLLING=${WATCHFILES_FORCE_POLLING:-true}
+      - TZ=Europe/Moscow
     volumes:
       - ./backend:/app/backend
       - /app/backend/__pycache__

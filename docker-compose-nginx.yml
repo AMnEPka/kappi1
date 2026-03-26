@@ -33,6 +33,7 @@ services:
       - CORS_ORIGINS=*
       - PYTHONPATH=/app
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
+      - TZ=Europe/Moscow
     volumes:
       - ./logs:/app/logs
     networks:

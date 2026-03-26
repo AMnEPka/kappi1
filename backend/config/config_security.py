@@ -97,6 +97,18 @@ def decode_token(token: str) -> dict:
     return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
 
 
+def decode_token_with_grace(token: str, grace_seconds: int = 120) -> dict:
+    """Decode JWT token with a grace period for recently-expired tokens.
+    
+    Allows tokens expired within `grace_seconds` to still be accepted,
+    providing a buffer for in-flight requests and refresh race conditions.
+    """
+    return jwt.decode(
+        token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM],
+        options={"leeway": grace_seconds}
+    )
+
+
 def is_refresh_token(payload: dict) -> bool:
     """Check if token payload is a refresh token"""
     return payload.get("type") == "refresh"

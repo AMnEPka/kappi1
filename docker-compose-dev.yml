@@ -38,7 +38,8 @@ services:
       - PYTHONPATH=/app
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
       - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true      
+      - WATCHPACK_POLLING=true
+      - TZ=Europe/Moscow
     volumes:
       - ./backend:/app/backend
       - /app/backend/__pycache__

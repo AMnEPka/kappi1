@@ -35,6 +35,7 @@ services:
       - CORS_ORIGINS=*
       - PYTHONPATH=/app
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
+      - TZ=Europe/Moscow
     volumes:
       - backend_logs:/app/logs
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --workers 4

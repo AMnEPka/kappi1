@@ -10,7 +10,6 @@ const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const RolesPage = lazy(() => import("@/pages/RolesPage"));
 const LogsPage = lazy(() => import("@/pages/LogsPage"));
 const SchedulerPage = lazy(() => import("@/pages/SchedulerPage"));
-const HostsPage = lazy(() => import("@/pages/HostsPage"));
 const ScriptsPage = lazy(() => import("@/pages/ScriptsPage"));
 const ExecutePage = lazy(() => import("@/pages/ExecutePage"));
 const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
@@ -19,6 +18,7 @@ const IsCatalogPage = lazy(() => import("@/pages/IsCatalogPage"));
 const SecurityProfilesPage = lazy(() => import("@/pages/SecurityProfilesPage"));
 const ApplyProfilePage = lazy(() => import("@/pages/ApplyProfilePage"));
 const ConfigIntegrityPage = lazy(() => import("@/pages/ConfigIntegrityPage"));
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 
 // Page wrappers (pages that need router props)
 import {
@@ -67,7 +67,6 @@ function App() {
                             <Route path="/is-catalog" element={<IsCatalogPage />} />
                             <Route path="/ib-profiles" element={<SecurityProfilesPage />} />
                             <Route path="/ib-profiles/apply" element={<ApplyProfilePage />} />
-                            <Route path="/hosts" element={<HostsPage />} />
                             <Route path="/scripts" element={<ScriptsPage />} />
                             <Route path="/execute" element={<ExecutePage />} />
                             <Route path="/history" element={<HistoryPage />} />
@@ -78,6 +77,7 @@ function App() {
                             <Route path="/roles" element={<RolesPage />} />
                             <Route path="/config-integrity" element={<ConfigIntegrityPage />} />
                             <Route path="/ai-test" element={<AITestPage />} />
+                            <Route path="*" element={<NotFoundPage />} />
                           </Routes>
                         </Suspense>
                       </ErrorBoundary>

@@ -30,10 +30,6 @@ export const useProjectNavigation = () => {
     navigate('/scheduler');
   }, [navigate]);
 
-  const goToHosts = useCallback(() => {
-    navigate('/hosts');
-  }, [navigate]);
-
   const goToScripts = useCallback(() => {
     navigate('/scripts');
   }, [navigate]);
@@ -69,7 +65,6 @@ export const useProjectNavigation = () => {
     goToProjectExecute,
     goToProjectResults,
     goToScheduler,
-    goToHosts,
     goToScripts,
     handleNavigate  // для обратной совместимости
   };
