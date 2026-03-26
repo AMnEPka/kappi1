@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogClose, DialogTitle } from "@/components/ui/dialog";
 import ReferenceComparison from './ReferenceComparison';
+import api from "@/config/api";
 
 export default function ExecutionDetailsDialog({ 
   execution, 
@@ -14,6 +15,35 @@ export default function ExecutionDetailsDialog({
   if (!execution) return null;
 
   const errorInfo = getErrorInfo(execution);
+  const [executedCommand, setExecutedCommand] = useState("");
+  const [commandLoading, setCommandLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCommand = async () => {
+      const scriptId = execution?.script_id;
+      if (!scriptId) {
+        setExecutedCommand("");
+        return;
+      }
+      setCommandLoading(true);
+      try {
+        const res = await api.get(`/api/scripts/${scriptId}`);
+        const content = res?.data?.content;
+        if (!cancelled) setExecutedCommand(typeof content === "string" ? content : "");
+      } catch {
+        if (!cancelled) setExecutedCommand("");
+      } finally {
+        if (!cancelled) setCommandLoading(false);
+      }
+    };
+
+    loadCommand();
+    return () => {
+      cancelled = true;
+    };
+  }, [execution?.script_id]);
 
   return (
     <Dialog open={!!execution} onOpenChange={() => onClose()}>
@@ -105,6 +135,13 @@ export default function ExecutionDetailsDialog({
               actualData={execution.actual_data}
             />
           )}
+
+          <div>
+            <h3 className="font-bold mb-2">Команда:</h3>
+            <pre className="bg-muted text-foreground p-4 rounded-lg text-sm whitespace-pre-wrap break-words">
+              {commandLoading ? "Загрузка..." : (executedCommand || "—")}
+            </pre>
+          </div>
 
           {execution.output && (
             <div>
