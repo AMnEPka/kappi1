@@ -624,7 +624,7 @@ export default function ProjectExecutionPage({ projectId, onNavigate }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="sticky top-16 z-30 -mx-6 px-6 py-3 bg-[var(--md-sys-color-surface-container)] border-b border-[var(--md-sys-color-outline-variant)] rounded-t-[var(--md-sys-shape-corner-xl)] flex items-center gap-4">
         <Button variant="outline" onClick={() => onNavigate('projects')}>
           <ChevronLeft className="mr-2 h-4 w-4" />
           Назад

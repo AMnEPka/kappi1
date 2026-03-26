@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogClose, DialogTitle } from "@/components/ui/dialog";
 import ReferenceComparison from './ReferenceComparison';
 
 export default function ExecutionDetailsDialog({ 
@@ -17,20 +17,33 @@ export default function ExecutionDetailsDialog({
 
   return (
     <Dialog open={!!execution} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto w-[95vw]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {execution.script_name}
-          </DialogTitle>
-          <DialogDescription className="break-words">
-            Выполнено: {formatDate(execution.executed_at)}
-            {execution.host_id && (
-              <span className="break-words"> • Хост: {getHostName(execution.host_id)}</span>
-            )}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="w-[96vw] md:w-[calc(100vw-16rem-2rem)] max-w-none top-[calc(4rem+1rem)] translate-y-0 md:left-[calc(16rem+1rem)] md:translate-x-0 max-h-[calc(100vh-4rem-2rem)] flex flex-col overflow-hidden [&>button.absolute]:hidden">
+        <div className="sticky top-0 z-10 bg-background border-b px-6 py-4">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="flex items-center gap-2 break-words">
+                {execution.script_name}
+              </DialogTitle>
+              <DialogDescription className="break-words">
+                Выполнено: {formatDate(execution.executed_at)}
+                {execution.host_id && (
+                  <span className="break-words"> • Хост: {getHostName(execution.host_id)}</span>
+                )}
+              </DialogDescription>
+            </div>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </DialogClose>
+          </div>
+        </div>
 
-        <div className="space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
           <div>
             <h3 className="font-bold mb-2">Статус:</h3>
             {getCheckStatusBadge(execution)}
