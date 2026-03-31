@@ -1,19 +1,19 @@
-[2026-03-18 08:07:07.552] SSH LOG FILE CLEARED - Starting new project execution
+[2026-03-26 16:41:33.021] SSH LOG FILE CLEARED - Starting new project execution
 ================================================================================
 
-2026-03-18 08:07:07 [INFO] SSH log file cleared at 2026-03-18 08:07:07.552
-2026-03-18 08:07:07 [INFO] 
+2026-03-26 16:41:33 [INFO] SSH log file cleared at 2026-03-26 16:41:33.021
+2026-03-26 16:41:33 [INFO] 
 ================================================================================
-[2026-03-18 08:07:07.602] SSH CONNECTION: login - SUCCESS
+[2026-03-26 16:41:33.124] SSH CONNECTION: login - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 Auth Type: password
 Connection Type: ssh
 ================================================================================
 
-2026-03-18 08:07:07 [INFO] 
+2026-03-26 16:41:33 [INFO] 
 ================================================================================
-[2026-03-18 08:07:07.707] SSH CHECK: SUDO - SUCCESS
+[2026-03-26 16:41:33.244] SSH CHECK: SUDO - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
@@ -27,9 +27,9 @@ uid=0(root) gid=0(root) группы=0(root)
 
 ================================================================================
 
-2026-03-18 08:07:07 [INFO] 
+2026-03-26 16:41:33 [INFO] 
 ================================================================================
-[2026-03-18 08:07:07.805] SSH COMMAND EXECUTION - SUCCESS
+[2026-03-26 16:41:33.343] SSH COMMAND EXECUTION - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
@@ -54,9 +54,9 @@ simple_allow_groups = group1,group1,group3
 (empty)
 ================================================================================
 
-2026-03-18 08:07:07 [INFO] 
+2026-03-26 16:41:33 [INFO] 
 ================================================================================
-[2026-03-18 08:07:07.827] PROCESSOR SCRIPT EXECUTION - FAILED
+[2026-03-26 16:41:33.395] PROCESSOR SCRIPT EXECUTION - FAILED
 Host: Linux Server 1 ((offline):0)
 Script ID: f8d3a770-3d39-4bd7-84a4-9be8e163c7af
 Script Name: sssd.conf groups
@@ -139,8 +139,8 @@ auth_provider = ad
 simple_allow_users = user1,user2,user3
 simple_allow_groups = group1,group1,group3
 '
-++ head -n 1
 ++ grep -E '^[[:space:]]*simple_allow_groups[[:space:]]*='
+++ head -n 1
 + uncommented_line='simple_allow_groups = group1,group1,group3'
 ++ printf '%s\n' '[sssd]
 config_version=2
@@ -168,8 +168,8 @@ simple_allow_groups = group1,group1,group3
 + grep -qE '[^[:alnum:]_.\-,[:space:]]'
 grep: Invalid range end
 + mapfile -t actual_groups
-++ printf %s group1,group1,group3
 ++ tr ',\t' '  '
+++ printf %s group1,group1,group3
 ++ tr ' ' '\n'
 ++ sed -E '/^[[:space:]]*$/d'
 + [[ 3 -eq 0 ]]
@@ -217,9 +217,9 @@ group3'
 
 ================================================================================
 
-2026-03-18 08:07:07 [INFO] 
+2026-03-26 16:41:33 [INFO] 
 ================================================================================
-[2026-03-18 08:07:07.925] SSH COMMAND EXECUTION - SUCCESS
+[2026-03-26 16:41:33.500] SSH COMMAND EXECUTION - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
@@ -244,9 +244,9 @@ simple_allow_groups = group1,group1,group3
 (empty)
 ================================================================================
 
-2026-03-18 08:07:07 [INFO] 
+2026-03-26 16:41:33 [INFO] 
 ================================================================================
-[2026-03-18 08:07:07.949] PROCESSOR SCRIPT EXECUTION - FAILED
+[2026-03-26 16:41:33.525] PROCESSOR SCRIPT EXECUTION - FAILED
 Host: Linux Server 1 ((offline):0)
 Script ID: 6662ac67-34a4-4320-8d22-bfa6ea537216
 Script Name: sssd.conf users
@@ -407,9 +407,9 @@ udser33'
 
 ================================================================================
 
-2026-03-18 08:07:08 [INFO] 
+2026-03-26 16:41:33 [INFO] 
 ================================================================================
-[2026-03-18 08:07:08.051] SSH COMMAND EXECUTION - SUCCESS
+[2026-03-26 16:41:33.978] SSH COMMAND EXECUTION - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
@@ -464,9 +464,9 @@ vboxadd:x:999:1::/var/run/vboxadd:/bin/false
 (empty)
 ================================================================================
 
-2026-03-18 08:07:08 [INFO] 
+2026-03-26 16:41:34 [INFO] 
 ================================================================================
-[2026-03-18 08:07:08.072] PROCESSOR SCRIPT EXECUTION - FAILED
+[2026-03-26 16:41:34.007] PROCESSOR SCRIPT EXECUTION - FAILED
 Host: Linux Server 1 ((offline):0)
 Script ID: 4bdcaa84-e50a-40f9-8cc0-dbda15df3576
 Script Name: getent passwd (users)
@@ -895,9 +895,9 @@ vboxadd:x:999:1::/var/run/vboxadd:/bin/false
 
 ================================================================================
 
-2026-03-18 08:07:08 [INFO] 
+2026-03-26 16:41:34 [INFO] 
 ================================================================================
-[2026-03-18 08:07:08.176] SSH COMMAND EXECUTION - SUCCESS
+[2026-03-26 16:41:34.113] SSH COMMAND EXECUTION - SUCCESS
 Host: Linux Server 1 (192.168.56.102:22)
 Username: user
 
@@ -985,9 +985,9 @@ vboxdrmipc:x:998:
 (empty)
 ================================================================================
 
-2026-03-18 08:07:08 [INFO] 
+2026-03-26 16:41:34 [INFO] 
 ================================================================================
-[2026-03-18 08:07:08.194] PROCESSOR SCRIPT EXECUTION - FAILED
+[2026-03-26 16:41:34.135] PROCESSOR SCRIPT EXECUTION - FAILED
 Host: Linux Server 1 ((offline):0)
 Script ID: 23f11e4a-1953-444c-a486-41febf93c826
 Script Name: getent group
@@ -1677,6 +1677,25 @@ vboxdrmipc:x:998:
 + shift
 + printf 'Не пройдена\n%s\nexit code: %s\n' 'Конфигурация: Неверное значение - отсутствуют группы: group1 group2 group3' 44
 + exit 44
+
+================================================================================
+
+2026-03-26 16:41:34 [INFO] 
+================================================================================
+[2026-03-26 16:41:34.236] SSH COMMAND EXECUTION - FAILED
+Host: Linux Server 1 (192.168.56.102:22)
+Username: user
+
+>>> COMMAND SENT:
+sudo klist
+
+>>> EXIT CODE: 1
+
+>>> STDOUT:
+(empty)
+
+>>> STDERR:
+sudo: klist: command not found
 
 ================================================================================
 

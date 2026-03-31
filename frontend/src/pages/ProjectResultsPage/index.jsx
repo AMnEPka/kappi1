@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Download, BarChart3 } from "lucide-react";
+import { ChevronLeft, Download, BarChart3, FileText } from "lucide-react";
+import api from "@/config/api";
+import { toast } from "sonner";
 
 // Local components
 import { useProjectResults } from './useProjectResults';
@@ -36,6 +38,7 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     sessions,
     selectedSession,
     groupedExecutions,
+    hosts,
     loading,
     searchParams,
     handleSessionChange,
@@ -45,6 +48,84 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     getHostStats,
     getErrorInfo
   } = useProjectResults(projectId);
+
+  const handleExportTerminalMd = useCallback(async () => {
+    if (!selectedSession) {
+      toast.error("Выберите запуск для экспорта");
+      return;
+    }
+
+    try {
+      // Collect unique script IDs to fetch commands once
+      const allExecutions = Object.values(groupedExecutions).flat();
+      const uniqueScriptIds = [...new Set(allExecutions.map((e) => e.script_id).filter(Boolean))];
+
+      const scriptsMap = {};
+      if (uniqueScriptIds.length > 0) {
+        const responses = await Promise.all(
+          uniqueScriptIds.map((sid) =>
+            api
+              .get(`/api/scripts/${sid}`)
+              .then((r) => ({ sid, content: r?.data?.content }))
+              .catch(() => ({ sid, content: "" }))
+          )
+        );
+        for (const r of responses) {
+          scriptsMap[r.sid] = typeof r.content === "string" ? r.content : "";
+        }
+      }
+
+      const getHostHeader = (hostId) => {
+        const h = hosts?.[hostId];
+        const name = h?.name || hostId;
+        const ip = h?.hostname || h?.ip_address || "";
+        return ip ? `${name} (${ip})` : name;
+      };
+
+      const hostIds = Object.keys(groupedExecutions);
+
+      let md = `# Экспорт вывода терминала\n\n`;
+      md += `Проект: **${project?.name || "—"}**\n\n`;
+      md += `Сессия: **${selectedSession}**\n\n`;
+
+      for (const hostId of hostIds) {
+        md += `# ${getHostHeader(hostId)}\n\n`;
+        const executions = groupedExecutions[hostId] || [];
+
+        for (const ex of executions) {
+          md += `## ${ex.script_name || ex.script_id || "Проверка"}\n\n`;
+
+          const cmd = scriptsMap[ex.script_id] || "";
+          md += `### Команда\n\n`;
+          md += "```bash\n";
+          md += `${cmd || "—"}\n`;
+          md += "```\n\n";
+
+          md += `### Вывод\n\n`;
+          md += "```text\n";
+          md += `${ex.output || "—"}\n`;
+          md += "```\n\n";
+        }
+      }
+
+      const safeName = String(project?.name || "project")
+        .replace(/[\\/:*?"<>|]+/g, "_")
+        .slice(0, 80);
+      const filename = `terminal-export_${safeName}_${new Date().toISOString().slice(0, 10)}.md`;
+
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(e?.message || "Не удалось экспортировать вывод терминала");
+    }
+  }, [groupedExecutions, hosts, project?.name, selectedSession]);
 
   const handleBack = useCallback(() => {
     const returnTo = searchParams.get('returnTo');
@@ -106,16 +187,28 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
                 Просмотр результатов конкретного запуска проекта
               </CardDescription>
             </div>
-            <Button
-              onClick={handleExportToExcel}
-              disabled={!selectedSession}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Экспорт в Excel</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleExportTerminalMd}
+                disabled={!selectedSession}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Экспорт вывода терминала</span>
+              </Button>
+              <Button
+                onClick={handleExportToExcel}
+                disabled={!selectedSession}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Экспорт в Excel</span>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
