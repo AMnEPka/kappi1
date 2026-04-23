@@ -35,6 +35,45 @@ const webpackConfig = {
       '@': path.resolve(__dirname, 'src'),
     },
     configure: (webpackConfig) => {
+      webpackConfig.ignoreWarnings = [
+        ...(webpackConfig.ignoreWarnings || []),
+        (warning) => {
+          const message = warning?.message || "";
+          const file = warning?.file || "";
+          const isSourceMapNoise =
+            typeof message === "string" &&
+            message.includes("Failed to parse source map") &&
+            (message.includes("dompurify") || file.includes("dompurify"));
+          return isSourceMapNoise;
+        },
+      ];
+
+      // Silence noisy dompurify sourcemap warnings:
+      // dompurify ships sourcemaps that reference TS sources not present in the package,
+      // which triggers source-map-loader "Failed to parse source map" warnings.
+      // We exclude dompurify from source-map-loader to keep useful sourcemaps elsewhere.
+      try {
+        const rules = webpackConfig?.module?.rules || [];
+        const oneOf = rules.find((r) => Array.isArray(r.oneOf))?.oneOf;
+        const allRules = Array.isArray(oneOf) ? oneOf : rules;
+        allRules.forEach((rule) => {
+          const uses = rule && rule.use ? (Array.isArray(rule.use) ? rule.use : [rule.use]) : [];
+          const hasSourceMapLoader = uses.some((u) => {
+            const loader = typeof u === "string" ? u : u?.loader;
+            return loader && loader.includes("source-map-loader");
+          });
+          if (!hasSourceMapLoader) return;
+
+          const dompurifyRe = /[\\/]node_modules[\\/]dompurify[\\/]/;
+          if (rule.exclude == null) {
+            rule.exclude = [dompurifyRe];
+            return;
+          }
+          rule.exclude = Array.isArray(rule.exclude) ? [...rule.exclude, dompurifyRe] : [rule.exclude, dompurifyRe];
+        });
+      } catch (e) {
+        // If webpack internals change, don't break the build.
+      }
 
       // Disable hot reload completely if environment variable is set
       if (config.disableHotReload) {

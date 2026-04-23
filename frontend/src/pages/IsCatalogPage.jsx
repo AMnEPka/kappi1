@@ -62,6 +62,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { FileTypeIcon } from "@/components/IsCatalogFileIcons";
+import { FilePreviewDialog } from "@/components/is-catalog/FilePreviewDialog";
 
 const schemaFieldsOrdered = (schema) =>
   (schema?.fields || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -107,6 +108,13 @@ async function downloadIsCatalogFile(api, fileId, filename) {
   a.download = filename || fileId;
   a.click();
   window.URL.revokeObjectURL(url);
+}
+
+function canPreviewPdf(fileMeta) {
+  if (!fileMeta || typeof fileMeta !== "object") return false;
+  const { content_type, filename } = fileMeta;
+  if (content_type === "application/pdf") return true;
+  return (filename || "").toLowerCase().endsWith(".pdf");
 }
 
 export default function IsCatalogPage() {
@@ -156,6 +164,7 @@ export default function IsCatalogPage() {
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [importing, setImporting] = useState(false);
   const [uploadingFileKey, setUploadingFileKey] = useState(null);
+  const [filePreview, setFilePreview] = useState({ open: false, file: null });
   const fileInputRef = useRef(null);
   const fileFieldInputRefs = useRef({});
 
@@ -319,6 +328,10 @@ export default function IsCatalogPage() {
     setSheetOpen(false);
     setSelectedItem(null);
     setEditForm({});
+  };
+
+  const openFilePreview = (fileMeta) => {
+    setFilePreview({ open: true, file: fileMeta });
   };
 
   const resetHostForm = () => {
@@ -683,6 +696,16 @@ export default function IsCatalogPage() {
                                     className="h-5 w-5 shrink-0"
                                     title={val.filename}
                                   />
+                                  {canPreviewPdf(val) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs"
+                                      onClick={() => openFilePreview(val)}
+                                    >
+                                      Просмотр
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -816,7 +839,6 @@ export default function IsCatalogPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[90px]">Порядок</TableHead>
-                      <TableHead>Ключ</TableHead>
                       <TableHead>Подпись</TableHead>
                       <TableHead>Тип</TableHead>
                       <TableHead className="w-[140px]"></TableHead>
@@ -855,7 +877,6 @@ export default function IsCatalogPage() {
                               <span className="text-muted-foreground text-xs w-5">{idx + 1}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="font-mono text-sm">{f.key}</TableCell>
                           <TableCell>
                             {editingSchemaLabel.key === f.key ? (
                               <div className="flex items-center gap-1">
@@ -992,6 +1013,16 @@ export default function IsCatalogPage() {
                                 <span className="text-sm truncate max-w-[200px]" title={editForm[f.key].filename}>
                                   {editForm[f.key].filename}
                                 </span>
+                                {canPreviewPdf(editForm[f.key]) && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openFilePreview(editForm[f.key])}
+                                  >
+                                    Просмотр
+                                  </Button>
+                                )}
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -1078,6 +1109,16 @@ export default function IsCatalogPage() {
                                   filename={val.filename}
                                   className="h-5 w-5"
                                 />
+                                    {canPreviewPdf(val) && (
+                                      <Button
+                                        type="button"
+                                        variant="link"
+                                        className="h-auto p-0"
+                                        onClick={() => openFilePreview(val)}
+                                      >
+                                        Просмотр
+                                      </Button>
+                                    )}
                                 <Button
                                   variant="link"
                                   className="h-auto p-0"
@@ -1514,6 +1555,12 @@ export default function IsCatalogPage() {
           confirmDelete.onConfirm?.();
         }}
         onCancel={() => setConfirmDelete((p) => ({ ...p, open: false }))}
+      />
+
+      <FilePreviewDialog
+        open={filePreview.open}
+        onOpenChange={(open) => setFilePreview((prev) => ({ ...prev, open, file: open ? prev.file : null }))}
+        file={filePreview.file}
       />
     </div>
   );
