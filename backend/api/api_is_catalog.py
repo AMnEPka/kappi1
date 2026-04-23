@@ -490,8 +490,16 @@ async def upload_file(
 def _content_disposition(filename: str) -> str:
     """Build a Content-Disposition header value with RFC 5987 filename*= for non-ASCII names."""
     from urllib.parse import quote as _quote
-    safe_ascii = (filename or "").encode("ascii", "ignore").decode("ascii") or "file"
-    quoted = _quote(filename or "file", safe="")
+    # Defensive: prevent header splitting and keep quoted-string valid.
+    raw = str(filename or "file")
+    raw = raw.replace("\r", "").replace("\n", "")
+
+    safe_ascii = raw.encode("ascii", "ignore").decode("ascii") or "file"
+    safe_ascii = safe_ascii.replace("\r", "").replace("\n", "")
+    # Escape backslash and double-quote for quoted-string per RFC 2616/7230 style.
+    safe_ascii = safe_ascii.replace("\\", "\\\\").replace('"', '\\"')
+
+    quoted = _quote(raw, safe="")
     return f'attachment; filename="{safe_ascii}"; filename*=UTF-8\'\'{quoted}'
 
 
