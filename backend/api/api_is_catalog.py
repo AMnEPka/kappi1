@@ -712,7 +712,27 @@ async def update_is_catalog_item(
     if not update:
         return await _item_response(doc, schema_doc)
 
+    # Before writing the update, figure out which file-type fields are being
+    # replaced/cleared, so we can garbage-collect the old binaries afterwards.
+    file_keys = {k for k, ftype, _ in _get_schema_fields_with_type(schema_doc) if ftype == FIELD_TYPE_FILE}
+    file_ids_to_delete: List[str] = []
+    for k in file_keys:
+        if k not in data_fields:
+            continue
+        old_val = str(doc.get(k) or "").strip()
+        new_val = str(data_fields.get(k) or "").strip()
+        if old_val and old_val != new_val:
+            file_ids_to_delete.append(old_val)
+
     await db.is_catalog.update_one({"id": item_id}, {"$set": prepare_for_mongo(update)})
+
+    # Best-effort cleanup of orphaned file records and their GridFS/disk payloads.
+    for fid in file_ids_to_delete:
+        try:
+            await _delete_file_record(fid)
+        except Exception as e:
+            logger.warning("[is-catalog:file] orphan cleanup failed item=%s file_id=%s reason=%s", item_id, fid, str(e))
+
     updated = await db.is_catalog.find_one({"id": item_id}, {"_id": 0})
     return await _item_response(updated, schema_doc)
 
@@ -721,9 +741,25 @@ async def update_is_catalog_item(
 async def delete_is_catalog_item(
     item_id: str, current_user: User = Depends(get_current_user)
 ):
-    """Delete IS."""
+    """Delete IS. Also removes all file-type field payloads (GridFS + disk)."""
     await require_permission(current_user, "is_catalog_edit")
+    await ensure_default_schema()
+    schema_doc = await db.is_catalog_schema.find_one({"id": SCHEMA_ID}, {"_id": 0}) or {}
+    doc = await db.is_catalog.find_one({"id": item_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="ИС не найдена")
+
+    file_keys = {k for k, ftype, _ in _get_schema_fields_with_type(schema_doc) if ftype == FIELD_TYPE_FILE}
+    file_ids_to_delete = [str(doc.get(k) or "").strip() for k in file_keys if str(doc.get(k) or "").strip()]
+
     result = await db.is_catalog.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="ИС не найдена")
+
+    for fid in file_ids_to_delete:
+        try:
+            await _delete_file_record(fid)
+        except Exception as e:
+            logger.warning("[is-catalog:file] delete cleanup failed item=%s file_id=%s reason=%s", item_id, fid, str(e))
+
     return {"message": "ИС удалена"}

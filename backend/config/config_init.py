@@ -38,7 +38,9 @@ from config.config_database import (
     client,
     db,
     ensure_indexes,
-    check_db_health
+    check_db_health,
+    is_catalog_gridfs_bucket,
+    get_is_catalog_gridfs_bucket,
 )
 
 __all__ = [
@@ -74,5 +76,7 @@ __all__ = [
     "db",
     "client",
     "ensure_indexes",
-    "check_db_health"
+    "check_db_health",
+    "is_catalog_gridfs_bucket",
+    "get_is_catalog_gridfs_bucket",
 ]

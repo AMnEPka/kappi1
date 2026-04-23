@@ -3,7 +3,7 @@ config/database.py
 MongoDB connection configuration with connection pooling and timeouts
 """
 
-from motor.motor_asyncio import AsyncIOMotorClient  # pyright: ignore[reportMissingImports]
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket  # pyright: ignore[reportMissingImports]
 import os
 import logging
 
@@ -12,6 +12,9 @@ logger = logging.getLogger("ssh_runner")
 # MongoDB Configuration from environment
 mongo_url = os.environ['MONGO_URL']
 db_name = os.environ.get('DB_NAME', 'ssh_runner_db')
+
+# IS Catalog GridFS bucket name (can be overridden via env)
+_IS_CATALOG_GRIDFS_BUCKET = os.environ.get("IS_CATALOG_GRIDFS_BUCKET", "is_catalog_files").strip() or "is_catalog_files"
 
 # Connection pool and timeout settings
 MONGO_MAX_POOL_SIZE = int(os.environ.get('MONGO_MAX_POOL_SIZE', '50'))
@@ -34,8 +37,22 @@ client = AsyncIOMotorClient(
 
 db = client[db_name]
 
-logger.info(f"MongoDB client configured: pool_size={MONGO_MIN_POOL_SIZE}-{MONGO_MAX_POOL_SIZE}, "
-            f"connect_timeout={MONGO_CONNECT_TIMEOUT_MS}ms, socket_timeout={MONGO_SOCKET_TIMEOUT_MS}ms")
+# GridFS bucket for IS Catalog binary storage.
+# Uses custom bucket name so chunks are stored in "<bucket>.files" / "<bucket>.chunks"
+# instead of the default "fs.files" / "fs.chunks".
+is_catalog_gridfs_bucket = AsyncIOMotorGridFSBucket(db, bucket_name=_IS_CATALOG_GRIDFS_BUCKET)
+
+
+def get_is_catalog_gridfs_bucket() -> AsyncIOMotorGridFSBucket:
+    """Return the GridFS bucket used for IS Catalog file storage."""
+    return is_catalog_gridfs_bucket
+
+
+logger.info(
+    f"MongoDB client configured: pool_size={MONGO_MIN_POOL_SIZE}-{MONGO_MAX_POOL_SIZE}, "
+    f"connect_timeout={MONGO_CONNECT_TIMEOUT_MS}ms, socket_timeout={MONGO_SOCKET_TIMEOUT_MS}ms, "
+    f"is_catalog_gridfs_bucket={_IS_CATALOG_GRIDFS_BUCKET}"
+)
 
 
 async def ensure_indexes():
@@ -93,6 +110,9 @@ async def ensure_indexes():
         await db.is_catalog.create_index("created_at")
         await db.is_catalog.create_index("id", unique=True)
         await db.is_catalog_files.create_index("id", unique=True)
+        # Sparse index: used to lookup/cleanup GridFS-backed metadata records
+        await db.is_catalog_files.create_index("gridfs_id", sparse=True)
+        await db.is_catalog_files.create_index("storage_backend", sparse=True)
 
         # IB profiles
         await db.ib_profiles.create_index("id", unique=True)

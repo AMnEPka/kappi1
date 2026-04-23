@@ -33,6 +33,9 @@ services:
       - CORS_ORIGINS=*
       - PYTHONPATH=/app
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-cI31yQgFFdM8KF-iIoQN6GHRmWp82tKU_aUogjhyOWo=}
+      # IS Catalog file storage: gridfs | disk | hybrid
+      - IS_CATALOG_FILE_STORAGE=${IS_CATALOG_FILE_STORAGE:-hybrid}
+      - IS_CATALOG_GRIDFS_BUCKET=${IS_CATALOG_GRIDFS_BUCKET:-is_catalog_files}
       # Надёжное отслеживание изменений в контейнере (Windows/WSL/Docker Desktop)
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true

@@ -39,6 +39,20 @@ JWT_ACCESS_TOKEN_EXPIRE_HOURS = 24
 # Scheduler Configuration
 SCHEDULER_POLL_SECONDS = int(os.environ.get("SCHEDULER_POLL_SECONDS", "30"))
 
+# ============================================================================
+# IS CATALOG FILE STORAGE
+# ============================================================================
+# Storage backend for IS Catalog files:
+#   - "gridfs" : новые файлы пишутся в GridFS, disk fallback только на чтение
+#   - "disk"   : legacy режим, файлы только на диске
+#   - "hybrid" : upload в GridFS; download пробует сначала GridFS, потом диск
+IS_CATALOG_FILE_STORAGE = os.environ.get("IS_CATALOG_FILE_STORAGE", "hybrid").strip().lower()
+if IS_CATALOG_FILE_STORAGE not in {"gridfs", "disk", "hybrid"}:
+    IS_CATALOG_FILE_STORAGE = "hybrid"
+
+# Custom GridFS bucket name for IS Catalog files
+IS_CATALOG_GRIDFS_BUCKET = os.environ.get("IS_CATALOG_GRIDFS_BUCKET", "is_catalog_files").strip() or "is_catalog_files"
+
 # Config integrity: автопроверки в фиксированное локальное время (IANA TZ, напр. Europe/Moscow)
 CONFIG_INTEGRITY_SCHEDULE_TZ = os.environ.get("CONFIG_INTEGRITY_SCHEDULE_TZ", "Europe/Moscow")
 CONFIG_INTEGRITY_SCHEDULE_HOUR = int(os.environ.get("CONFIG_INTEGRITY_SCHEDULE_HOUR", "9"))
