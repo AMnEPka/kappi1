@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectNative } from "@/components/ui/select-native";
@@ -9,6 +9,10 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useDialog } from "@/hooks/useDialog";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { useAuth } from '@/contexts/AuthContext';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Local components
 import { useScriptsData } from './useScriptsData';
@@ -59,6 +63,10 @@ export default function ScriptsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
+
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportQuery, setExportQuery] = useState("");
+  const [exportSelectedIds, setExportSelectedIds] = useState(() => new Set());
 
   // Submit handler
   const handleSubmit = useCallback(async (e) => {
@@ -179,11 +187,69 @@ export default function ScriptsPage() {
     }
   }, [editingScript?.id, fetchScripts, setFormData]);
 
+  const filteredScriptsForExport = useMemo(() => {
+    const q = exportQuery.trim().toLowerCase();
+    if (!q) return scripts;
+    return scripts.filter((s) => {
+      const hay = [
+        s?.name,
+        s?.description,
+        s?.category_name,
+        s?.system_name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [scripts, exportQuery]);
+
+  const openExportDialog = useCallback(() => {
+    // Default: select all currently shown in the table (respecting current filters)
+    const next = new Set(filteredScriptsForExport.map((s) => s.id).filter(Boolean));
+    setExportSelectedIds(next);
+    setExportQuery("");
+    setExportDialogOpen(true);
+  }, [filteredScriptsForExport]);
+
+  const toggleExportId = useCallback((id) => {
+    if (!id) return;
+    setExportSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAllFiltered = useCallback(() => {
+    setExportSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const s of filteredScriptsForExport) {
+        if (s?.id) next.add(s.id);
+      }
+      return next;
+    });
+  }, [filteredScriptsForExport]);
+
+  const clearAll = useCallback(() => {
+    setExportSelectedIds(new Set());
+  }, []);
+
   const handleExport = useCallback(async () => {
     if (isExporting) return;
+    const ids = Array.from(exportSelectedIds);
+    if (ids.length === 0) {
+      toast.error("Выберите проверки для экспорта");
+      return;
+    }
     setIsExporting(true);
     try {
-      const response = await api.get('/api/scripts/export/all', { responseType: 'blob' });
+      const response = await api.post(
+        '/api/scripts/export/selected',
+        { script_ids: ids },
+        { responseType: 'blob' }
+      );
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = url;
@@ -193,12 +259,13 @@ export default function ScriptsPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
       toast.success("Экспорт завершен");
+      setExportDialogOpen(false);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Ошибка экспорта");
     } finally {
       setIsExporting(false);
     }
-  }, [isExporting]);
+  }, [isExporting, exportSelectedIds]);
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -265,17 +332,17 @@ export default function ScriptsPage() {
             <>
               <Button 
                 variant="outline" 
-                onClick={handleExport}
+                onClick={openExportDialog}
                 disabled={isExporting}
               >
-                <Download className="mr-2 h-4 w-4" /> {isExporting ? "Экспорт..." : "Экспорт"}
+                <Upload className="mr-2 h-4 w-4" /> {isExporting ? "Экспорт..." : "Экспорт"}
               </Button>
               <Button 
                 variant="outline" 
                 onClick={handleImportClick}
                 disabled={isImporting}
               >
-                <Upload className="mr-2 h-4 w-4" /> {isImporting ? "Импорт..." : "Импорт"}
+                <Download className="mr-2 h-4 w-4" /> {isImporting ? "Импорт..." : "Импорт"}
               </Button>
             </>
           )}
@@ -412,6 +479,89 @@ export default function ScriptsPage() {
         className="hidden"
         onChange={handleImportFileChange}
       />
+
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Экспорт проверок</DialogTitle>
+            <DialogDescription>
+              Выберите проверки, которые нужно экспортировать. Будут выгружены только выбранные.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
+                  Выбрать все (по фильтру)
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={clearAll}>
+                  Очистить
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Выбрано: {exportSelectedIds.size} / {scripts.length}
+              </div>
+            </div>
+
+            <Input
+              placeholder="Поиск по названию, описанию, категории, системе…"
+              value={exportQuery}
+              onChange={(e) => setExportQuery(e.target.value)}
+            />
+
+            <div className="border rounded-md">
+              <ScrollArea className="h-[360px]">
+                <div className="p-3 space-y-2">
+                  {filteredScriptsForExport.length === 0 ? (
+                    <div className="text-sm text-muted-foreground py-8 text-center">
+                      Ничего не найдено
+                    </div>
+                  ) : (
+                    filteredScriptsForExport.map((s) => {
+                      const checked = exportSelectedIds.has(s.id);
+                      const secondary = s.category_name
+                        ? `${s.category_icon || "📁"} ${s.category_name} → ${s.system_name || ""}`
+                        : (s.system_name || "");
+
+                      return (
+                        <label
+                          key={s.id}
+                          className="flex items-start gap-3 rounded-md border p-3 hover:bg-slate-50 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() => toggleExportId(s.id)}
+                            className="mt-1"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium truncate">{s.name}</div>
+                            {(secondary || s.description) && (
+                              <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                                {secondary && <div className="truncate">{secondary}</div>}
+                                {s.description && <div className="truncate">{s.description}</div>}
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setExportDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button type="button" onClick={handleExport} disabled={isExporting || exportSelectedIds.size === 0}>
+              {isExporting ? "Экспорт..." : "Экспортировать выбранные"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

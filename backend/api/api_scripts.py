@@ -60,6 +60,10 @@ class ScriptImportPayload(BaseModel):
     group_names: List[str] = Field(default_factory=list)
 
 
+class ScriptsExportSelectedPayload(BaseModel):
+    script_ids: List[str] = Field(default_factory=list)
+
+
 class ScriptsImportRequest(BaseModel):
     """Payload for importing checks with dependencies"""
     version: int = 1
@@ -611,6 +615,126 @@ async def export_all_scripts(current_user: User = Depends(get_current_user)):
     
     filename = f"scripts-export-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
     
+    return JSONResponse(
+        content=payload,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.post("/scripts/export/selected")
+async def export_selected_scripts(
+    body: ScriptsExportSelectedPayload,
+    current_user: User = Depends(get_current_user),
+):
+    """Export only selected checks (by script ids), with required categories/systems/groups."""
+    if not (await has_permission(current_user, 'checks_edit_all') or await has_permission(current_user, 'checks_create')):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для экспорта проверок")
+
+    script_ids = [sid for sid in (body.script_ids or []) if isinstance(sid, str) and sid.strip()]
+    script_ids = list(dict.fromkeys(script_ids))  # preserve order, unique
+    if len(script_ids) == 0:
+        raise HTTPException(status_code=400, detail="Не выбраны проверки для экспорта")
+    if len(script_ids) > 10000:
+        raise HTTPException(status_code=400, detail="Слишком много проверок для экспорта")
+
+    scripts_docs = await db.scripts.find({"id": {"$in": script_ids}}, {"_id": 0}).to_list(10000)
+    scripts_by_id = {s.get("id"): s for s in scripts_docs if s.get("id")}
+    ordered_scripts_docs = [scripts_by_id[sid] for sid in script_ids if sid in scripts_by_id]
+
+    if len(ordered_scripts_docs) == 0:
+        raise HTTPException(status_code=404, detail="Выбранные проверки не найдены")
+
+    decoded_scripts = []
+    system_ids = set()
+    group_ids = set()
+
+    for script_doc in ordered_scripts_docs:
+        parsed = parse_from_mongo(script_doc)
+        decoded = decode_script_from_storage(parsed)
+        decoded_scripts.append(decoded)
+        if decoded.get("system_id"):
+            system_ids.add(decoded.get("system_id"))
+        for gid in decoded.get("group_ids", []) or []:
+            if gid:
+                group_ids.add(gid)
+
+    systems_docs = await db.systems.find({"id": {"$in": list(system_ids)}}, {"_id": 0}).to_list(4000)
+    systems_map = {sys.get("id"): sys for sys in systems_docs if sys.get("id")}
+
+    category_ids = set()
+    for sys in systems_docs:
+        if sys.get("category_id"):
+            category_ids.add(sys.get("category_id"))
+
+    categories_docs = await db.categories.find({"id": {"$in": list(category_ids)}}, {"_id": 0}).to_list(2000)
+    categories_map = {cat.get("id"): cat for cat in categories_docs if cat.get("id")}
+
+    groups_docs = []
+    if len(group_ids) > 0:
+        groups_docs = await db.check_groups.find({"id": {"$in": list(group_ids)}}, {"_id": 0}).to_list(4000)
+    group_map = {grp.get("id"): grp for grp in groups_docs if grp.get("id")}
+
+    systems_export = []
+    for system in systems_docs:
+        category = categories_map.get(system.get("category_id", ""))
+        systems_export.append({
+            "name": system.get("name"),
+            "description": system.get("description"),
+            "os_type": system.get("os_type", "linux"),
+            "category_name": category.get("name") if category else "",
+        })
+
+    categories_export = [{
+        "name": cat.get("name"),
+        "icon": cat.get("icon", "📁"),
+        "description": cat.get("description")
+    } for cat in categories_docs]
+
+    groups_export = [{"name": grp.get("name")} for grp in groups_docs]
+
+    scripts_export = []
+    for decoded in decoded_scripts:
+        system = systems_map.get(decoded.get("system_id", ""))
+        category = categories_map.get(system.get("category_id")) if system else None
+
+        group_names = []
+        for gid in decoded.get("group_ids", []) or []:
+            grp = group_map.get(gid)
+            if grp:
+                group_names.append(grp.get("name"))
+
+        processor_version = decoded.get("processor_script_version") or {}
+        processor_comment = processor_version.get("comment") if isinstance(processor_version, dict) else None
+
+        scripts_export.append({
+            "name": decoded.get("name"),
+            "description": decoded.get("description"),
+            "content": decoded.get("content", ""),
+            "processor_script": decoded.get("processor_script"),
+            "processor_script_comment": processor_comment,
+            "has_reference_files": decoded.get("has_reference_files", False),
+            "test_methodology": decoded.get("test_methodology"),
+            "success_criteria": decoded.get("success_criteria"),
+            "non_compliance_criticality_ope": decoded.get("non_compliance_criticality_ope", DEFAULT_NON_COMPLIANCE_CRITICALITY),
+            "non_compliance_criticality_pe": decoded.get("non_compliance_criticality_pe", DEFAULT_NON_COMPLIANCE_CRITICALITY),
+            "order": decoded.get("order", 0),
+            "category_name": category.get("name") if category else "",
+            "category_icon": category.get("icon", "📁") if category else "📁",
+            "system_name": system.get("name") if system else "",
+            "system_os_type": system.get("os_type", "linux") if system else "linux",
+            "group_names": group_names
+        })
+
+    payload = {
+        "version": 1,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "categories": categories_export,
+        "systems": systems_export,
+        "check_groups": groups_export,
+        "scripts": scripts_export
+    }
+
+    filename = f"scripts-export-selected-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
     return JSONResponse(
         content=payload,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
