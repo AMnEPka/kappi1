@@ -35,42 +35,53 @@ const webpackConfig = {
       '@': path.resolve(__dirname, 'src'),
     },
     configure: (webpackConfig) => {
+      const NOISY_SOURCE_MAP_MODULES = ["dompurify", "docx-preview", "xlsx"];
       webpackConfig.ignoreWarnings = [
         ...(webpackConfig.ignoreWarnings || []),
         (warning) => {
           const message = warning?.message || "";
           const file = warning?.file || "";
-          const isSourceMapNoise =
-            typeof message === "string" &&
-            message.includes("Failed to parse source map") &&
-            (message.includes("dompurify") || file.includes("dompurify"));
-          return isSourceMapNoise;
+          if (typeof message !== "string" || !message.includes("Failed to parse source map")) {
+            return false;
+          }
+          return NOISY_SOURCE_MAP_MODULES.some(
+            (name) => message.includes(name) || file.includes(name),
+          );
         },
       ];
 
-      // Silence noisy dompurify sourcemap warnings:
-      // dompurify ships sourcemaps that reference TS sources not present in the package,
-      // which triggers source-map-loader "Failed to parse source map" warnings.
-      // We exclude dompurify from source-map-loader to keep useful sourcemaps elsewhere.
+      // Exclude noisy modules from source-map-loader.
+      // They ship sourcemaps referencing TS sources that are not included in the package,
+      // which triggers "Failed to parse source map" warnings.
       try {
-        const rules = webpackConfig?.module?.rules || [];
-        const oneOf = rules.find((r) => Array.isArray(r.oneOf))?.oneOf;
-        const allRules = Array.isArray(oneOf) ? oneOf : rules;
-        allRules.forEach((rule) => {
-          const uses = rule && rule.use ? (Array.isArray(rule.use) ? rule.use : [rule.use]) : [];
-          const hasSourceMapLoader = uses.some((u) => {
-            const loader = typeof u === "string" ? u : u?.loader;
-            return loader && loader.includes("source-map-loader");
-          });
-          if (!hasSourceMapLoader) return;
+        const excludePatterns = NOISY_SOURCE_MAP_MODULES.map(
+          (name) => new RegExp(`[\\\\/]node_modules[\\\\/]${name}[\\\\/]`),
+        );
 
-          const dompurifyRe = /[\\/]node_modules[\\/]dompurify[\\/]/;
-          if (rule.exclude == null) {
-            rule.exclude = [dompurifyRe];
-            return;
-          }
-          rule.exclude = Array.isArray(rule.exclude) ? [...rule.exclude, dompurifyRe] : [rule.exclude, dompurifyRe];
-        });
+        const visit = (rulesArray) => {
+          if (!Array.isArray(rulesArray)) return;
+          rulesArray.forEach((rule) => {
+            if (!rule) return;
+            if (Array.isArray(rule.oneOf)) visit(rule.oneOf);
+            if (Array.isArray(rule.rules)) visit(rule.rules);
+
+            const uses = rule.use ? (Array.isArray(rule.use) ? rule.use : [rule.use]) : [];
+            const hasSourceMapLoader = uses.some((u) => {
+              const loader = typeof u === "string" ? u : u?.loader;
+              return loader && loader.includes("source-map-loader");
+            });
+            if (!hasSourceMapLoader) return;
+
+            if (rule.exclude == null) {
+              rule.exclude = [...excludePatterns];
+              return;
+            }
+            rule.exclude = Array.isArray(rule.exclude)
+              ? [...rule.exclude, ...excludePatterns]
+              : [rule.exclude, ...excludePatterns];
+          });
+        };
+        visit(webpackConfig?.module?.rules);
       } catch (e) {
         // If webpack internals change, don't break the build.
       }

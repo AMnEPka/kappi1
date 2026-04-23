@@ -151,3 +151,34 @@ html {
   ::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
   }
+
+/* Стили предпросмотра XLSX (результат XLSX.utils.sheet_to_html) */
+.xlsx-preview-host table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 13px;
+  color: #111;
+  background: #fff;
+}
+.xlsx-preview-host th,
+.xlsx-preview-host td {
+  border: 1px solid #d4d4d8;
+  padding: 4px 8px;
+  white-space: nowrap;
+  vertical-align: top;
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xlsx-preview-host thead th,
+.xlsx-preview-host tr:first-child td {
+  background: #f4f4f5;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.xlsx-preview-host tr:nth-child(even) td {
+  background: #fafafa;
+}

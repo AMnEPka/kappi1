@@ -110,11 +110,26 @@ async function downloadIsCatalogFile(api, fileId, filename) {
   window.URL.revokeObjectURL(url);
 }
 
-function canPreviewPdf(fileMeta) {
+function canPreviewFile(fileMeta) {
   if (!fileMeta || typeof fileMeta !== "object") return false;
   const { content_type, filename } = fileMeta;
-  if (content_type === "application/pdf") return true;
-  return (filename || "").toLowerCase().endsWith(".pdf");
+  const name = (filename || "").toLowerCase();
+  if (content_type === "application/pdf" || name.endsWith(".pdf")) return true;
+  if (
+    content_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    name.endsWith(".docx")
+  ) {
+    return true;
+  }
+  if (
+    content_type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    content_type === "application/vnd.ms-excel" ||
+    name.endsWith(".xlsx") ||
+    name.endsWith(".xls")
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export default function IsCatalogPage() {
@@ -696,7 +711,7 @@ export default function IsCatalogPage() {
                                     className="h-5 w-5 shrink-0"
                                     title={val.filename}
                                   />
-                                  {canPreviewPdf(val) && (
+                                  {canPreviewFile(val) && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -1013,7 +1028,7 @@ export default function IsCatalogPage() {
                                 <span className="text-sm truncate max-w-[200px]" title={editForm[f.key].filename}>
                                   {editForm[f.key].filename}
                                 </span>
-                                {canPreviewPdf(editForm[f.key]) && (
+                                {canPreviewFile(editForm[f.key]) && (
                                   <Button
                                     type="button"
                                     variant="outline"
@@ -1109,7 +1124,7 @@ export default function IsCatalogPage() {
                                   filename={val.filename}
                                   className="h-5 w-5"
                                 />
-                                    {canPreviewPdf(val) && (
+                                    {canPreviewFile(val) && (
                                       <Button
                                         type="button"
                                         variant="link"
