@@ -10,11 +10,15 @@ import { api } from "@/config/api";
 const PREVIEW_KIND_PDF = "pdf";
 const PREVIEW_KIND_DOCX = "docx";
 const PREVIEW_KIND_XLSX = "xlsx";
+const PREVIEW_KIND_TEXT = "text";
 const PREVIEW_KIND_NONE = "none";
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const XLS_MIME = "application/vnd.ms-excel";
+
+const TEXT_EXTENSIONS = [".md", ".markdown", ".txt", ".log"];
+const TEXT_MIME_PREFIXES = ["text/"];
 
 const log = (...args) => {
   // eslint-disable-next-line no-console
@@ -27,15 +31,22 @@ const logError = (...args) => {
 
 function detectPreviewKind({ contentType, filename }) {
   const name = (filename || "").toLowerCase();
-  if (contentType === "application/pdf" || name.endsWith(".pdf")) return PREVIEW_KIND_PDF;
-  if (contentType === DOCX_MIME || name.endsWith(".docx")) return PREVIEW_KIND_DOCX;
+  const ct = (contentType || "").toLowerCase();
+  if (ct === "application/pdf" || name.endsWith(".pdf")) return PREVIEW_KIND_PDF;
+  if (ct === DOCX_MIME || name.endsWith(".docx")) return PREVIEW_KIND_DOCX;
   if (
-    contentType === XLSX_MIME ||
-    contentType === XLS_MIME ||
+    ct === XLSX_MIME ||
+    ct === XLS_MIME ||
     name.endsWith(".xlsx") ||
     name.endsWith(".xls")
   ) {
     return PREVIEW_KIND_XLSX;
+  }
+  if (
+    TEXT_MIME_PREFIXES.some((p) => ct.startsWith(p)) ||
+    TEXT_EXTENSIONS.some((ext) => name.endsWith(ext))
+  ) {
+    return PREVIEW_KIND_TEXT;
   }
   return PREVIEW_KIND_NONE;
 }
@@ -73,14 +84,20 @@ async function extractAxiosErrorMessage(err) {
   return fallback;
 }
 
-async function downloadFile(fileId, filename) {
-  const res = await api.get(`/api/is-catalog/files/${encodeURIComponent(fileId)}`, { responseType: "blob" });
-  const url = window.URL.createObjectURL(res.data);
+function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename || fileId;
+  a.download = filename || "file";
+  document.body.appendChild(a);
   a.click();
+  a.remove();
   window.URL.revokeObjectURL(url);
+}
+
+async function downloadFromCatalog(fileId, filename) {
+  const res = await api.get(`/api/is-catalog/files/${encodeURIComponent(fileId)}`, { responseType: "blob" });
+  downloadBlob(res.data, filename || fileId);
 }
 
 async function waitForRef(ref, { timeoutMs = 3000, intervalMs = 50 } = {}) {
@@ -102,6 +119,19 @@ async function blobToArrayBuffer(blob) {
   });
 }
 
+/**
+ * FilePreviewDialog
+ *
+ * Supported sources (in `file` prop):
+ *  - Catalog-backed file:  { file_id, filename, content_type }
+ *      Loads bytes via GET /api/is-catalog/files/{file_id}.
+ *  - In-memory Blob:       { blob: Blob, filename, content_type }
+ *      Uses the Blob as-is, no network call. Useful when we already have
+ *      the file in hand (e.g. right after generating/downloading it).
+ *
+ * Every invocation with a new `file` identity (different `file_id` OR different
+ * Blob reference) retriggers the preview pipeline.
+ */
 export function FilePreviewDialog({ open, onOpenChange, file }) {
   const [loading, setLoading] = useState(false);
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
@@ -112,20 +142,30 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
   const [xlsxActiveSheet, setXlsxActiveSheet] = useState("");
   const [xlsxSheetHtml, setXlsxSheetHtml] = useState("");
 
+  const [textContent, setTextContent] = useState("");
+
   const docxContainerRef = useRef(null);
 
+  const hasSource = !!(file && (file.file_id || file.blob instanceof Blob));
+
   const kind = useMemo(() => {
-    if (!file?.file_id) return PREVIEW_KIND_NONE;
+    if (!hasSource) return PREVIEW_KIND_NONE;
     return detectPreviewKind({ contentType: file.content_type, filename: file.filename });
-  }, [file?.content_type, file?.filename, file?.file_id]);
+  }, [hasSource, file?.content_type, file?.filename]);
 
   useEffect(() => {
-    if (!open || !file?.file_id) return undefined;
+    if (!open || !hasSource) return undefined;
 
-    log("open preview", { file_id: file.file_id, filename: file.filename, content_type: file.content_type, kind });
+    log("open preview", {
+      source: file.blob instanceof Blob ? "blob" : "catalog",
+      file_id: file.file_id,
+      filename: file.filename,
+      content_type: file.content_type,
+      kind,
+    });
 
     if (kind === PREVIEW_KIND_NONE) {
-      setError("Предпросмотр поддерживается только для PDF, DOCX и XLSX.");
+      setError("Предпросмотр поддерживается только для PDF, DOCX, XLSX и текстовых файлов.");
       return undefined;
     }
 
@@ -136,17 +176,23 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
     setXlsxSheetNames([]);
     setXlsxActiveSheet("");
     setXlsxSheetHtml("");
+    setTextContent("");
 
     const load = async () => {
       try {
-        log("fetching blob", `/api/is-catalog/files/${file.file_id}`);
-        const res = await api.get(`/api/is-catalog/files/${encodeURIComponent(file.file_id)}`, {
-          responseType: "blob",
-        });
-        if (cancelled) return;
-
-        const blob = res.data;
-        log("fetched blob", { size: blob?.size, type: blob?.type, isBlob: blob instanceof Blob });
+        let blob;
+        if (file.blob instanceof Blob) {
+          blob = file.blob;
+          log("using in-memory blob", { size: blob?.size, type: blob?.type });
+        } else {
+          log("fetching blob", `/api/is-catalog/files/${file.file_id}`);
+          const res = await api.get(`/api/is-catalog/files/${encodeURIComponent(file.file_id)}`, {
+            responseType: "blob",
+          });
+          if (cancelled) return;
+          blob = res.data;
+          log("fetched blob", { size: blob?.size, type: blob?.type, isBlob: blob instanceof Blob });
+        }
 
         if (kind === PREVIEW_KIND_PDF) {
           const url = window.URL.createObjectURL(blob);
@@ -211,6 +257,18 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
           setXlsxWorkbook(workbook);
           setXlsxSheetNames(sheetNames);
           setXlsxActiveSheet(sheetNames[0]);
+          return;
+        }
+
+        if (kind === PREVIEW_KIND_TEXT) {
+          const text =
+            typeof blob.text === "function"
+              ? await blob.text()
+              : await new Response(blob).text();
+          if (cancelled) return;
+          log("text loaded", { length: text.length });
+          setTextContent(text);
+          return;
         }
       } catch (e) {
         if (cancelled) return;
@@ -229,7 +287,9 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
     return () => {
       cancelled = true;
     };
-  }, [open, file?.file_id, kind]);
+    // Re-run when the dialog opens, when the catalog file_id changes,
+    // or when the in-memory blob reference changes (new export).
+  }, [open, hasSource, file?.file_id, file?.blob, kind]);
 
   useEffect(() => {
     if (!xlsxWorkbook || !xlsxActiveSheet) {
@@ -273,6 +333,7 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
     setXlsxSheetNames([]);
     setXlsxActiveSheet("");
     setXlsxSheetHtml("");
+    setTextContent("");
     setError("");
     setLoading(false);
   }, [open, pdfBlobUrl]);
@@ -285,11 +346,26 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
     onOpenChange?.(nextOpen);
   };
 
+  const handleDownloadClick = () => {
+    if (file?.blob instanceof Blob) {
+      downloadBlob(file.blob, file.filename);
+      return;
+    }
+    if (file?.file_id) {
+      downloadFromCatalog(file.file_id, file.filename).catch((e) => {
+        toast.error(e?.message || "Не удалось скачать файл");
+      });
+    }
+  };
+
+  const canDownload = !!(file && (file.file_id || file.blob instanceof Blob));
+
   const showOverlay =
     loading ||
     !!error ||
     (kind === PREVIEW_KIND_PDF && !pdfBlobUrl) ||
-    (kind === PREVIEW_KIND_XLSX && !xlsxSheetHtml);
+    (kind === PREVIEW_KIND_XLSX && !xlsxSheetHtml) ||
+    (kind === PREVIEW_KIND_TEXT && !textContent);
 
   const renderOverlay = () => {
     if (loading) {
@@ -309,7 +385,7 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
     if (kind === PREVIEW_KIND_NONE) {
       return (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground bg-background/90">
-          Предпросмотр поддерживается только для PDF, DOCX и XLSX
+          Предпросмотр поддерживается только для PDF, DOCX, XLSX и текстовых файлов
         </div>
       );
     }
@@ -364,6 +440,14 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
             </div>
           )}
 
+          {kind === PREVIEW_KIND_TEXT && textContent && !error && (
+            <div className="h-full w-full overflow-auto bg-background">
+              <pre className="m-0 p-4 text-xs leading-relaxed whitespace-pre font-mono text-foreground">
+                {textContent}
+              </pre>
+            </div>
+          )}
+
           {showOverlay && renderOverlay()}
         </div>
 
@@ -371,11 +455,11 @@ export function FilePreviewDialog({ open, onOpenChange, file }) {
           <Button variant="outline" type="button" onClick={() => onOpenChange?.(false)}>
             Закрыть
           </Button>
-          {file?.file_id && (
+          {canDownload && (
             <Button
               type="button"
               variant="secondary"
-              onClick={() => downloadFile(file.file_id, file.filename)}
+              onClick={handleDownloadClick}
               disabled={loading}
             >
               Скачать

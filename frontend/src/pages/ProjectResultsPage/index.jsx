@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Download, BarChart3, FileText } from "lucide-react";
+import { ChevronLeft, FileSpreadsheet, BarChart3, FileText } from "lucide-react";
 import api from "@/config/api";
 import { toast } from "sonner";
 
@@ -13,6 +13,7 @@ import { useProjectResults } from './useProjectResults';
 import ComparisonModal from './ComparisonModal';
 import HostResultsCard from './HostResultsCard';
 import ExecutionDetailsDialog from './ExecutionDetailsDialog';
+import { FilePreviewDialog } from "@/components/is-catalog/FilePreviewDialog";
 
 const getCheckStatusBadge = (execution) => {
   const status = execution.check_status;
@@ -32,6 +33,12 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonMode, setComparisonMode] = useState("last2");
   const [selectedExecution, setSelectedExecution] = useState(null);
+
+  // Inline Excel preview state. Kept in page scope so it can react to session changes.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const lastPreviewSessionRef = useRef(null);
   
   const {
     project,
@@ -49,83 +56,171 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
     getErrorInfo
   } = useProjectResults(projectId);
 
-  const handleExportTerminalMd = useCallback(async () => {
+  // Build the terminal-output markdown for a given session and return
+  // { blob, filename, content_type, session_id }. No download is triggered;
+  // the caller decides how to present the result.
+  const buildTerminalMdBlob = useCallback(async () => {
+    if (!selectedSession) return null;
+
+    const allExecutions = Object.values(groupedExecutions).flat();
+    const uniqueScriptIds = [...new Set(allExecutions.map((e) => e.script_id).filter(Boolean))];
+
+    const scriptsMap = {};
+    if (uniqueScriptIds.length > 0) {
+      const responses = await Promise.all(
+        uniqueScriptIds.map((sid) =>
+          api
+            .get(`/api/scripts/${sid}`)
+            .then((r) => ({ sid, content: r?.data?.content }))
+            .catch(() => ({ sid, content: "" }))
+        )
+      );
+      for (const r of responses) {
+        scriptsMap[r.sid] = typeof r.content === "string" ? r.content : "";
+      }
+    }
+
+    const getHostHeader = (hostId) => {
+      const h = hosts?.[hostId];
+      const name = h?.name || hostId;
+      const ip = h?.hostname || h?.ip_address || "";
+      return ip ? `${name} (${ip})` : name;
+    };
+
+    const hostIds = Object.keys(groupedExecutions);
+
+    let md = `# Экспорт вывода терминала\n\n`;
+    md += `Проект: **${project?.name || "—"}**\n\n`;
+    md += `Сессия: **${selectedSession}**\n\n`;
+
+    for (const hostId of hostIds) {
+      md += `# ${getHostHeader(hostId)}\n\n`;
+      const executions = groupedExecutions[hostId] || [];
+
+      for (const ex of executions) {
+        md += `## ${ex.script_name || ex.script_id || "Проверка"}\n\n`;
+
+        const cmd = scriptsMap[ex.script_id] || "";
+        md += `### Команда\n\n`;
+        md += "```bash\n";
+        md += `${cmd || "—"}\n`;
+        md += "```\n\n";
+
+        md += `### Вывод\n\n`;
+        md += "```text\n";
+        md += `${ex.output || "—"}\n`;
+        md += "```\n\n";
+      }
+    }
+
+    const MD_MIME = "text/markdown;charset=utf-8";
+    const blob = new Blob([md], { type: MD_MIME });
+    const safeName = String(project?.name || "project")
+      .replace(/[\\/:*?"<>|]+/g, "_")
+      .slice(0, 80);
+    const filename = `terminal-export_${safeName}_${new Date().toISOString().slice(0, 10)}.md`;
+
+    return {
+      blob,
+      filename,
+      content_type: MD_MIME,
+      session_id: selectedSession,
+    };
+  }, [groupedExecutions, hosts, project?.name, selectedSession]);
+
+  // One-click flow: build the terminal output markdown and open the preview
+  // dialog. No automatic download — the user saves the file from the dialog.
+  const handleExportTerminalAndPreview = useCallback(async () => {
     if (!selectedSession) {
       toast.error("Выберите запуск для экспорта");
       return;
     }
-
+    if (exporting) return;
+    setExporting(true);
     try {
-      // Collect unique script IDs to fetch commands once
-      const allExecutions = Object.values(groupedExecutions).flat();
-      const uniqueScriptIds = [...new Set(allExecutions.map((e) => e.script_id).filter(Boolean))];
-
-      const scriptsMap = {};
-      if (uniqueScriptIds.length > 0) {
-        const responses = await Promise.all(
-          uniqueScriptIds.map((sid) =>
-            api
-              .get(`/api/scripts/${sid}`)
-              .then((r) => ({ sid, content: r?.data?.content }))
-              .catch(() => ({ sid, content: "" }))
-          )
-        );
-        for (const r of responses) {
-          scriptsMap[r.sid] = typeof r.content === "string" ? r.content : "";
-        }
+      const result = await buildTerminalMdBlob();
+      if (!result?.blob) {
+        toast.error("Не удалось сформировать вывод терминала");
+        return;
       }
-
-      const getHostHeader = (hostId) => {
-        const h = hosts?.[hostId];
-        const name = h?.name || hostId;
-        const ip = h?.hostname || h?.ip_address || "";
-        return ip ? `${name} (${ip})` : name;
-      };
-
-      const hostIds = Object.keys(groupedExecutions);
-
-      let md = `# Экспорт вывода терминала\n\n`;
-      md += `Проект: **${project?.name || "—"}**\n\n`;
-      md += `Сессия: **${selectedSession}**\n\n`;
-
-      for (const hostId of hostIds) {
-        md += `# ${getHostHeader(hostId)}\n\n`;
-        const executions = groupedExecutions[hostId] || [];
-
-        for (const ex of executions) {
-          md += `## ${ex.script_name || ex.script_id || "Проверка"}\n\n`;
-
-          const cmd = scriptsMap[ex.script_id] || "";
-          md += `### Команда\n\n`;
-          md += "```bash\n";
-          md += `${cmd || "—"}\n`;
-          md += "```\n\n";
-
-          md += `### Вывод\n\n`;
-          md += "```text\n";
-          md += `${ex.output || "—"}\n`;
-          md += "```\n\n";
-        }
-      }
-
-      const safeName = String(project?.name || "project")
-        .replace(/[\\/:*?"<>|]+/g, "_")
-        .slice(0, 80);
-      const filename = `terminal-export_${safeName}_${new Date().toISOString().slice(0, 10)}.md`;
-
-      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      setPreviewFile({
+        kind: "md",
+        blob: result.blob,
+        filename: result.filename,
+        content_type: result.content_type,
+        session_id: result.session_id,
+      });
+      lastPreviewSessionRef.current = result.session_id;
+      setPreviewOpen(true);
     } catch (e) {
       toast.error(e?.message || "Не удалось экспортировать вывод терминала");
+    } finally {
+      setExporting(false);
     }
-  }, [groupedExecutions, hosts, project?.name, selectedSession]);
+  }, [selectedSession, exporting, buildTerminalMdBlob]);
+
+  // One-click flow: generate the xlsx and immediately open the preview
+  // dialog. No automatic download — the user saves the file manually
+  // from the dialog if they need a local copy.
+  const handleExportAndPreview = useCallback(async () => {
+    if (!selectedSession) {
+      toast.error("Выберите запуск для экспорта");
+      return;
+    }
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const result = await handleExportToExcel();
+      if (!result?.blob) return;
+      setPreviewFile({
+        kind: "xlsx",
+        blob: result.blob,
+        filename: result.filename,
+        content_type: result.content_type,
+        session_id: result.session_id,
+      });
+      lastPreviewSessionRef.current = result.session_id;
+      setPreviewOpen(true);
+    } finally {
+      setExporting(false);
+    }
+  }, [selectedSession, exporting, handleExportToExcel]);
+
+  // If the user switches to another run while the preview dialog is open,
+  // regenerate the export (xlsx or md — depending on what's currently shown)
+  // for the newly selected session automatically.
+  useEffect(() => {
+    if (!previewOpen || !selectedSession || !previewFile?.kind) return;
+    if (lastPreviewSessionRef.current === selectedSession) return;
+
+    const currentKind = previewFile.kind;
+    let cancelled = false;
+    (async () => {
+      const generator = currentKind === "md" ? buildTerminalMdBlob : handleExportToExcel;
+      const result = await generator();
+      if (cancelled || !result?.blob) return;
+      setPreviewFile({
+        kind: currentKind,
+        blob: result.blob,
+        filename: result.filename,
+        content_type: result.content_type,
+        session_id: result.session_id,
+      });
+      lastPreviewSessionRef.current = result.session_id;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewOpen, selectedSession, previewFile?.kind, handleExportToExcel, buildTerminalMdBlob]);
+
+  const handlePreviewOpenChange = useCallback((nextOpen) => {
+    setPreviewOpen(nextOpen);
+    if (!nextOpen) {
+      setPreviewFile(null);
+      lastPreviewSessionRef.current = null;
+    }
+  }, []);
 
   const handleBack = useCallback(() => {
     const returnTo = searchParams.get('returnTo');
@@ -189,24 +284,28 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
             </div>
             <div className="flex items-center gap-2">
               <Button
-                onClick={handleExportTerminalMd}
-                disabled={!selectedSession}
+                onClick={handleExportTerminalAndPreview}
+                disabled={!selectedSession || exporting}
                 variant="outline"
                 size="sm"
                 className="gap-2"
               >
                 <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Экспорт вывода терминала</span>
+                <span className="hidden sm:inline">
+                  {exporting ? "Формирование..." : "Просмотр вывода терминала"}
+                </span>
               </Button>
               <Button
-                onClick={handleExportToExcel}
-                disabled={!selectedSession}
+                onClick={handleExportAndPreview}
+                disabled={!selectedSession || exporting}
                 variant="outline"
                 size="sm"
                 className="gap-2"
               >
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Экспорт в Excel</span>
+                <FileSpreadsheet className="h-4 w-4" />
+                <span className="hidden sm:inline">
+                  {exporting ? "Формирование..." : "Просмотр протокола (Excel)"}
+                </span>
               </Button>
             </div>
           </CardHeader>
@@ -299,6 +398,13 @@ export default function ProjectResultsPage({ projectId, onNavigate }) {
         getHostName={getHostName}
         getErrorInfo={getErrorInfo}
         getCheckStatusBadge={getCheckStatusBadge}
+      />
+
+      {/* Inline Excel Preview (reuses the just-exported blob; no extra requests) */}
+      <FilePreviewDialog
+        open={previewOpen}
+        onOpenChange={handlePreviewOpenChange}
+        file={previewFile}
       />
     </div>
   );

@@ -5,6 +5,7 @@ API endpoints for exporting data (Excel, etc.).
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from datetime import date
+from typing import List, Optional
 import tempfile
 
 from openpyxl import Workbook  # pyright: ignore[reportMissingModuleSource]
@@ -28,14 +29,15 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
         if not await can_access_project(current_user, project_id):
             raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
     
-    # Get project info
+    # Get project info (single fetch — used for name + system_input_target)
     project = await db.projects.find_one({"id": project_id}, {"_id": 0})
     if not project:
         raise HTTPException(status_code=404, detail="Проект не найден")
 
-    # Получаем имя проекта
-    project_doc = await db.projects.find_one({"id": project_id})
-    project_name = project_doc.get('name') if project_doc else "Неизвестный проект"
+    project_name = project.get('name') or "Неизвестный проект"
+    # ОПЭ / ПЭ — задаётся при создании проекта, определяет, какой столбец
+    # критичности скрипта использовать в протоколе.
+    system_input_target = project.get('system_input_target') or "ОПЭ"
     
     # Get executions for this session
     executions = await db.executions.find(
@@ -98,74 +100,180 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
         "Комментарии",
         "Уровень критичности"
     ]
-    
+
     for col, header in enumerate(headers, 1):
         cell = ws.cell(row=8, column=col, value=header)
         cell.font = header_font
         cell.fill = yellow_fill
         cell.border = thick_border
         cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    
+
+    # Значения, записываемые в столбец F ("Результат испытания").
+    # Формулы СЧЁТЕСЛИ в сводной таблице M3:S8 ищут точно эти строки,
+    # поэтому мы используем "Пройдено" / "Не пройдено" (не "Пройдена"/"Не пройдена").
+    # "Частично" и "Не применимо" оператор проставляет вручную после экспорта
+    # для статусов "Ошибка" / "Оператор".
+    RESULT_PASSED = "Пройдено"
+    RESULT_FAILED = "Не пройдено"
+    # Поле в Script с уровнем критичности для текущего target (ОПЭ/ПЭ)
+    criticality_field = (
+        "non_compliance_criticality_ope"
+        if system_input_target == "ОПЭ"
+        else "non_compliance_criticality_pe"
+    )
+
+    def map_check_status(check_status: Optional[str]) -> str:
+        if check_status == "Пройдена":
+            return RESULT_PASSED
+        if check_status == "Не пройдена":
+            return RESULT_FAILED
+        if check_status == "Оператор":
+            return "Требует участия оператора"
+        # "Ошибка" и всё прочее — оставляем как есть
+        return check_status or "Не определён"
+
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin'),
+    )
+
     # Data rows starting from row 9
     row_num = 9
     for idx, execution_data in enumerate(executions, 1):
         execution = Execution(**parse_from_mongo(execution_data))
-        
+
         # Get script and host info from pre-fetched cache (no N+1 queries)
         script = scripts_cache.get(execution.script_id, {})
         host = hosts_cache.get(execution.host_id, {})
-        
-        # Prepare data
+
         test_methodology = script.get('test_methodology', '') or ''
         success_criteria = script.get('success_criteria', '') or ''
-        
-        # Result mapping
-        result_map = {
-            "Пройдена": "Пройдена",
-            "Не пройдена": "Не пройдена",
-            "Ошибка": "Ошибка",
-            "Оператор": "Требует участия оператора"
-        }
-        result = result_map.get(execution.check_status, execution.check_status or "Не определён")
-        
-        # Add error description to comments if error occurred
-        comments = ""
+
+        result = map_check_status(execution.check_status)
+
+        # "Комментарии": сначала описание ошибки (если есть), затем с новой
+        # строки — информация о хосте и учётной записи (ранее жила в
+        # столбце "Уровень критичности").
+        comment_lines: List[str] = []
         if execution.error_code and execution.error_description:
-            comments = f"Код ошибки: {execution.error_code}. {execution.error_description}"
+            comment_lines.append(
+                f"Код ошибки: {execution.error_code}. {execution.error_description}"
+            )
         elif execution.error:
-            comments = execution.error
-        
-        # Level of criticality column - host and username info
-        host_info = ""
+            comment_lines.append(execution.error)
+
         if host:
             hostname_or_ip = host.get('hostname', 'неизвестно')
             username = host.get('username', 'неизвестно')
-            host_info = f"Испытания проводились на хосте {hostname_or_ip} под учетной записью {username}"
-        
-        # Write row data
+            comment_lines.append(
+                f"Испытания проводились на хосте {hostname_or_ip} "
+                f"под учетной записью {username}"
+            )
+        comments = "\n".join(comment_lines)
+
+        # Уровень критичности берём из скрипта, выбирая столбец согласно
+        # system_input_target проекта (ОПЭ или ПЭ).
+        criticality = script.get(criticality_field) or "Нет"
+
         row_data = [
-            idx,  # № п/п
-            "",   # Реализация требования ИБ (пусто)
-            idx,  # № п/п (дубликат)
-            test_methodology,  # Описание методики
-            success_criteria,  # Критерий успешного прохождения
-            result,  # Результат
-            comments,  # Комментарии (с описанием ошибки, если есть)
-            host_info  # Уровень критичности
+            idx,                # № п/п
+            "",                 # Реализация требования ИБ
+            idx,                # № п/п (дубликат)
+            test_methodology,   # Описание методики
+            success_criteria,   # Критерий успешного прохождения
+            result,             # Результат испытания
+            comments,           # Комментарии (ошибка + хост/пользователь)
+            criticality,        # Уровень критичности проверки (ОПЭ/ПЭ)
         ]
-        
+
         for col, value in enumerate(row_data, 1):
             cell = ws.cell(row=row_num, column=col, value=value)
-            cell.border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
+            cell.border = thin_border
             cell.alignment = Alignment(vertical='top', wrap_text=True)
-        
+
         row_num += 1
-    
+
+    # last_data_row — номер последней строки с данными. Если проверок нет,
+    # используем строку 9, чтобы получить валидный (пустой) диапазон F9:F9
+    # и не захватить заголовок таблицы.
+    last_data_row = row_num - 1 if row_num > 9 else 9
+
+    # ----------------- Сводная таблица (M3:S8) -----------------
+    # Блок 1 (M/N/O): распределение результатов испытаний.
+    # Блок 2 (Q/R/S): разбивка не пройденных по уровню критичности.
+    # "Высокая" в блоке 2 включает и "Высокая (Стоп-фактор)" — поэтому
+    # используется СУММ(СЧЁТЕСЛИМН(...)) по обоим значениям.
+    f_range = f"F9:F{last_data_row}"
+    h_range = f"H9:H{last_data_row}"
+
+    # Ячейки с числами, на которые опираются процентные формулы.
+    # N7 = всего; N8 = всего применимых (N7 - "Не применимо").
+    # Процент в O считаем от N8 ("всего применимых") — это 100%.
+    summary_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    summary_header_font = Font(bold=True)
+    percent_format = "0.0%"
+
+    summary_left = [
+        ("M3", "Пройдено",         f'=COUNTIF({f_range},"Пройдено")',     '=N3/N$8'),
+        ("M4", "Не пройдено",      f'=COUNTIF({f_range},"Не пройдено")',  '=N4/N$8'),
+        ("M5", "Частично",         f'=COUNTIF({f_range},"Частично")',     '=N5/N$8'),
+        ("M6", "Не применимо",     f'=COUNTIF({f_range},"Не применимо")', None),
+        ("M7", "Всего",            f'=COUNTA({f_range})',                 None),
+        ("M8", "Всего применимых", '=N7-N6',                              '=1'),
+    ]
+    for addr, label, n_formula, o_formula in summary_left:
+        row = int(addr[1:])
+        label_cell = ws.cell(row=row, column=13, value=label)  # M
+        label_cell.font = summary_header_font
+        label_cell.fill = summary_fill
+        label_cell.border = thin_border
+        label_cell.alignment = Alignment(horizontal='left', vertical='center')
+
+        n_cell = ws.cell(row=row, column=14, value=n_formula)  # N
+        n_cell.border = thin_border
+        n_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        o_cell = ws.cell(row=row, column=15, value=o_formula)  # O
+        o_cell.border = thin_border
+        o_cell.alignment = Alignment(horizontal='center', vertical='center')
+        if o_formula is not None:
+            o_cell.number_format = percent_format
+
+    # Блок справа (Q/R/S) — "Не пройдено" по уровням критичности.
+    # "Высокая" объединяет "Высокая" и "Высокая (Стоп-фактор)".
+    high_formula = (
+        f'=COUNTIFS({f_range},"Не пройдено",{h_range},"Высокая")'
+        f'+COUNTIFS({f_range},"Не пройдено",{h_range},"Высокая (Стоп-фактор)")'
+    )
+    medium_formula = f'=COUNTIFS({f_range},"Не пройдено",{h_range},"Средняя")'
+    low_formula = f'=COUNTIFS({f_range},"Не пройдено",{h_range},"Низкая")'
+
+    summary_right = [
+        ("Q3", "Высокая", high_formula,   '=R3/N$8'),
+        ("Q4", "Средняя", medium_formula, '=R4/N$8'),
+        ("Q5", "Низкая",  low_formula,    '=R5/N$8'),
+        ("Q6", "Всего",   '=R3+R4+R5',    None),
+    ]
+    for addr, label, r_formula, s_formula in summary_right:
+        row = int(addr[1:])
+        label_cell = ws.cell(row=row, column=17, value=label)  # Q
+        label_cell.font = summary_header_font
+        label_cell.fill = summary_fill
+        label_cell.border = thin_border
+        label_cell.alignment = Alignment(horizontal='left', vertical='center')
+
+        r_cell = ws.cell(row=row, column=18, value=r_formula)  # R
+        r_cell.border = thin_border
+        r_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        s_cell = ws.cell(row=row, column=19, value=s_formula)  # S
+        s_cell.border = thin_border
+        s_cell.alignment = Alignment(horizontal='center', vertical='center')
+        if s_formula is not None:
+            s_cell.number_format = percent_format
+
     # Set column widths
     ws.column_dimensions['A'].width = 8   # № п/п
     ws.column_dimensions['B'].width = 25  # Реализация требования ИБ
@@ -173,9 +281,17 @@ async def export_session_to_excel(project_id: str, session_id: str, current_user
     ws.column_dimensions['D'].width = 35  # Описание методики
     ws.column_dimensions['E'].width = 35  # Критерий успешного прохождения
     ws.column_dimensions['F'].width = 20  # Результат
-    ws.column_dimensions['G'].width = 25  # Комментарии
-    ws.column_dimensions['H'].width = 40  # Уровень критичности
-    
+    ws.column_dimensions['G'].width = 35  # Комментарии (теперь с инфой о хосте)
+    ws.column_dimensions['H'].width = 25  # Уровень критичности
+
+    # Сводная таблица справа
+    ws.column_dimensions['M'].width = 22
+    ws.column_dimensions['N'].width = 10
+    ws.column_dimensions['O'].width = 10
+    ws.column_dimensions['Q'].width = 14
+    ws.column_dimensions['R'].width = 10
+    ws.column_dimensions['S'].width = 10
+
     # Set row heights
     ws.row_dimensions[8].height = 40  # Header row
     

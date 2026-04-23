@@ -209,11 +209,14 @@ export const useProjectResults = (projectId) => {
     return null;
   }, []);
 
-  // Export to Excel
+  // Generate the Excel export for the currently selected session and
+  // return the in-memory blob + metadata. The caller decides what to do
+  // with it (preview, save-as, etc.) — this hook no longer triggers a
+  // browser download on its own.
   const handleExportToExcel = useCallback(async () => {
     if (!selectedSession) {
       toast.error("Выберите сессию для экспорта");
-      return;
+      return null;
     }
 
     try {
@@ -222,19 +225,29 @@ export const useProjectResults = (projectId) => {
         { responseType: 'blob' }
       );
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Протокол_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const rawBlob = response.data;
+      // Normalize MIME so downstream consumers (preview, save-as) behave predictably.
+      const blob =
+        rawBlob instanceof Blob && rawBlob.type === XLSX_MIME
+          ? rawBlob
+          : new Blob([rawBlob], { type: XLSX_MIME });
 
-      toast.success("Excel файл успешно экспортирован");
+      const safeName = String(project?.name || 'project')
+        .replace(/[\\/:*?"<>|]+/g, '_')
+        .slice(0, 80);
+      const filename = `Протокол_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      return {
+        blob,
+        filename,
+        content_type: XLSX_MIME,
+        session_id: selectedSession,
+      };
     } catch (error) {
       console.error('Error exporting to Excel:', error);
       toast.error("Не удалось экспортировать в Excel");
+      return null;
     }
   }, [selectedSession, projectId, project?.name]);
 

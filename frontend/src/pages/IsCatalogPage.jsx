@@ -100,37 +100,9 @@ const FIELD_TYPE_SELECT = "select";
 const SYSTEM_INPUT_TARGET_OPTIONS = ["ОПЭ", "ПЭ"];
 const ACCEPT_FILES = ".doc,.docx,.xls,.xlsx,.pdf";
 
-async function downloadIsCatalogFile(api, fileId, filename) {
-  const res = await api.get(`/api/is-catalog/files/${encodeURIComponent(fileId)}`, { responseType: "blob" });
-  const url = window.URL.createObjectURL(res.data);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename || fileId;
-  a.click();
-  window.URL.revokeObjectURL(url);
-}
-
-function canPreviewFile(fileMeta) {
-  if (!fileMeta || typeof fileMeta !== "object") return false;
-  const { content_type, filename } = fileMeta;
-  const name = (filename || "").toLowerCase();
-  if (content_type === "application/pdf" || name.endsWith(".pdf")) return true;
-  if (
-    content_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    name.endsWith(".docx")
-  ) {
-    return true;
-  }
-  if (
-    content_type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-    content_type === "application/vnd.ms-excel" ||
-    name.endsWith(".xlsx") ||
-    name.endsWith(".xls")
-  ) {
-    return true;
-  }
-  return false;
-}
+// Files live in the shared FilePreviewDialog now — both the preview AND the
+// "Скачать" button are rendered inside the dialog. Page-level download
+// helpers / per-row "Скачать" buttons are intentionally removed.
 
 export default function IsCatalogPage() {
   const navigate = useNavigate();
@@ -711,23 +683,13 @@ export default function IsCatalogPage() {
                                     className="h-5 w-5 shrink-0"
                                     title={val.filename}
                                   />
-                                  {canPreviewFile(val) && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs"
-                                      onClick={() => openFilePreview(val)}
-                                    >
-                                      Просмотр
-                                    </Button>
-                                  )}
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 px-2 text-xs"
-                                    onClick={() => downloadIsCatalogFile(api, val.file_id, val.filename)}
+                                    onClick={() => openFilePreview(val)}
                                   >
-                                    Скачать
+                                    Просмотр
                                   </Button>
                                 </div>
                               </TableCell>
@@ -1028,25 +990,13 @@ export default function IsCatalogPage() {
                                 <span className="text-sm truncate max-w-[200px]" title={editForm[f.key].filename}>
                                   {editForm[f.key].filename}
                                 </span>
-                                {canPreviewFile(editForm[f.key]) && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openFilePreview(editForm[f.key])}
-                                  >
-                                    Просмотр
-                                  </Button>
-                                )}
                                 <Button
                                   type="button"
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
-                                  onClick={() =>
-                                    downloadIsCatalogFile(api, editForm[f.key].file_id, editForm[f.key].filename)
-                                  }
+                                  onClick={() => openFilePreview(editForm[f.key])}
                                 >
-                                  Скачать
+                                  Просмотр
                                 </Button>
                                 <Button
                                   type="button"
@@ -1124,22 +1074,16 @@ export default function IsCatalogPage() {
                                   filename={val.filename}
                                   className="h-5 w-5"
                                 />
-                                    {canPreviewFile(val) && (
-                                      <Button
-                                        type="button"
-                                        variant="link"
-                                        className="h-auto p-0"
-                                        onClick={() => openFilePreview(val)}
-                                      >
-                                        Просмотр
-                                      </Button>
-                                    )}
+                                <span className="text-sm truncate max-w-[220px]" title={val.filename}>
+                                  {val.filename || "—"}
+                                </span>
                                 <Button
+                                  type="button"
                                   variant="link"
                                   className="h-auto p-0"
-                                  onClick={() => downloadIsCatalogFile(api, val.file_id, val.filename)}
+                                  onClick={() => openFilePreview(val)}
                                 >
-                                  {val.filename || "Скачать"}
+                                  Просмотр
                                 </Button>
                               </div>
                             ) : (
