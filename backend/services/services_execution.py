@@ -701,7 +701,40 @@ async def run_processor_on_output(
         actual_data = None
         if reference_data and reference_data.strip() and error_code not in [41, 42]:
             if 'ACTUAL_DATA:' in result.stdout:
-                actual_data = result.stdout.split('ACTUAL_DATA:')[1].split('\n')[0].strip()
+                # Support both single-line and multi-line ACTUAL_DATA blocks.
+                # Contract:
+                # - "ACTUAL_DATA: <value>" (single line), OR
+                # - "ACTUAL_DATA:" then one or more lines of data, until a status line / "exit code:".
+                lines = (result.stdout or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+                start_idx = None
+                first_tail = ""
+                for i, line in enumerate(lines):
+                    if "ACTUAL_DATA:" in line:
+                        start_idx = i
+                        first_tail = line.split("ACTUAL_DATA:", 1)[1].strip()
+                        break
+
+                if start_idx is not None:
+                    block_lines = []
+                    if first_tail:
+                        block_lines.append(first_tail)
+
+                    def _is_block_terminator(s: str) -> bool:
+                        s2 = (s or "").strip().lower()
+                        if not s2:
+                            return False
+                        if s2.startswith("exit code:"):
+                            return True
+                        if s2 in {"пройдена", "не пройдена", "ошибка", "оператор"}:
+                            return True
+                        return False
+
+                    for j in range(start_idx + 1, len(lines)):
+                        if _is_block_terminator(lines[j]):
+                            break
+                        block_lines.append(lines[j].rstrip())
+
+                    actual_data = "\n".join(block_lines).strip() or None
             else:
                 import re as re_module
                 ref_items = []
