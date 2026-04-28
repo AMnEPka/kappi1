@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileCode, Edit, Trash2 } from "lucide-react";
+import { FileCode, Edit, Info, Trash2 } from "lucide-react";
 import { usePermissions } from '@/hooks/usePermissions';
 
 export default function ScriptsTable({ 
@@ -44,25 +44,7 @@ export default function ScriptsTable({
               </div>
             )}
           </td>
-          <td className="py-1 px-4 text-sm text-slate-500">
-            {script.description ? (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="truncate cursor-help text-left">
-                      {script.description}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <div className="text-sm">{script.description}</div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : (
-              "-"
-            )}
-          </td>
-          <td className="py-1 px-4 text-sm text-slate-500">
+          <td className="py-1 px-2 text-sm text-slate-500">
             {scriptGroups.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {scriptGroups.map(group => (
@@ -79,15 +61,32 @@ export default function ScriptsTable({
               <span className="text-slate-400 text-sm">-</span>
             )}
           </td>
-          <td className="py-1 px-4">
-            <div className="flex gap-1">
+          <td className="py-1 px-1">
+            <div className="flex gap-0.5">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={`inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-slate-100 cursor-help ${
+                        script.description ? 'text-slate-500' : 'text-slate-300'
+                      }`}
+                      tabIndex={0}
+                    >
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <div className="text-sm">{script.description || "Описание отсутствует"}</div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               {canEditScript(script) && (
-                <Button variant="ghost" size="icon" onClick={() => onEdit(script)}>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(script)}>
                   <Edit className="text-black-600" />
                 </Button>
               )}
               {canDeleteScript(script) && (
-                <Button variant="ghost" size="icon" onClick={() => onDelete(script.id)}>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(script.id)}>
                   <Trash2 className="text-red-600" />
                 </Button>
               )}
@@ -112,19 +111,17 @@ export default function ScriptsTable({
     <div className="overflow-hidden">
       <table className="w-full border-collapse table-fixed">
         <colgroup>
-          <col className="w-[20%]"/>
-          <col className="w-[20%]"/>
+          <col className="w-[55%]"/>
           <col className="w-[25%]"/>
-          <col className="w-[20%]"/>
-          <col className="w-[15%]"/>
+          <col className="w-[10%]"/>
+          <col className="w-[10%]"/>
         </colgroup>
         <thead>
           <tr className="border-b border-slate-200">
             <th className="text-left py-1 px-4 text-slate-600 font-medium">Название</th>
             <th className="text-left py-1 px-4 text-slate-600 font-medium">Категория</th>
-            <th className="text-left py-1 px-4 text-slate-600 font-medium">Описание</th>
-            <th className="text-left py-1 px-4 text-slate-600 font-medium">Группы</th>
-            <th className="text-left py-1 px-4 text-slate-600 font-medium">Действия</th>
+            <th className="text-left py-1 px-2 text-slate-600 font-medium">Группы</th>
+            <th className="text-left py-1 px-1 text-slate-600 font-medium">Действия</th>
           </tr>
         </thead>
         <tbody>
