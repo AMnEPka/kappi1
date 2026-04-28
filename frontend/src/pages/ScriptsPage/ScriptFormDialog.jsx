@@ -8,7 +8,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, CheckCircle2, Loader2, History } from "lucide-react";
-import { AdvancedCodeEditor } from "@/components/ui/advanced-code-editor";
+import { ScriptCodeEditor } from "@/components/ui/script-code-editor";
 import { useAuth } from '@/contexts/AuthContext';
 
 const NON_COMPLIANCE_CRITICALITY_OPTIONS = [
@@ -108,7 +108,7 @@ fi`;
   }, [setFormData]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent
         className={[
           "max-w-6xl w-[min(96vw,72rem)] p-0 overflow-hidden",
@@ -117,7 +117,6 @@ fi`;
           "flex flex-col",
           "[&>button.absolute]:hidden",
         ].join(" ")}
-        modal={false}
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b bg-background px-6 py-4">
           <div className="min-w-0">
@@ -367,7 +366,7 @@ fi`;
                     )}
                   </div>
                 </div>
-                <AdvancedCodeEditor
+                <ScriptCodeEditor
                   value={formData.processor_script}
                   onChange={(e) => handleFormChange('processor_script', e.target.value)}
                   placeholder={getPlaceholder}

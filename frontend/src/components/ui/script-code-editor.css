@@ -1,0 +1,156 @@
+.script-code-editor {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--background));
+}
+
+.script-code-editor:focus-within {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.15);
+}
+
+.script-code-editor-fullscreen {
+  position: fixed;
+  top: var(--app-header-height, 4rem);
+  right: 0;
+  bottom: 0;
+  left: var(--app-sidebar-width, 16rem);
+  z-index: 1100;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  pointer-events: auto;
+  isolation: isolate;
+}
+
+.script-code-editor-overlay {
+  position: fixed;
+  top: var(--app-header-height, 4rem);
+  right: 0;
+  bottom: 0;
+  left: var(--app-sidebar-width, 16rem);
+  z-index: 1099;
+  background: rgb(0 0 0 / 0.45);
+  pointer-events: auto;
+}
+
+.script-code-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  height: 45px;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.5);
+  z-index: 2;
+}
+
+.script-code-editor-title,
+.script-code-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.script-code-editor-title {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.script-code-editor-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+
+.script-code-editor-button:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.script-code-editor-exit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.script-code-editor-exit-button:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.script-code-editor-button-close:hover {
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+
+.script-code-editor .cm-editor {
+  flex: 1;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: "Roboto Mono", Consolas, Monaco, "Courier New", monospace;
+  font-size: 0.875rem;
+  pointer-events: auto;
+}
+
+.script-code-editor .cm-scroller {
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.script-code-editor .cm-gutters {
+  border-right: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.45);
+  color: hsl(var(--muted-foreground));
+}
+
+.script-code-editor .cm-activeLine,
+.script-code-editor .cm-activeLineGutter {
+  background: hsl(var(--muted) / 0.55);
+}
+
+.script-code-editor .cm-focused {
+  outline: none;
+}
+
+.script-code-editor .cm-content {
+  min-height: 100%;
+  padding: 0.625rem 0;
+}
+
+.script-code-editor .cm-line {
+  padding: 0 0.75rem;
+}
+
+.script-code-editor .cm-placeholder {
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+.script-code-editor .cm-selectionBackground,
+.script-code-editor .cm-focused .cm-selectionBackground {
+  background: hsl(var(--primary) / 0.22);
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Server, 
@@ -45,6 +45,11 @@ export const MainLayout = ({ children }) => {
   };
 
   const sidebarWidth = isSidebarExpanded ? 'md3-main-content-sidebar-expanded' : 'md3-main-content-sidebar-collapsed';
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--app-header-height', '4rem');
+    document.documentElement.style.setProperty('--app-sidebar-width', isSidebarExpanded ? '16rem' : '5rem');
+  }, [isSidebarExpanded]);
 
   return (
     <div className="md3-layout">
