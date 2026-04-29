@@ -7,7 +7,8 @@ const SelectNative = React.forwardRef(({ className, children, ...props }, ref) =
     <select
       ref={ref}
       className={cn(
-        "w-full h-10 appearance-none rounded-md border border-input bg-background px-3 py-2 text-sm",
+        "w-full h-10 appearance-none rounded-md border border-input bg-background pl-4 pr-10 py-2 text-sm",
+        "[&>option]:px-3 [&>option]:py-2",
         "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className

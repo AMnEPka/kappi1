@@ -6,6 +6,8 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 import hashlib
 import traceback
+import base64
+import gzip
 
 from config.config_init import db, logger
 from models.content_models import Script, ScriptCreate, ScriptUpdate, Category, System, CheckGroup
@@ -46,7 +48,9 @@ class ScriptImportPayload(BaseModel):
     name: str
     description: Optional[str] = None
     content: str
+    content_encoding: Optional[str] = None
     processor_script: Optional[str] = None
+    processor_script_encoding: Optional[str] = None
     processor_script_comment: Optional[str] = None
     has_reference_files: bool = False
     test_methodology: Optional[str] = None
@@ -72,6 +76,66 @@ class ScriptsImportRequest(BaseModel):
     systems: List[SystemImportPayload] = Field(default_factory=list)
     check_groups: List[CheckGroupImportPayload] = Field(default_factory=list)
     scripts: List[ScriptImportPayload]
+
+
+def _encode_transport_field(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    compressed = gzip.compress(value.encode("utf-8"))
+    return base64.b64encode(compressed).decode("ascii")
+
+
+def _decode_transport_field(
+    value: Optional[str],
+    encoding: Optional[str],
+    field_name: str,
+) -> Optional[str]:
+    if value is None:
+        return None
+    if not encoding:
+        return value
+    if encoding != "gzip+base64":
+        raise HTTPException(status_code=400, detail=f"Неподдерживаемая кодировка поля '{field_name}': {encoding}")
+
+    try:
+        compressed = base64.b64decode(value.encode("ascii"), validate=True)
+        return gzip.decompress(compressed).decode("utf-8")
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"Некорректные данные в поле '{field_name}' для кодировки gzip+base64")
+
+
+def _build_export_script_item(decoded: dict, system: Optional[dict], category: Optional[dict], group_names: List[str], encoded: bool) -> dict:
+    processor_version = decoded.get("processor_script_version") or {}
+    processor_comment = processor_version.get("comment") if isinstance(processor_version, dict) else None
+    content_value = decoded.get("content", "")
+    processor_value = decoded.get("processor_script")
+
+    payload = {
+        "name": decoded.get("name"),
+        "description": decoded.get("description"),
+        "content": content_value,
+        "processor_script": processor_value,
+        "processor_script_comment": processor_comment,
+        "has_reference_files": decoded.get("has_reference_files", False),
+        "test_methodology": decoded.get("test_methodology"),
+        "success_criteria": decoded.get("success_criteria"),
+        "non_compliance_criticality_ope": decoded.get("non_compliance_criticality_ope", DEFAULT_NON_COMPLIANCE_CRITICALITY),
+        "non_compliance_criticality_pe": decoded.get("non_compliance_criticality_pe", DEFAULT_NON_COMPLIANCE_CRITICALITY),
+        "order": decoded.get("order", 0),
+        "category_name": category.get("name") if category else "",
+        "category_icon": category.get("icon", "📁") if category else "📁",
+        "system_name": system.get("name") if system else "",
+        "system_os_type": system.get("os_type", "linux") if system else "linux",
+        "group_names": group_names,
+    }
+
+    if encoded:
+        payload["content"] = _encode_transport_field(content_value) or ""
+        payload["content_encoding"] = "gzip+base64"
+        payload["processor_script"] = _encode_transport_field(processor_value)
+        payload["processor_script_encoding"] = "gzip+base64" if processor_value is not None else None
+
+    return payload
 
 
 @router.post("/systems/{system_id}/scripts", response_model=Script)
@@ -536,7 +600,10 @@ async def rollback_processor_script_version(
 
 
 @router.get("/scripts/export/all")
-async def export_all_scripts(current_user: User = Depends(get_current_user)):
+async def export_all_scripts(
+    encoded: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+):
     """Export all checks with categories, systems and groups (bulk export)"""
     if not (await has_permission(current_user, 'checks_edit_all') or await has_permission(current_user, 'checks_create')):
         raise HTTPException(status_code=403, detail="Недостаточно прав для экспорта проверок")
@@ -583,30 +650,10 @@ async def export_all_scripts(current_user: User = Depends(get_current_user)):
             if grp:
                 group_names.append(grp.get("name"))
 
-        processor_version = decoded.get("processor_script_version") or {}
-        processor_comment = processor_version.get("comment") if isinstance(processor_version, dict) else None
-        
-        scripts_export.append({
-            "name": decoded.get("name"),
-            "description": decoded.get("description"),
-            "content": decoded.get("content", ""),
-            "processor_script": decoded.get("processor_script"),
-            "processor_script_comment": processor_comment,
-            "has_reference_files": decoded.get("has_reference_files", False),
-            "test_methodology": decoded.get("test_methodology"),
-            "success_criteria": decoded.get("success_criteria"),
-            "non_compliance_criticality_ope": decoded.get("non_compliance_criticality_ope", DEFAULT_NON_COMPLIANCE_CRITICALITY),
-            "non_compliance_criticality_pe": decoded.get("non_compliance_criticality_pe", DEFAULT_NON_COMPLIANCE_CRITICALITY),
-            "order": decoded.get("order", 0),
-            "category_name": category.get("name") if category else "",
-            "category_icon": category.get("icon", "📁") if category else "📁",
-            "system_name": system.get("name") if system else "",
-            "system_os_type": system.get("os_type", "linux") if system else "linux",
-            "group_names": group_names
-        })
+        scripts_export.append(_build_export_script_item(decoded, system, category, group_names, encoded))
     
     payload = {
-        "version": 1,
+        "version": 2 if encoded else 1,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "categories": categories_export,
         "systems": systems_export,
@@ -614,7 +661,8 @@ async def export_all_scripts(current_user: User = Depends(get_current_user)):
         "scripts": scripts_export
     }
     
-    filename = f"scripts-export-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
+    suffix = "encoded" if encoded else "plain"
+    filename = f"scripts-export-{suffix}-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
     
     return JSONResponse(
         content=payload,
@@ -625,6 +673,7 @@ async def export_all_scripts(current_user: User = Depends(get_current_user)):
 @router.post("/scripts/export/selected")
 async def export_selected_scripts(
     body: ScriptsExportSelectedPayload,
+    encoded: bool = Query(False),
     current_user: User = Depends(get_current_user),
 ):
     """Export only selected checks (by script ids), with required categories/systems/groups."""
@@ -704,30 +753,10 @@ async def export_selected_scripts(
             if grp:
                 group_names.append(grp.get("name"))
 
-        processor_version = decoded.get("processor_script_version") or {}
-        processor_comment = processor_version.get("comment") if isinstance(processor_version, dict) else None
-
-        scripts_export.append({
-            "name": decoded.get("name"),
-            "description": decoded.get("description"),
-            "content": decoded.get("content", ""),
-            "processor_script": decoded.get("processor_script"),
-            "processor_script_comment": processor_comment,
-            "has_reference_files": decoded.get("has_reference_files", False),
-            "test_methodology": decoded.get("test_methodology"),
-            "success_criteria": decoded.get("success_criteria"),
-            "non_compliance_criticality_ope": decoded.get("non_compliance_criticality_ope", DEFAULT_NON_COMPLIANCE_CRITICALITY),
-            "non_compliance_criticality_pe": decoded.get("non_compliance_criticality_pe", DEFAULT_NON_COMPLIANCE_CRITICALITY),
-            "order": decoded.get("order", 0),
-            "category_name": category.get("name") if category else "",
-            "category_icon": category.get("icon", "📁") if category else "📁",
-            "system_name": system.get("name") if system else "",
-            "system_os_type": system.get("os_type", "linux") if system else "linux",
-            "group_names": group_names
-        })
+        scripts_export.append(_build_export_script_item(decoded, system, category, group_names, encoded))
 
     payload = {
-        "version": 1,
+        "version": 2 if encoded else 1,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "categories": categories_export,
         "systems": systems_export,
@@ -735,7 +764,8 @@ async def export_selected_scripts(
         "scripts": scripts_export
     }
 
-    filename = f"scripts-export-selected-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
+    suffix = "encoded" if encoded else "plain"
+    filename = f"scripts-export-selected-{suffix}-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
     return JSONResponse(
         content=payload,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -809,6 +839,12 @@ async def import_scripts(
         created = {"categories": 0, "systems": 0, "check_groups": 0, "scripts": 0}
         
         for idx, script in enumerate(payload.scripts, start=1):
+            decoded_content = _decode_transport_field(script.content, script.content_encoding, "content")
+            decoded_processor_script = _decode_transport_field(
+                script.processor_script,
+                script.processor_script_encoding,
+                "processor_script",
+            )
             script_fingerprint = hashlib.sha256(
                 f"{script.name}|{script.category_name}|{script.system_name}".encode("utf-8")
             ).hexdigest()[:12]
@@ -921,8 +957,8 @@ async def import_scripts(
                 system_id=system.get("id"),
                 name=script.name,
                 description=script.description,
-                content=script.content,
-                processor_script=script.processor_script,
+                content=decoded_content or "",
+                processor_script=decoded_processor_script,
                 processor_script_comment=script.processor_script_comment or "Импортированная версия",
                 has_reference_files=script.has_reference_files,
                 test_methodology=script.test_methodology,

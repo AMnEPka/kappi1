@@ -13,6 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CircleHelp } from "lucide-react";
 
 // Local components
 import { useScriptsData } from './useScriptsData';
@@ -67,6 +70,7 @@ export default function ScriptsPage() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportQuery, setExportQuery] = useState("");
   const [exportSelectedIds, setExportSelectedIds] = useState(() => new Set());
+  const [exportFormat, setExportFormat] = useState("encoded");
 
   // Submit handler
   const handleSubmit = useCallback(async (e) => {
@@ -209,6 +213,7 @@ export default function ScriptsPage() {
     const next = new Set(filteredScriptsForExport.map((s) => s.id).filter(Boolean));
     setExportSelectedIds(next);
     setExportQuery("");
+    setExportFormat("encoded");
     setExportDialogOpen(true);
   }, [filteredScriptsForExport]);
 
@@ -245,15 +250,16 @@ export default function ScriptsPage() {
     }
     setIsExporting(true);
     try {
+      const encoded = exportFormat === "encoded";
       const response = await api.post(
-        '/api/scripts/export/selected',
+        `/api/scripts/export/selected?encoded=${encoded}`,
         { script_ids: ids },
         { responseType: 'blob' }
       );
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `scripts-export-${new Date().toISOString().split('T')[0]}.json`);
+      link.setAttribute('download', `scripts-export-${encoded ? 'encoded' : 'plain'}-${new Date().toISOString().split('T')[0]}.json`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -265,7 +271,7 @@ export default function ScriptsPage() {
     } finally {
       setIsExporting(false);
     }
-  }, [isExporting, exportSelectedIds]);
+  }, [isExporting, exportSelectedIds, exportFormat]);
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -501,6 +507,41 @@ export default function ScriptsPage() {
               </div>
               <div className="text-sm text-muted-foreground">
                 Выбрано: {exportSelectedIds.size} / {scripts.length}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-end">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Label>Формат экспорта</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Подсказка по формату экспорта"
+                        >
+                          <CircleHelp className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p>
+                          v2 рекомендуется для сетей с контент-фильтрацией (DPI/WAF), где plain-скрипты могут блокироваться.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Select value={exportFormat} onValueChange={setExportFormat}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите формат экспорта" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="plain">Оригинальный (v1)</SelectItem>
+                    <SelectItem value="encoded">Кодированный content/processor_script (v2)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
