@@ -1,22 +1,28 @@
 import React, { useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileCode, Edit, Info, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, FileCode, Edit, Info, Trash2 } from "lucide-react";
 import { usePermissions } from '@/hooks/usePermissions';
 
 export default function ScriptsTable({ 
   scripts, 
   checkGroups, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onMove,
+  isReordering = false,
+  showReorderControls = false,
 }) {
   const { canEditScript, canDeleteScript } = usePermissions();
 
   const rows = useMemo(() => (
-    scripts.map((script) => {
+    scripts.map((script, index) => {
       const scriptGroups = checkGroups.filter(group => 
         script.group_ids?.includes(group.id)
       );
+      const canEdit = canEditScript(script);
+      const isFirst = index === 0;
+      const isLast = index === scripts.length - 1;
       
       return (
         <tr 
@@ -80,7 +86,31 @@ export default function ScriptsTable({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {canEditScript(script) && (
+              {showReorderControls && canEdit && onMove && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onMove(script.id, "up")}
+                    disabled={isFirst || isReordering}
+                    title="Переместить выше"
+                  >
+                    <ArrowUp className="h-4 w-4 text-slate-600" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onMove(script.id, "down")}
+                    disabled={isLast || isReordering}
+                    title="Переместить ниже"
+                  >
+                    <ArrowDown className="h-4 w-4 text-slate-600" />
+                  </Button>
+                </>
+              )}
+              {canEdit && (
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(script)}>
                   <Edit className="text-black-600" />
                 </Button>
@@ -95,7 +125,7 @@ export default function ScriptsTable({
         </tr>
       );
     })
-  ), [scripts, checkGroups, canEditScript, canDeleteScript, onEdit, onDelete]);
+  ), [scripts, checkGroups, canEditScript, canDeleteScript, onEdit, onDelete, onMove, isReordering, showReorderControls]);
 
   if (scripts.length === 0) {
     return (
@@ -111,10 +141,10 @@ export default function ScriptsTable({
     <div className="overflow-hidden">
       <table className="w-full border-collapse table-fixed">
         <colgroup>
-          <col className="w-[55%]"/>
-          <col className="w-[25%]"/>
+          <col className={showReorderControls ? "w-[50%]" : "w-[55%]"}/>
+          <col className={showReorderControls ? "w-[24%]" : "w-[25%]"}/>
           <col className="w-[10%]"/>
-          <col className="w-[10%]"/>
+          <col className={showReorderControls ? "w-[16%]" : "w-[10%]"}/>
         </colgroup>
         <thead>
           <tr className="border-b border-slate-200">

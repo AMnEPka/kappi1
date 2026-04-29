@@ -69,6 +69,15 @@ class ScriptsExportSelectedPayload(BaseModel):
     script_ids: List[str] = Field(default_factory=list)
 
 
+class ScriptOrderPayload(BaseModel):
+    id: str
+    order: int
+
+
+class ScriptsReorderPayload(BaseModel):
+    script_orders: List[ScriptOrderPayload] = Field(default_factory=list)
+
+
 class ScriptsImportRequest(BaseModel):
     """Payload for importing checks with dependencies"""
     version: int = 1
@@ -248,6 +257,54 @@ async def get_scripts(system_id: Optional[str] = None, category_id: Optional[str
         enriched_scripts.append(script_data)
     
     return enriched_scripts
+
+
+@router.put("/scripts/reorder")
+async def reorder_scripts(
+    body: ScriptsReorderPayload,
+    current_user: User = Depends(get_current_user),
+):
+    """Update display order for checks in bulk."""
+    script_orders = body.script_orders or []
+    if not script_orders:
+        raise HTTPException(status_code=400, detail="Нет данных для изменения порядка")
+    if len(script_orders) > 10000:
+        raise HTTPException(status_code=400, detail="Слишком много проверок для изменения порядка")
+
+    script_ids = [item.id for item in script_orders if item.id]
+    if len(script_ids) != len(script_orders):
+        raise HTTPException(status_code=400, detail="Некорректный список проверок")
+
+    unique_ids = list(dict.fromkeys(script_ids))
+    if len(unique_ids) != len(script_ids):
+        raise HTTPException(status_code=400, detail="Список проверок содержит дубликаты")
+
+    can_edit_all = await has_permission(current_user, "checks_edit_all")
+    can_edit_own = await has_permission(current_user, "checks_edit_own")
+    if not (can_edit_all or can_edit_own):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для изменения порядка проверок")
+
+    scripts_docs = await db.scripts.find({"id": {"$in": unique_ids}}).to_list(len(unique_ids))
+    scripts_by_id = {doc.get("id"): doc for doc in scripts_docs}
+    missing_ids = [script_id for script_id in unique_ids if script_id not in scripts_by_id]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail="Некоторые проверки не найдены")
+
+    if not can_edit_all:
+        forbidden = [
+            script_id for script_id, doc in scripts_by_id.items()
+            if doc.get("created_by") != current_user.id
+        ]
+        if forbidden:
+            raise HTTPException(status_code=403, detail="Нет доступа к изменению порядка некоторых проверок")
+
+    for item in script_orders:
+        await db.scripts.update_one(
+            {"id": item.id},
+            {"$set": {"order": item.order}},
+        )
+
+    return {"message": "Порядок проверок обновлен"}
 
 
 @router.get("/scripts/{script_id}", response_model=Script)

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectNative } from "@/components/ui/select-native";
-import { Plus, Upload, Download } from "lucide-react";
+import { Pencil, Plus, Upload, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api } from '@/config/api';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -65,6 +65,8 @@ export default function ScriptsPage() {
   const [isCheckingSyntax, setIsCheckingSyntax] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
+  const [isOrderEditMode, setIsOrderEditMode] = useState(false);
   const fileInputRef = useRef(null);
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -190,6 +192,35 @@ export default function ScriptsPage() {
       }));
     }
   }, [editingScript?.id, fetchScripts, setFormData]);
+
+  const handleMoveScript = useCallback(async (scriptId, direction) => {
+    if (isReordering) return;
+
+    const currentIndex = scripts.findIndex((script) => script.id === scriptId);
+    if (currentIndex === -1) return;
+
+    const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (nextIndex < 0 || nextIndex >= scripts.length) return;
+
+    const reordered = [...scripts];
+    [reordered[currentIndex], reordered[nextIndex]] = [reordered[nextIndex], reordered[currentIndex]];
+
+    setIsReordering(true);
+    try {
+      await api.put('/api/scripts/reorder', {
+        script_orders: reordered.map((script, index) => ({
+          id: script.id,
+          order: index,
+        })),
+      });
+      await fetchScripts();
+      toast.success("Порядок проверок обновлен");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Ошибка изменения порядка проверок");
+    } finally {
+      setIsReordering(false);
+    }
+  }, [isReordering, scripts, fetchScripts]);
 
   const filteredScriptsForExport = useMemo(() => {
     const q = exportQuery.trim().toLowerCase();
@@ -350,6 +381,14 @@ export default function ScriptsPage() {
               >
                 <Download className="mr-2 h-4 w-4" /> {isImporting ? "Импорт..." : "Импорт"}
               </Button>
+              <Button
+                variant={isOrderEditMode ? "default" : "outline"}
+                onClick={() => setIsOrderEditMode((prev) => !prev)}
+                disabled={isReordering}
+                title="Редактировать порядок отображения проверок"
+              >
+                <Pencil className="mr-2 h-4 w-4" /> Порядок
+              </Button>
             </>
           )}
           {canCreateScript() && (
@@ -413,6 +452,9 @@ export default function ScriptsPage() {
         checkGroups={checkGroups}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onMove={handleMoveScript}
+        isReordering={isReordering}
+        showReorderControls={isOrderEditMode}
       />
 
       {/* Form dialog */}
